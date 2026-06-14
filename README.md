@@ -111,3 +111,36 @@ Zustand で `player` / `equipped` / `inventory` / `currentEnemy` / `currentFloor
 localStorage には `player` / 装備ID / 所持品ID / `currentFloor` を保存します。
 装備は **ID のみ**を保存し、読み込み時に `data/items.ts` から復元するため、
 出目変化のロジック（関数的データ）も安全にシリアライズできます。
+
+---
+
+## Claude Code Skill
+
+このリポジトリには、Claude Code でこのゲームを開発する際の作業指針をまとめた
+Skill を同梱しています。
+
+- 場所: `.claude/skills/mobile-dice-hackslash/SKILL.md`
+- Skill 名: `mobile-dice-hackslash`
+
+### 使い方
+
+Claude Code をこのリポジトリで起動すると、Skill は自動的に読み込まれます。
+明示的に呼び出したい場合は、チャットで次のように入力します。
+
+```
+/mobile-dice-hackslash
+```
+
+この Skill は、機能追加・バグ修正・UI/バランス調整を行う際に、以下を守らせます。
+
+- Next.js App Router / TypeScript / Tailwind / Zustand 前提で実装する
+- スマホ縦画面UIを最優先する
+- 戦闘中の操作は「リロール」「決定」の2ボタン中心を維持する
+- **装備でダイス面を書き換える**ゲーム設計を壊さない
+- 1 Issue = 1 PR、`main` へ直接 push しない
+- `npm run build` が通るまで修正する（型エラー0が完了条件）
+- PR 作成後、CI 通過で自動マージする前提
+- 既存仕様を壊さず、小さく実装する
+
+ファイル早見表やPR前チェックリストも Skill 内に含まれているため、
+「どこを触ればよいか」をすぐ把握できます。
