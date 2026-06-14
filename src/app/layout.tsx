@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import AudioController from "@/components/AudioController";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body>
+        <AudioController />
         <div className="app-shell">{children}</div>
       </body>
     </html>

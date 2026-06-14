@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import SoundToggle from "@/components/SoundToggle";
 import { isFeatureUnlocked, FEATURE_UNLOCKS } from "@/data/unlocks";
 import { useGameStore } from "@/store/gameStore";
 
@@ -27,6 +28,9 @@ export default function TitlePage() {
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6 text-center">
+      <div className="absolute right-3 top-3">
+        <SoundToggle />
+      </div>
       <div>
         <h1 className="text-4xl font-black tracking-tight">
           🎲 ダイス
