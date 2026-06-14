@@ -23,6 +23,7 @@ import {
   EQUIP_SLOTS,
   expForLevel,
   luckFloor,
+  resolveBossTurn,
   resolveEnemyTurn,
   resolvePlayerAction,
   tickBuffs,
@@ -410,11 +411,49 @@ export const useGameStore = create<GameState>((set, get) => {
         weakenAmount = action.weaken;
         weakenTurns = WEAKEN_TURNS;
       }
+      // Boss gimmick state.
+      let enraged = enemy.enraged ?? false;
+      let charging = enemy.charging ?? false;
+      let chargeCounter = enemy.chargeCounter ?? 0;
+      // Enrage when a boss drops to half HP.
+      if (enemy.isBoss && !enraged && enemyHp <= enemy.maxHp / 2) {
+        enraged = true;
+        log = pushLogs(log, [{ text: `${enemy.name} が激昂した！ 攻撃力が上がった`, tone: "bad" }]);
+      }
+
+      const decayWeaken = () => {
+        if (weakenTurns > 0) {
+          weakenTurns -= 1;
+          if (weakenTurns === 0) weakenAmount = 0;
+        }
+      };
+
       if (stunTurns > 0) {
         stunTurns -= 1;
         log = pushLogs(log, [{ text: `${enemy.name} はスタンして動けない！`, tone: "good" }]);
+      } else if (enemy.isBoss) {
+        // Boss-specific gimmick turn (enrage + charge cycle + heal).
+        const turn = resolveBossTurn({ ...enemy, enraged, weakenAmount, weakenTurns }, stats, action.guard);
+        if (turn.enemyHeal > 0) enemyHp = Math.min(enemy.maxHp, enemyHp + turn.enemyHeal);
+        charging = turn.charging;
+        chargeCounter = turn.chargeCounter;
+        decayWeaken();
+        playerHp -= turn.playerDamage;
+        log = pushLogs(log, turn.logs.map((text) => ({ text, tone: "bad" as const })));
+
+        if (playerHp <= 0) {
+          const lost = finishDefeat(
+            { ...state, player: { ...state.player, hp: 0 } },
+            log,
+            { ...enemy, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns, enraged, charging, chargeCounter },
+            enemyHp,
+          );
+          set(lost);
+          persistFromSnapshot(lost);
+          return;
+        }
       } else {
-        // Special ability or normal attack (weaken reduces its attack).
+        // Normal enemy: special ability or attack (weaken reduces its attack).
         const turn = resolveEnemyTurn({ ...enemy, weakenAmount, weakenTurns }, stats, action.guard);
         if (turn.enemyHeal > 0) {
           enemyHp = Math.min(enemy.maxHp, enemyHp + turn.enemyHeal);
@@ -426,10 +465,7 @@ export const useGameStore = create<GameState>((set, get) => {
           bonusDefenseTurns -= 1;
           if (bonusDefenseTurns === 0) bonusDefense = 0;
         }
-        if (weakenTurns > 0) {
-          weakenTurns -= 1;
-          if (weakenTurns === 0) weakenAmount = 0;
-        }
+        decayWeaken();
         playerHp -= turn.playerDamage;
         log = pushLogs(log, turn.logs.map((text) => ({ text, tone: "bad" as const })));
 
@@ -437,7 +473,7 @@ export const useGameStore = create<GameState>((set, get) => {
           const lost = finishDefeat(
             { ...state, player: { ...state.player, hp: 0 } },
             log,
-            { ...enemy, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns },
+            { ...enemy, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns, enraged, charging, chargeCounter },
             enemyHp,
           );
           set(lost);
@@ -448,7 +484,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
       // Next turn: fresh roll + rerolls.
       set({
-        currentEnemy: { ...enemy, hp: enemyHp, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns },
+        currentEnemy: { ...enemy, hp: enemyHp, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns, enraged, charging, chargeCounter },
         player: { ...state.player, hp: playerHp },
         diceValue: rollWithLuck(),
         rerollsLeft: stats.rerolls,

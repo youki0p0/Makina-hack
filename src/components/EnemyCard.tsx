@@ -76,8 +76,20 @@ export default function EnemyCard() {
       {(statuses.length > 0 ||
         (enemy.stunTurns ?? 0) > 0 ||
         (enemy.bonusDefenseTurns ?? 0) > 0 ||
-        (enemy.weakenTurns ?? 0) > 0) && (
+        (enemy.weakenTurns ?? 0) > 0 ||
+        enemy.charging ||
+        enemy.enraged) && (
         <div className="mt-2 flex flex-wrap justify-center gap-1 text-[10px]">
+          {enemy.charging && (
+            <span className="rounded-full bg-red-600/30 px-2 py-0.5 font-bold text-red-300 animate-pulse">
+              ⚠️ 大技チャージ中
+            </span>
+          )}
+          {enemy.enraged && (
+            <span className="rounded-full bg-rose-600/30 px-2 py-0.5 font-bold text-rose-300">
+              😡 激昂
+            </span>
+          )}
           {(enemy.stunTurns ?? 0) > 0 && (
             <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 font-bold text-yellow-300">
               ⚡ スタン ({enemy.stunTurns}T)
