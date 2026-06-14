@@ -1,0 +1,48 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect } from "react";
+import EquipmentPanel from "@/components/EquipmentPanel";
+import InventoryList from "@/components/InventoryList";
+import PlayerStatus from "@/components/PlayerStatus";
+import { useGameStore } from "@/store/gameStore";
+
+export default function InventoryPage() {
+  const hydrate = useGameStore((s) => s.hydrate);
+  const hydrated = useGameStore((s) => s.hydrated);
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
+  if (!hydrated) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center text-gray-500">
+        読み込み中…
+      </main>
+    );
+  }
+
+  return (
+    <main className="flex min-h-dvh flex-col gap-4 p-3">
+      <div className="flex items-center justify-between">
+        <Link
+          href="/"
+          className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
+        >
+          ← タイトル
+        </Link>
+        <Link
+          href="/battle"
+          className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white active:scale-95"
+        >
+          戦闘へ →
+        </Link>
+      </div>
+
+      <PlayerStatus />
+      <EquipmentPanel />
+      <InventoryList />
+    </main>
+  );
+}

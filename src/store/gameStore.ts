@@ -1,0 +1,409 @@
+"use client";
+
+import { create } from "zustand";
+import { generateEnemy } from "@/data/enemies";
+import { getItemById } from "@/data/items";
+import {
+  applyExp,
+  computeStats,
+  EQUIP_SLOTS,
+  expForLevel,
+  resolveEnemyAttack,
+  resolvePlayerAction,
+} from "@/lib/battle";
+import { applyEquipmentModifiers, rollDice } from "@/lib/dice";
+import { rollLoot } from "@/lib/loot";
+import { clearSave, loadGame, saveGame } from "@/lib/save";
+import type {
+  BattleLogEntry,
+  BattleResult,
+  BattleState,
+  ComputedStats,
+  DiceFace,
+  DiceValue,
+  Enemy,
+  Equipment,
+  EquippedItems,
+  Player,
+} from "@/types/game";
+import { faceByValue } from "@/data/diceFaces";
+
+const LOG_LIMIT = 14;
+
+function createPlayer(): Player {
+  return {
+    level: 1,
+    exp: 0,
+    expToNext: expForLevel(1),
+    maxHp: 50,
+    hp: 50,
+    baseAttack: 8,
+    baseDefense: 2,
+    gold: 0,
+  };
+}
+
+function emptyEquipped(): EquippedItems {
+  return { weapon: null, armor: null, accessory: null };
+}
+
+interface GameState {
+  hydrated: boolean;
+  player: Player;
+  equipped: EquippedItems;
+  inventory: Equipment[];
+  currentEnemy: Enemy | null;
+  currentFloor: number;
+  battleState: BattleState;
+  diceValue: DiceValue;
+  diceFaces: DiceFace[];
+  rerollsLeft: number;
+  battleLog: BattleLogEntry[];
+  lastResult: BattleResult | null;
+
+  // selectors
+  stats: () => ComputedStats;
+  currentFace: () => DiceFace;
+
+  // lifecycle
+  hydrate: () => void;
+  newGame: () => void;
+
+  // battle
+  startBattle: () => void;
+  reroll: () => void;
+  confirm: () => void;
+
+  // equipment
+  equipItem: (itemIndex: number) => void;
+  unequipItem: (slot: keyof EquippedItems) => void;
+}
+
+let logCounter = 0;
+
+export const useGameStore = create<GameState>((set, get) => {
+  function persist(): void {
+    const s = get();
+    saveGame({
+      player: s.player,
+      equipped: s.equipped,
+      inventory: s.inventory,
+      currentFloor: s.currentFloor,
+    });
+  }
+
+  function pushLogs(
+    base: BattleLogEntry[],
+    entries: { text: string; tone: BattleLogEntry["tone"] }[],
+  ): BattleLogEntry[] {
+    const next = [...base];
+    for (const e of entries) {
+      next.push({ id: ++logCounter, text: e.text, tone: e.tone });
+    }
+    return next.slice(-LOG_LIMIT);
+  }
+
+  function refreshFaces(): DiceFace[] {
+    const { equipped } = get();
+    return applyEquipmentModifiers([
+      equipped.weapon,
+      equipped.armor,
+      equipped.accessory,
+    ]);
+  }
+
+  return {
+    hydrated: false,
+    player: createPlayer(),
+    equipped: emptyEquipped(),
+    inventory: [],
+    currentEnemy: null,
+    currentFloor: 1,
+    battleState: "idle",
+    diceValue: 1,
+    diceFaces: [],
+    rerollsLeft: 1,
+    battleLog: [],
+    lastResult: null,
+
+    stats: () => computeStats(get().player, get().equipped),
+    currentFace: () => faceByValue(get().diceFaces, get().diceValue),
+
+    hydrate: () => {
+      if (get().hydrated) return;
+      const loaded = loadGame();
+      if (loaded) {
+        set({
+          player: loaded.player,
+          equipped: loaded.equipped,
+          inventory: loaded.inventory,
+          currentFloor: loaded.currentFloor,
+          hydrated: true,
+        });
+      } else {
+        // Fresh save: start with a humble weapon already equipped.
+        const starter = getItemById("rusty_sword");
+        set({
+          player: createPlayer(),
+          equipped: { ...emptyEquipped(), weapon: starter },
+          inventory: [],
+          currentFloor: 1,
+          hydrated: true,
+        });
+        persist();
+      }
+      set({ diceFaces: refreshFaces() });
+    },
+
+    newGame: () => {
+      clearSave();
+      const starter = getItemById("rusty_sword");
+      set({
+        player: createPlayer(),
+        equipped: { ...emptyEquipped(), weapon: starter },
+        inventory: [],
+        currentFloor: 1,
+        currentEnemy: null,
+        battleState: "idle",
+        battleLog: [],
+        lastResult: null,
+        hydrated: true,
+      });
+      set({ diceFaces: refreshFaces() });
+      persist();
+    },
+
+    startBattle: () => {
+      const { currentFloor, player } = get();
+      const stats = computeStats(player, get().equipped);
+      const enemy = generateEnemy(currentFloor);
+      // Heal a little between fights so runs are survivable but not free.
+      const healed = Math.min(stats.maxHp, player.hp + Math.round(stats.maxHp * 0.15));
+      set({
+        currentEnemy: enemy,
+        battleState: "player",
+        diceFaces: refreshFaces(),
+        diceValue: rollDice(),
+        rerollsLeft: stats.rerolls,
+        lastResult: null,
+        player: { ...player, hp: healed },
+        battleLog: pushLogs([], [
+          { text: `${currentFloor}階 — ${enemy.name} が現れた！`, tone: "neutral" },
+        ]),
+      });
+    },
+
+    reroll: () => {
+      const { rerollsLeft, battleState } = get();
+      if (battleState !== "player" || rerollsLeft <= 0) return;
+      set({
+        diceValue: rollDice(),
+        rerollsLeft: rerollsLeft - 1,
+      });
+    },
+
+    confirm: () => {
+      const state = get();
+      if (state.battleState !== "player" || !state.currentEnemy) return;
+
+      const stats = computeStats(state.player, state.equipped);
+      const face = faceByValue(state.diceFaces, state.diceValue);
+      const enemy = state.currentEnemy;
+
+      const action = resolvePlayerAction(face, stats, enemy);
+
+      let enemyHp = enemy.hp - action.enemyDamage;
+      let playerHp = state.player.hp - action.selfDamage + action.heal;
+      playerHp = Math.min(stats.maxHp, playerHp);
+
+      let log = pushLogs(
+        state.battleLog,
+        action.logs.map((text) => ({ text, tone: "good" as const })),
+      );
+
+      // Enemy defeated?
+      if (enemyHp <= 0) {
+        const updatedEnemy = { ...enemy, hp: 0 };
+        log = pushLogs(log, [{ text: `${enemy.name} を倒した！`, tone: "good" }]);
+        const result = finishVictory(state, log, playerHp, updatedEnemy);
+        set(result);
+        persistFromSnapshot(result);
+        return;
+      }
+
+      // Self-damage could kill the player.
+      if (playerHp <= 0) {
+        const lost = finishDefeat(state, log, enemy, enemyHp);
+        set(lost);
+        persistFromSnapshot(lost);
+        return;
+      }
+
+      // Enemy retaliates.
+      const enemyAtk = resolveEnemyAttack(enemy, stats, action.guard);
+      playerHp -= enemyAtk.damage;
+      log = pushLogs(log, [{ text: enemyAtk.log, tone: "bad" }]);
+
+      if (playerHp <= 0) {
+        const lost = finishDefeat(
+          { ...state, player: { ...state.player, hp: 0 } },
+          log,
+          enemy,
+          enemyHp,
+        );
+        set(lost);
+        persistFromSnapshot(lost);
+        return;
+      }
+
+      // Next turn: fresh roll + rerolls.
+      set({
+        currentEnemy: { ...enemy, hp: enemyHp },
+        player: { ...state.player, hp: playerHp },
+        diceValue: rollDice(),
+        rerollsLeft: stats.rerolls,
+        battleLog: log,
+      });
+    },
+
+    equipItem: (itemIndex: number) => {
+      const state = get();
+      const item = state.inventory[itemIndex];
+      if (!item) return;
+
+      const slot = item.slot;
+      const previously = state.equipped[slot];
+
+      const inventory = state.inventory.filter((_, i) => i !== itemIndex);
+      if (previously) inventory.push(previously);
+
+      const equipped: EquippedItems = { ...state.equipped, [slot]: item };
+
+      // Re-clamp hp to the new computed max.
+      const stats = computeStats(state.player, equipped);
+      const player = { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) };
+
+      set({
+        equipped,
+        inventory,
+        player,
+        diceFaces: applyEquipmentModifiers([equipped.weapon, equipped.armor, equipped.accessory]),
+      });
+      persist();
+    },
+
+    unequipItem: (slot: keyof EquippedItems) => {
+      const state = get();
+      const item = state.equipped[slot];
+      if (!item) return;
+      const equipped: EquippedItems = { ...state.equipped, [slot]: null };
+      const inventory = [...state.inventory, item];
+      const stats = computeStats(state.player, equipped);
+      const player = { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) };
+      set({
+        equipped,
+        inventory,
+        player,
+        diceFaces: applyEquipmentModifiers([equipped.weapon, equipped.armor, equipped.accessory]),
+      });
+      persist();
+    },
+  };
+
+  // ===== victory / defeat helpers (closures over set/get not needed) =====
+
+  type Snapshot = Partial<GameState>;
+
+  function finishVictory(
+    state: GameState,
+    log: BattleLogEntry[],
+    playerHp: number,
+    enemy: Enemy,
+  ): Snapshot {
+    const expGained = enemy.exp;
+    const goldGained = enemy.gold;
+    const drop = rollLoot(enemy, state.currentFloor);
+
+    const withHp: Player = { ...state.player, hp: playerHp, gold: state.player.gold + goldGained };
+    const { player: leveled, leveledUp } = applyExp(withHp, expGained);
+
+    let finalLog = pushLogs(log, [
+      { text: `EXP +${expGained} / ゴールド +${goldGained}`, tone: "good" },
+    ]);
+    if (leveledUp) {
+      finalLog = pushLogs(finalLog, [
+        { text: `レベルアップ！ Lv${leveled.level} (全回復)`, tone: "good" },
+      ]);
+    }
+    const inventory = drop ? [...state.inventory, drop] : state.inventory;
+    if (drop) {
+      finalLog = pushLogs(finalLog, [{ text: `${drop.name} を手に入れた！`, tone: "good" }]);
+    }
+
+    const result: BattleResult = {
+      victory: true,
+      expGained,
+      goldGained,
+      goldLost: 0,
+      drop,
+      leveledUp,
+    };
+
+    return {
+      player: leveled,
+      inventory,
+      currentEnemy: enemy,
+      currentFloor: state.currentFloor + 1,
+      battleState: "won",
+      battleLog: finalLog,
+      lastResult: result,
+    };
+  }
+
+  function finishDefeat(
+    state: GameState,
+    log: BattleLogEntry[],
+    enemy: Enemy,
+    enemyHp: number,
+  ): Snapshot {
+    const goldLost = Math.round(state.player.gold * 0.3);
+    const player: Player = {
+      ...state.player,
+      hp: 0,
+      gold: state.player.gold - goldLost,
+    };
+
+    const result: BattleResult = {
+      victory: false,
+      expGained: 0,
+      goldGained: 0,
+      goldLost,
+      drop: null,
+      leveledUp: false,
+    };
+
+    const finalLog = pushLogs(log, [
+      { text: `力尽きた… ゴールド -${goldLost}`, tone: "bad" },
+      { text: "ダンジョンの最初に戻される。", tone: "bad" },
+    ]);
+
+    return {
+      player,
+      currentEnemy: { ...enemy, hp: Math.max(0, enemyHp) },
+      currentFloor: 1,
+      battleState: "lost",
+      battleLog: finalLog,
+      lastResult: result,
+    };
+  }
+
+  function persistFromSnapshot(snap: Snapshot): void {
+    const s = get();
+    saveGame({
+      player: snap.player ?? s.player,
+      equipped: snap.equipped ?? s.equipped,
+      inventory: snap.inventory ?? s.inventory,
+      currentFloor: snap.currentFloor ?? s.currentFloor,
+    });
+  }
+});
