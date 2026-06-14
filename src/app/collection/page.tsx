@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ACHIEVEMENTS, achievedCount } from "@/data/achievements";
-import { BOSS_TEMPLATE, ENEMY_TEMPLATES } from "@/data/enemies";
+import { BOSS_TEMPLATE, ENEMY_ABILITY_LABEL, ENEMY_TEMPLATES } from "@/data/enemies";
 import { ITEMS } from "@/data/items";
 import { TITLES, isTitleUnlocked } from "@/data/titles";
 import { rarityLabel, rarityStyle } from "@/lib/ui";
@@ -120,18 +120,32 @@ export default function CollectionPage() {
       )}
 
       {tab === "enemies" && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-2">
+          <p className="text-xs text-gray-400">
+            撃破 {enemies.filter((e) => progress.defeatedEnemies.includes(e.id)).length} / {enemies.length}
+          </p>
           {enemies.map((e) => {
             const found = progress.defeatedEnemies.includes(e.id);
             return (
               <div
                 key={e.id}
-                className={`rounded-xl border p-2 text-center ${
+                className={`flex items-center gap-3 rounded-xl border p-2 ${
                   found ? "border-white/15 bg-black/30" : "border-white/10 bg-black/20 opacity-70"
                 }`}
               >
                 <div className="text-3xl">{found ? e.emoji : "❓"}</div>
-                <p className="text-xs font-bold">{found ? e.name : "???"}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold">
+                    {found ? e.name : "???"}
+                    {found && e.ability && (
+                      <span className="ml-2 text-[10px] text-rose-300">
+                        {ENEMY_ABILITY_LABEL[e.ability]}
+                      </span>
+                    )}
+                    {found && e.isBoss && <span className="ml-1 text-[10px] text-red-400">BOSS</span>}
+                  </p>
+                  <p className="text-[10px] text-gray-400">{found ? e.desc : "未発見の敵"}</p>
+                </div>
               </div>
             );
           })}
