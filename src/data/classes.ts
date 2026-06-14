@@ -1,4 +1,4 @@
-import type { ClassId, DiceModifier, StatBonus } from "@/types/game";
+import type { ClassId, DiceModifier, Progress, StatBonus } from "@/types/game";
 
 export interface CharacterClass {
   id: ClassId;
@@ -9,6 +9,10 @@ export interface CharacterClass {
   statMods: StatBonus;
   /** Dice rewrites applied BEFORE equipment (equipment can override). */
   diceModifiers: DiceModifier[];
+  /** Unlock condition (omit = always available). */
+  unlock?: (p: Progress) => boolean;
+  /** Hint shown while the class is locked. */
+  unlockHint?: string;
 }
 
 /**
@@ -64,6 +68,8 @@ export const CLASSES: readonly CharacterClass[] = [
     name: "魔法使い",
     icon: "🔮",
     description: "一撃特化。6が強力な火球、防御は脆い。",
+    unlock: (p) => p.maxFloor >= 3,
+    unlockHint: "3階に到達で解放",
     statMods: { attack: 3, defense: -1, maxHp: -5, reroll: 0 },
     diceModifiers: [
       {
@@ -84,6 +90,8 @@ export const CLASSES: readonly CharacterClass[] = [
     name: "狂戦士",
     icon: "🪓",
     description: "ハイリスク。5〜6で大ダメージ、1〜2で自傷。",
+    unlock: (p) => p.kills >= 15,
+    unlockHint: "敵を15体撃破で解放",
     statMods: { attack: 4, defense: -2, maxHp: 0, reroll: 0 },
     diceModifiers: [
       {
@@ -105,6 +113,8 @@ export const CLASSES: readonly CharacterClass[] = [
     name: "聖騎士",
     icon: "✝️",
     description: "粘り強い。3以下でガード、4以上で与ダメ回復。",
+    unlock: (p) => p.bossKills >= 1,
+    unlockHint: "ボスを1体撃破で解放",
     statMods: { attack: 0, defense: 2, maxHp: 12, reroll: 0 },
     diceModifiers: [
       {
@@ -124,6 +134,8 @@ export const CLASSES: readonly CharacterClass[] = [
     name: "呪術師",
     icon: "🪄",
     description: "弱体特化。3〜4で敵を弱体化、6で大火球。",
+    unlock: (p) => p.maxFloor >= 6,
+    unlockHint: "6階に到達で解放",
     statMods: { attack: 1, defense: 0, maxHp: 0, reroll: 0 },
     diceModifiers: [
       {
@@ -156,4 +168,11 @@ export function normalizeClassId(id?: ClassId): ClassId {
 
 export function classStatBonus(id: ClassId): StatBonus {
   return getClass(id).statMods;
+}
+
+/** Whether a class is unlocked for the given progress (no unlock = always). */
+export function isClassUnlocked(id: ClassId, progress: Progress): boolean {
+  const cls = CLASS_MAP.get(id);
+  if (!cls || !cls.unlock) return true;
+  return cls.unlock(progress);
 }
