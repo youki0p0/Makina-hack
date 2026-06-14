@@ -4,12 +4,14 @@ import { create } from "zustand";
 import { generateEnemy } from "@/data/enemies";
 import { getItemById } from "@/data/items";
 import {
+  addStatus,
   applyExp,
   computeStats,
   EQUIP_SLOTS,
   expForLevel,
   resolveEnemyAttack,
   resolvePlayerAction,
+  tickEnemyStatuses,
 } from "@/lib/battle";
 import { applyEquipmentModifiers, rollDice } from "@/lib/dice";
 import { rollLoot } from "@/lib/loot";
@@ -221,7 +223,7 @@ export const useGameStore = create<GameState>((set, get) => {
         action.logs.map((text) => ({ text, tone: "good" as const })),
       );
 
-      // Enemy defeated?
+      // 1) Enemy defeated by the player's attack?
       if (enemyHp <= 0) {
         const updatedEnemy = { ...enemy, hp: 0 };
         log = pushLogs(log, [{ text: `${enemy.name} を倒した！`, tone: "good" }]);
@@ -231,7 +233,7 @@ export const useGameStore = create<GameState>((set, get) => {
         return;
       }
 
-      // Self-damage could kill the player.
+      // 2) Self-damage could kill the player.
       if (playerHp <= 0) {
         const lost = finishDefeat(state, log, enemy, enemyHp);
         set(lost);
@@ -239,7 +241,30 @@ export const useGameStore = create<GameState>((set, get) => {
         return;
       }
 
-      // Enemy retaliates.
+      // 3) Resolve existing status-over-time on the enemy (ignores defense).
+      const tick = tickEnemyStatuses(enemy);
+      let statuses = tick.statuses;
+      if (tick.damage > 0) {
+        enemyHp -= tick.damage;
+        log = pushLogs(log, tick.logs.map((text) => ({ text, tone: "good" as const })));
+      }
+
+      // 4) Enemy finished off by status damage → victory without retaliation.
+      if (enemyHp <= 0) {
+        const updatedEnemy = { ...enemy, hp: 0, statuses };
+        log = pushLogs(log, [{ text: `${enemy.name} は力尽きた！`, tone: "good" }]);
+        const result = finishVictory(state, log, playerHp, updatedEnemy);
+        set(result);
+        persistFromSnapshot(result);
+        return;
+      }
+
+      // 5) Apply the status freshly inflicted this turn (ticks from next turn).
+      if (action.status) {
+        statuses = addStatus(statuses, action.status);
+      }
+
+      // 6) Enemy retaliates.
       const enemyAtk = resolveEnemyAttack(enemy, stats, action.guard);
       playerHp -= enemyAtk.damage;
       log = pushLogs(log, [{ text: enemyAtk.log, tone: "bad" }]);
@@ -248,7 +273,7 @@ export const useGameStore = create<GameState>((set, get) => {
         const lost = finishDefeat(
           { ...state, player: { ...state.player, hp: 0 } },
           log,
-          enemy,
+          { ...enemy, statuses },
           enemyHp,
         );
         set(lost);
@@ -258,7 +283,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
       // Next turn: fresh roll + rerolls.
       set({
-        currentEnemy: { ...enemy, hp: enemyHp },
+        currentEnemy: { ...enemy, hp: enemyHp, statuses },
         player: { ...state.player, hp: playerHp },
         diceValue: rollDice(),
         rerollsLeft: stats.rerolls,

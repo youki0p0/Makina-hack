@@ -21,6 +21,29 @@ export type DiceKind =
   | "defend"
   | "selfDamage";
 
+/** Continuous status the dice can inflict on the enemy. */
+export type StatusKind = "poison" | "burn";
+
+/**
+ * A status-over-time the face applies to the enemy when confirmed.
+ * Equipment declares this on a face via diceModifiers.
+ */
+export interface StatusEffect {
+  kind: StatusKind;
+  /** Per-turn damage as a fraction (0-1) of the player's attack at apply time. */
+  damagePerTurnMultiplier: number;
+  /** How many enemy turns it lasts. */
+  turns: number;
+}
+
+/** A status currently active on the enemy (damage frozen at apply time). */
+export interface ActiveStatus {
+  kind: StatusKind;
+  /** Flat per-turn damage, ignores defense. */
+  damagePerTurn: number;
+  remainingTurns: number;
+}
+
 /**
  * Resolved numeric behavior of a single dice face.
  * Equipment modifiers merge into this object to "rewrite" what a face does.
@@ -39,6 +62,8 @@ export interface DiceFaceEffect {
   extraHits: number;
   /** True if the face misses entirely. */
   isMiss: boolean;
+  /** Status-over-time inflicted on the enemy when this face is confirmed. */
+  statusEffect?: StatusEffect;
 }
 
 /**
@@ -134,6 +159,8 @@ export interface Enemy {
   gold: number;
   dropRate: number;
   isBoss: boolean;
+  /** Active status-over-time effects (poison/burn). */
+  statuses: ActiveStatus[];
 }
 
 // ===== Battle =====

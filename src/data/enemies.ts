@@ -96,6 +96,7 @@ export function generateEnemy(floor: number): Enemy {
     gold,
     dropRate: template.dropRate,
     isBoss: template.isBoss,
+    statuses: [],
   };
 }
 

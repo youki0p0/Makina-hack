@@ -59,5 +59,6 @@ function mergeEffect(
     lifestealPct: patch.lifestealPct ?? base.lifestealPct,
     extraHits: patch.extraHits ?? base.extraHits,
     isMiss: patch.isMiss ?? base.isMiss,
+    statusEffect: patch.statusEffect ?? base.statusEffect,
   };
 }

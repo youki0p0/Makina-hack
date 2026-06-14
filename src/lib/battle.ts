@@ -1,9 +1,12 @@
 import type {
+  ActiveStatus,
   ComputedStats,
   DiceFace,
   Enemy,
   EquippedItems,
   Player,
+  StatusEffect,
+  StatusKind,
 } from "@/types/game";
 
 const BASE_REROLLS = 1;
@@ -44,6 +47,22 @@ export interface PlayerActionOutcome {
   guard: number;
   hits: number;
   logs: string[];
+  /** Status to apply to the enemy this turn (null if none). */
+  status: ActiveStatus | null;
+}
+
+export const STATUS_LABEL: Record<StatusKind, string> = {
+  poison: "毒",
+  burn: "燃焼",
+};
+
+/** Build a concrete ActiveStatus from a face's StatusEffect at the current attack. */
+function buildStatus(effect: StatusEffect, attack: number): ActiveStatus {
+  return {
+    kind: effect.kind,
+    damagePerTurn: Math.max(1, Math.round(attack * effect.damagePerTurnMultiplier)),
+    remainingTurns: effect.turns,
+  };
 }
 
 /**
@@ -66,6 +85,7 @@ export function resolvePlayerAction(
       guard: 0,
       hits: 0,
       logs: ["攻撃を外した！"],
+      status: null,
     };
   }
 
@@ -97,7 +117,41 @@ export function resolvePlayerAction(
     logs.push(`ガード態勢 (防御+${guard})`);
   }
 
-  return { enemyDamage, selfDamage, heal, guard, hits, logs };
+  const status = e.statusEffect ? buildStatus(e.statusEffect, stats.attack) : null;
+  if (status) {
+    logs.push(`${STATUS_LABEL[status.kind]}を付与！ (${status.damagePerTurn}/T × ${status.remainingTurns}T)`);
+  }
+
+  return { enemyDamage, selfDamage, heal, guard, hits, logs, status };
+}
+
+export interface StatusTickResult {
+  damage: number;
+  statuses: ActiveStatus[];
+  logs: string[];
+}
+
+/**
+ * Resolve one turn of the enemy's status-over-time effects.
+ * Deals defense-ignoring damage and decrements remaining turns.
+ */
+export function tickEnemyStatuses(enemy: Enemy): StatusTickResult {
+  let damage = 0;
+  const logs: string[] = [];
+  const next: ActiveStatus[] = [];
+  for (const s of enemy.statuses ?? []) {
+    damage += s.damagePerTurn;
+    logs.push(`${enemy.name} は${STATUS_LABEL[s.kind]}で ${s.damagePerTurn} ダメージ`);
+    if (s.remainingTurns - 1 > 0) {
+      next.push({ ...s, remainingTurns: s.remainingTurns - 1 });
+    }
+  }
+  return { damage, statuses: next, logs };
+}
+
+/** Append a freshly applied status to the enemy's existing stack. */
+export function addStatus(statuses: ActiveStatus[], status: ActiveStatus): ActiveStatus[] {
+  return [...statuses, status];
 }
 
 /** Enemy attack damage after the player's guard for this turn. */
