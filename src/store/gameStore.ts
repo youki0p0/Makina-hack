@@ -142,6 +142,8 @@ interface GameState {
   difficulty: Difficulty;
   /** Preferred hand for the action buttons. */
   handedness: "right" | "left";
+  /** Highest reached 50-floor checkpoint; defeat restarts here. */
+  checkpoint: number;
   /** Items for sale at the current shop floor (not persisted). */
   shopStock: ShopEntry[];
 
@@ -220,6 +222,7 @@ export const useGameStore = create<GameState>((set, get) => {
       titleId: s.titleId,
       difficulty: s.difficulty,
       handedness: s.handedness,
+      checkpoint: s.checkpoint,
     });
   }
 
@@ -298,6 +301,7 @@ export const useGameStore = create<GameState>((set, get) => {
       titleId: loaded.titleId,
       difficulty: normalizeDifficulty(loaded.difficulty),
       handedness: loaded.handedness,
+      checkpoint: loaded.checkpoint,
       hydrated: true,
       currentEnemy: null,
       battleState: "idle",
@@ -337,6 +341,7 @@ export const useGameStore = create<GameState>((set, get) => {
     titleId: "",
     difficulty: "normal",
     handedness: "right",
+    checkpoint: 1,
     shopStock: [],
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
@@ -391,6 +396,7 @@ export const useGameStore = create<GameState>((set, get) => {
         titleId: "",
         difficulty: get().difficulty,
         handedness: get().handedness,
+        checkpoint: 1,
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -872,6 +878,7 @@ export const useGameStore = create<GameState>((set, get) => {
         // Rebirth returns you to the base class.
         classId: DEFAULT_CLASS_ID,
         winStreak: 0,
+        checkpoint: 1,
         progress: {
           ...state.progress,
           rebirths: state.progress.rebirths + 1,
@@ -1004,6 +1011,14 @@ export const useGameStore = create<GameState>((set, get) => {
     };
 
     const newFloor = state.currentFloor + 1;
+    // Reaching a 50-floor mark sets a checkpoint to restart from on defeat.
+    let checkpoint = state.checkpoint;
+    if (newFloor % 50 === 0 && newFloor > checkpoint) {
+      checkpoint = newFloor;
+      finalLog = pushLogs(finalLog, [
+        { text: `💾 セーブポイント到達！(${newFloor}階) 以降の敗北はここから再開`, tone: "good" },
+      ]);
+    }
     const progress: Progress = {
       ...state.progress,
       kills: state.progress.kills + 1,
@@ -1027,6 +1042,7 @@ export const useGameStore = create<GameState>((set, get) => {
       activeBuffs: buffs,
       winStreak,
       progress,
+      checkpoint,
     };
   }
 
@@ -1056,15 +1072,19 @@ export const useGameStore = create<GameState>((set, get) => {
       streakBonusPct: 0,
     };
 
+    const restart = state.checkpoint > 1 ? state.checkpoint : 1;
     const finalLog = pushLogs(log, [
       { text: `力尽きた… ゴールド -${goldLost}`, tone: "bad" },
-      { text: "ダンジョンの最初に戻される。", tone: "bad" },
+      {
+        text: restart > 1 ? `セーブポイント(${restart}階)から再開する。` : "ダンジョンの最初に戻される。",
+        tone: "bad",
+      },
     ]);
 
     return {
       player,
       currentEnemy: { ...enemy, hp: Math.max(0, enemyHp) },
-      currentFloor: 1,
+      currentFloor: restart,
       battleState: "lost",
       battleLog: finalLog,
       lastResult: result,
@@ -1092,6 +1112,7 @@ export const useGameStore = create<GameState>((set, get) => {
       titleId: snap.titleId ?? s.titleId,
       difficulty: snap.difficulty ?? s.difficulty,
       handedness: snap.handedness ?? s.handedness,
+      checkpoint: snap.checkpoint ?? s.checkpoint,
     });
   }
 });

@@ -174,7 +174,9 @@ function ResultOverlay() {
         ) : (
           <div className="mt-3 space-y-1 text-sm text-gray-200">
             <p>ゴールド -{result.goldLost}</p>
-            <p className="text-xs text-gray-400">ダンジョンの最初に戻された。</p>
+            <p className="text-xs text-gray-400">
+              {floor > 1 ? `セーブポイント ${floor}階 から再開。` : "ダンジョンの最初に戻された。"}
+            </p>
           </div>
         )}
 

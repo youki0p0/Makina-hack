@@ -360,4 +360,6 @@ export interface SaveData {
   difficulty?: string;
   /** Preferred hand for action buttons ("right"|"left"). */
   handedness?: string;
+  /** Highest reached 50-floor checkpoint; defeat restarts here (default 1). */
+  checkpoint?: number;
 }
