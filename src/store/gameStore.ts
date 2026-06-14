@@ -7,6 +7,11 @@ import {
   computeRebirthGain,
   defaultArtifactLevels,
 } from "@/data/artifacts";
+import {
+  classStatBonus,
+  DEFAULT_CLASS_ID,
+  getClass,
+} from "@/data/classes";
 import { generateEnemy } from "@/data/enemies";
 import { getItemById } from "@/data/items";
 import {
@@ -28,6 +33,8 @@ import type {
   ActiveBuff,
   ArtifactId,
   ArtifactLevels,
+  ClassId,
+  StatBonus,
   BattleLogEntry,
   BattleResult,
   BattleState,
@@ -84,12 +91,16 @@ interface GameState {
   souls: number;
   /** Permanent artifact levels (persist across rebirths). */
   artifacts: ArtifactLevels;
+  /** Current character class. */
+  classId: ClassId;
 
   // selectors
   stats: () => ComputedStats;
   currentFace: () => DiceFace;
   /** Souls that would be earned by rebirthing right now. */
   rebirthGain: () => number;
+  /** Whether the player may change class right now (floor-gated). */
+  canChangeClass: () => boolean;
 
   // lifecycle
   hydrate: () => void;
@@ -112,6 +123,9 @@ interface GameState {
   // artifacts / rebirth
   upgradeArtifact: (id: ArtifactId) => void;
   rebirth: () => void;
+
+  // class change (転職)
+  changeClass: (id: ClassId) => void;
 }
 
 let logCounter = 0;
@@ -127,6 +141,7 @@ export const useGameStore = create<GameState>((set, get) => {
       gachaPoints: s.gachaPoints,
       souls: s.souls,
       artifacts: s.artifacts,
+      classId: s.classId,
     });
   }
 
@@ -143,7 +158,10 @@ export const useGameStore = create<GameState>((set, get) => {
 
   function refreshFaces(): DiceFace[] {
     const { equipped } = get();
+    const cls = getClass(get().classId);
+    // Class rewrites apply before equipment so gear can still override faces.
     return applyEquipmentModifiers([
+      { name: cls.name, diceModifiers: cls.diceModifiers },
       equipped.weapon,
       equipped.armor,
       equipped.accessory,
@@ -156,13 +174,25 @@ export const useGameStore = create<GameState>((set, get) => {
     return Math.max(rollDice(), min) as DiceValue;
   }
 
-  /** Compute stats including the player's permanent artifact bonuses. */
+  /** Sum of permanent artifact bonuses and the current class's stat mods. */
+  function passiveBonus(): StatBonus {
+    const a = artifactBonus(get().artifacts);
+    const c = classStatBonus(get().classId);
+    return {
+      attack: a.attack + c.attack,
+      defense: a.defense + c.defense,
+      maxHp: a.maxHp + c.maxHp,
+      reroll: a.reroll + c.reroll,
+    };
+  }
+
+  /** Compute stats including artifact bonuses and the active class. */
   function currentStats(
     player: Player,
     equipped: EquippedItems,
     buffs: ActiveBuff[] = [],
   ): ComputedStats {
-    return computeStats(player, equipped, buffs, artifactBonus(get().artifacts));
+    return computeStats(player, equipped, buffs, passiveBonus());
   }
 
   return {
@@ -183,10 +213,14 @@ export const useGameStore = create<GameState>((set, get) => {
     lastPull: null,
     souls: 0,
     artifacts: defaultArtifactLevels(),
+    classId: DEFAULT_CLASS_ID,
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
     currentFace: () => faceByValue(get().diceFaces, get().diceValue),
     rebirthGain: () => computeRebirthGain(get().currentFloor, get().player.level),
+    // 転職は3階ごと、または初期クラスのときに可能。
+    canChangeClass: () =>
+      get().classId === DEFAULT_CLASS_ID || get().currentFloor % 3 === 0,
 
     hydrate: () => {
       if (get().hydrated) return;
@@ -200,6 +234,7 @@ export const useGameStore = create<GameState>((set, get) => {
           gachaPoints: loaded.gachaPoints,
           souls: loaded.souls,
           artifacts: loaded.artifacts,
+          classId: loaded.classId,
           hydrated: true,
         });
       } else {
@@ -234,6 +269,7 @@ export const useGameStore = create<GameState>((set, get) => {
         lastPull: null,
         souls: 0,
         artifacts: defaultArtifactLevels(),
+        classId: DEFAULT_CLASS_ID,
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -455,7 +491,35 @@ export const useGameStore = create<GameState>((set, get) => {
         gachaPoints: 0,
         lastPull: null,
         souls: state.souls + gain,
+        // Rebirth returns you to the base class.
+        classId: DEFAULT_CLASS_ID,
         diceFaces: applyEquipmentModifiers([equipped.weapon, equipped.armor, equipped.accessory]),
+      });
+      persist();
+    },
+
+    changeClass: (id: ClassId) => {
+      const state = get();
+      if (!(state.classId === DEFAULT_CLASS_ID || state.currentFloor % 3 === 0)) return;
+      if (id === state.classId) return;
+      const cls = getClass(id);
+      const diceFaces = applyEquipmentModifiers([
+        { name: cls.name, diceModifiers: cls.diceModifiers },
+        state.equipped.weapon,
+        state.equipped.armor,
+        state.equipped.accessory,
+      ]);
+      // Re-clamp hp to the new class's max (don't auto-heal).
+      const stats = computeStats(state.player, state.equipped, state.activeBuffs, {
+        attack: artifactBonus(state.artifacts).attack + cls.statMods.attack,
+        defense: artifactBonus(state.artifacts).defense + cls.statMods.defense,
+        maxHp: artifactBonus(state.artifacts).maxHp + cls.statMods.maxHp,
+        reroll: artifactBonus(state.artifacts).reroll + cls.statMods.reroll,
+      });
+      set({
+        classId: id,
+        diceFaces,
+        player: { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) },
       });
       persist();
     },
@@ -588,6 +652,7 @@ export const useGameStore = create<GameState>((set, get) => {
       gachaPoints: snap.gachaPoints ?? s.gachaPoints,
       souls: snap.souls ?? s.souls,
       artifacts: snap.artifacts ?? s.artifacts,
+      classId: snap.classId ?? s.classId,
     });
   }
 });

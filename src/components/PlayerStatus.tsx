@@ -1,5 +1,6 @@
 "use client";
 
+import { getClass } from "@/data/classes";
 import { consumableIcon } from "@/data/consumables";
 import { useGameStore } from "@/store/gameStore";
 
@@ -16,11 +17,14 @@ export default function PlayerStatus() {
   const buffs = useGameStore((s) => s.activeBuffs);
 
   const hpPct = Math.max(0, Math.round((player.hp / stats.maxHp) * 100));
+  const cls = getClass(useGameStore((s) => s.classId));
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/30 p-3">
       <div className="flex items-center justify-between text-sm">
-        <span className="font-bold">勇者 Lv{player.level}</span>
+        <span className="font-bold">
+          {cls.icon} {cls.name} Lv{player.level}
+        </span>
         <span className="text-amber-300">💰 {player.gold}</span>
       </div>
 

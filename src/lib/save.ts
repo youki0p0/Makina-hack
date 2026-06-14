@@ -1,8 +1,10 @@
 import { normalizeArtifacts } from "@/data/artifacts";
+import { normalizeClassId } from "@/data/classes";
 import { getItemById } from "@/data/items";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import type {
   ArtifactLevels,
+  ClassId,
   Equipment,
   EquippedItems,
   Player,
@@ -19,6 +21,7 @@ export interface LoadedState {
   gachaPoints: number;
   souls: number;
   artifacts: ArtifactLevels;
+  classId: ClassId;
 }
 
 export function saveGame(state: LoadedState): void {
@@ -35,6 +38,7 @@ export function saveGame(state: LoadedState): void {
     gachaPoints: state.gachaPoints,
     souls: state.souls,
     artifacts: state.artifacts,
+    classId: state.classId,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -68,6 +72,7 @@ export function loadGame(): LoadedState | null {
       gachaPoints: data.gachaPoints ?? 0,
       souls: data.souls ?? 0,
       artifacts: normalizeArtifacts(data.artifacts),
+      classId: normalizeClassId(data.classId),
     };
   } catch {
     return null;
