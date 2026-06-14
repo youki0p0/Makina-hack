@@ -35,9 +35,12 @@ export default function EnemyCard() {
   const hpPct = Math.max(0, Math.round((enemy.hp / enemy.maxHp) * 100));
   const statuses = summarize(enemy.statuses ?? []);
 
+  const eatk = Math.max(0, enemy.attack - ((enemy.weakenTurns ?? 0) > 0 ? enemy.weakenAmount : 0));
+  const edef = enemy.defense + (enemy.bonusDefense ?? 0);
+
   return (
     <div
-      className={`relative rounded-xl border p-4 text-center ${
+      className={`relative flex gap-3 rounded-xl border p-3 ${
         enemy.isBoss ? "border-red-600/70 bg-red-950/30" : "border-white/10 bg-black/30"
       }`}
     >
@@ -46,36 +49,41 @@ export default function EnemyCard() {
           {f.text}
         </span>
       ))}
-      <div className="text-xs text-gray-400">{floor}階</div>
-      <div key={shake} className={`my-1 text-5xl leading-none ${shake ? "inline-block animate-shake" : "inline-block"}`}>
+
+      {/* Vertical HP gauge — drains from the top downward. */}
+      <div className="relative w-2.5 shrink-0 self-stretch overflow-hidden rounded-full bg-gray-800">
+        <div
+          className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-red-600 to-rose-400 transition-all"
+          style={{ height: `${hpPct}%` }}
+        />
+      </div>
+
+      {/* Emoji */}
+      <div
+        key={shake}
+        className={`self-center text-4xl leading-none ${shake ? "animate-shake" : ""}`}
+      >
         {enemy.emoji}
       </div>
-      <div className="font-bold">
-        {enemy.isBoss && <span className="mr-1 text-red-400">BOSS</span>}
-        {enemy.name}
-      </div>
 
-      <div className="mt-2">
-        <div className="flex justify-between text-xs text-gray-300">
-          <span>HP</span>
-          <span>
-            {Math.max(0, enemy.hp)} / {enemy.maxHp}
-          </span>
+      {/* Name + HP/stats */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between">
+          <p className="truncate font-bold">
+            {enemy.isBoss && <span className="mr-1 text-red-400">BOSS</span>}
+            {enemy.name}
+          </p>
+          <span className="shrink-0 text-[10px] text-gray-400">{floor}階</span>
         </div>
-        <div className="mt-1 h-3 w-full overflow-hidden rounded-full bg-gray-800">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-red-600 to-rose-400 transition-all"
-            style={{ width: `${hpPct}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="mt-2 text-xs text-gray-400">
-        ⚔️ {Math.max(0, enemy.attack - ((enemy.weakenTurns ?? 0) > 0 ? enemy.weakenAmount : 0))} ／ 🛡️ {enemy.defense + (enemy.bonusDefense ?? 0)}
-        {enemy.ability && (
-          <span className="ml-2 text-rose-300">{ENEMY_ABILITY_LABEL[enemy.ability]}</span>
-        )}
-      </div>
+        <p className="text-xs text-gray-300">
+          HP {Math.max(0, enemy.hp)}/{enemy.maxHp}
+        </p>
+        <p className="text-[11px] text-gray-400">
+          ⚔️{eatk} 🛡️{edef}
+          {enemy.ability && (
+            <span className="ml-1 text-rose-300">{ENEMY_ABILITY_LABEL[enemy.ability]}</span>
+          )}
+        </p>
 
       {(statuses.length > 0 ||
         (enemy.stunTurns ?? 0) > 0 ||
@@ -83,7 +91,7 @@ export default function EnemyCard() {
         (enemy.weakenTurns ?? 0) > 0 ||
         enemy.charging ||
         enemy.enraged) && (
-        <div className="mt-2 flex flex-wrap justify-center gap-1 text-[10px]">
+        <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
           {enemy.charging && (
             <span className="rounded-full bg-red-600/30 px-2 py-0.5 font-bold text-red-300 animate-pulse">
               ⚠️ 大技チャージ中
@@ -119,6 +127,7 @@ export default function EnemyCard() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
