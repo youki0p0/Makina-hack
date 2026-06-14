@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getAffixById } from "@/data/affixes";
 import { getItemById, getItemInstance, ITEMS } from "@/data/items";
-import { pullGachaItem, rollLoot, SCRAP_VALUE } from "@/lib/loot";
+import { pullGachaItem, pullPremiumItem, pullTargetedItem, rollLoot, SCRAP_VALUE } from "@/lib/loot";
 import { generateShopStock } from "@/lib/shop";
 import { applyAffix, rollAffixedCopy } from "@/data/affixes";
 
@@ -51,6 +51,22 @@ describe("rollLoot", () => {
       expect(drop!.gachaOnly).not.toBe(true);
       expect(drop!.casinoOnly).not.toBe(true);
       expect(drop!.minFloor ?? 1).toBeLessThanOrEqual(10);
+    }
+  });
+});
+
+describe("premium & targeted gacha", () => {
+  it("premium pull never returns a casino-exclusive item", () => {
+    for (let i = 0; i < 200; i++) {
+      expect(pullPremiumItem().casinoOnly).not.toBe(true);
+    }
+  });
+
+  it("targeted pull always returns the chosen slot", () => {
+    for (const slot of ["weapon", "armor", "accessory"] as const) {
+      for (let i = 0; i < 60; i++) {
+        expect(pullTargetedItem(slot).slot).toBe(slot);
+      }
     }
   });
 });

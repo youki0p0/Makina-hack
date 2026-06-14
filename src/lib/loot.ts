@@ -1,7 +1,13 @@
 import { rollAffixedCopy } from "@/data/affixes";
 import { CONSUMABLES } from "@/data/consumables";
 import { ITEMS } from "@/data/items";
-import type { Consumable, Enemy, Equipment, Rarity } from "@/types/game";
+import type {
+  Consumable,
+  Enemy,
+  Equipment,
+  EquipmentSlot,
+  Rarity,
+} from "@/types/game";
 
 /** Relative weight of each rarity in the drop table. */
 const RARITY_WEIGHT: Record<Rarity, number> = {
@@ -29,6 +35,49 @@ export const SCRAP_VALUE: Record<Rarity, number> = {
 
 /** Cost of a single gacha pull. */
 export const GACHA_COST = 10;
+/** Premium gacha: pricier, much higher rate for epic/legendary. */
+export const PREMIUM_COST = 100;
+/** Targeted gacha: pick a slot and pull a high-rarity item of that slot. */
+export const TARGETED_COST = 250;
+
+/** Weighted random pick from a pool, returning an affixed copy. */
+function weightedPull(
+  pool: Equipment[],
+  weightOf: (item: Equipment) => number,
+): Equipment {
+  const weighted = pool.map((item) => ({ item, weight: Math.max(0.01, weightOf(item)) }));
+  const total = weighted.reduce((sum, w) => sum + w.weight, 0);
+  let roll = Math.random() * total;
+  for (const { item, weight } of weighted) {
+    roll -= weight;
+    if (roll <= 0) return rollAffixedCopy({ ...item });
+  }
+  return rollAffixedCopy({ ...weighted[weighted.length - 1].item });
+}
+
+/** Premium weighting: crush commons, heavily favor epic/legendary + exclusives. */
+function premiumWeight(item: Equipment): number {
+  let w = RARITY_WEIGHT[item.rarity];
+  if (item.rarity === "common") w *= 0.15;
+  else if (item.rarity === "rare") w *= 0.7;
+  else if (item.rarity === "epic") w += 45;
+  else if (item.rarity === "legendary") w += 35;
+  else if (item.rarity === "cursed") w += 15;
+  if (item.gachaOnly) w += 30;
+  return w;
+}
+
+/** Premium pull (cost {@link PREMIUM_COST}): boosted high-rarity rate. */
+export function pullPremiumItem(): Equipment {
+  return weightedPull(GACHA_POOL, premiumWeight);
+}
+
+/** Targeted pull (cost {@link TARGETED_COST}): a chosen slot, premium rates. */
+export function pullTargetedItem(slot: EquipmentSlot): Equipment {
+  const pool = GACHA_POOL.filter((i) => i.slot === slot);
+  if (pool.length === 0) return pullPremiumItem();
+  return weightedPull(pool, premiumWeight);
+}
 
 /**
  * Pull a single equipment from the gacha. Includes gacha-exclusive items and

@@ -35,7 +35,17 @@ import {
   PLAYER_POISON_TURNS,
 } from "@/lib/battle";
 import { applyEquipmentModifiers, rollDice } from "@/lib/dice";
-import { GACHA_COST, pullGachaItem, rollConsumable, rollLoot, SCRAP_VALUE } from "@/lib/loot";
+import {
+  GACHA_COST,
+  PREMIUM_COST,
+  TARGETED_COST,
+  pullGachaItem,
+  pullPremiumItem,
+  pullTargetedItem,
+  rollConsumable,
+  rollLoot,
+  SCRAP_VALUE,
+} from "@/lib/loot";
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState } from "@/lib/save";
 import { itemKey, rarityRank } from "@/lib/ui";
@@ -56,6 +66,7 @@ import type {
   Enemy,
   Equipment,
   EquippedItems,
+  EquipmentSlot,
   Player,
   Progress,
   Rarity,
@@ -188,6 +199,8 @@ interface GameState {
   /** Scrap all non-favorited items at or below the given rarity. */
   scrapBulk: (maxRarity: Rarity) => void;
   pullGacha: () => void;
+  pullPremium: () => void;
+  pullTargeted: (slot: EquipmentSlot) => void;
   clearLastPull: () => void;
 
   // casino
@@ -818,6 +831,32 @@ export const useGameStore = create<GameState>((set, get) => {
       const pulled = pullGachaItem();
       set({
         gachaPoints: state.gachaPoints - GACHA_COST,
+        inventory: [...state.inventory, pulled],
+        lastPull: pulled,
+        progress: { ...state.progress, discoveredItems: addUnique(state.progress.discoveredItems, pulled.id) },
+      });
+      persist();
+    },
+
+    pullPremium: () => {
+      const state = get();
+      if (state.gachaPoints < PREMIUM_COST) return;
+      const pulled = pullPremiumItem();
+      set({
+        gachaPoints: state.gachaPoints - PREMIUM_COST,
+        inventory: [...state.inventory, pulled],
+        lastPull: pulled,
+        progress: { ...state.progress, discoveredItems: addUnique(state.progress.discoveredItems, pulled.id) },
+      });
+      persist();
+    },
+
+    pullTargeted: (slot: EquipmentSlot) => {
+      const state = get();
+      if (state.gachaPoints < TARGETED_COST) return;
+      const pulled = pullTargetedItem(slot);
+      set({
+        gachaPoints: state.gachaPoints - TARGETED_COST,
         inventory: [...state.inventory, pulled],
         lastPull: pulled,
         progress: { ...state.progress, discoveredItems: addUnique(state.progress.discoveredItems, pulled.id) },
