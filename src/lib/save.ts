@@ -1,3 +1,4 @@
+import { normalizeProgress } from "@/data/achievements";
 import { normalizeArtifacts } from "@/data/artifacts";
 import { normalizeClassId } from "@/data/classes";
 import { getItemInstance } from "@/data/items";
@@ -8,6 +9,7 @@ import type {
   Equipment,
   EquippedItems,
   Player,
+  Progress,
   SavedItem,
   SaveData,
 } from "@/types/game";
@@ -29,6 +31,7 @@ export interface LoadedState {
   artifacts: ArtifactLevels;
   classId: ClassId;
   winStreak: number;
+  progress: Progress;
 }
 
 export function saveGame(state: LoadedState): void {
@@ -47,6 +50,7 @@ export function saveGame(state: LoadedState): void {
     artifacts: state.artifacts,
     classId: state.classId,
     winStreak: state.winStreak,
+    progress: state.progress,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -90,6 +94,7 @@ export function loadGame(): LoadedState | null {
       artifacts: normalizeArtifacts(data.artifacts),
       classId: normalizeClassId(data.classId),
       winStreak: data.winStreak ?? 0,
+      progress: normalizeProgress(data.progress),
     };
   } catch {
     return null;

@@ -89,6 +89,7 @@ export function generateEnemy(floor: number): Enemy {
 
   return {
     id: `${template.id}_${floor}`,
+    templateId: template.id,
     name: isBossFloor ? `${template.name} Lv${tier}` : template.name,
     emoji: template.emoji,
     maxHp,

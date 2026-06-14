@@ -71,6 +71,13 @@ export default function TitlePage() {
             🎰 カジノ
           </Link>
 
+          <Link
+            href="/collection"
+            className="h-12 rounded-2xl bg-white/10 pt-3 font-bold active:scale-95"
+          >
+            📚 実績 / 図鑑
+          </Link>
+
           {hasProgress && (
             <button
               onClick={() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { defaultProgress } from "@/data/achievements";
 import {
   artifactBonus,
   artifactUpgradeCost,
@@ -48,6 +49,7 @@ import type {
   Equipment,
   EquippedItems,
   Player,
+  Progress,
 } from "@/types/game";
 import { faceByValue } from "@/data/diceFaces";
 
@@ -68,6 +70,11 @@ function createPlayer(): Player {
 
 function emptyEquipped(): EquippedItems {
   return { weapon: null, armor: null, accessory: null };
+}
+
+/** Add an id to a list if not already present (set-union). */
+function addUnique(list: string[], id: string): string[] {
+  return list.includes(id) ? list : [...list, id];
 }
 
 interface GameState {
@@ -97,6 +104,8 @@ interface GameState {
   classId: ClassId;
   /** Consecutive-win count. */
   winStreak: number;
+  /** Cumulative progress for achievements/collection. */
+  progress: Progress;
   /** Items for sale at the current shop floor (not persisted). */
   shopStock: ShopEntry[];
 
@@ -158,6 +167,7 @@ export const useGameStore = create<GameState>((set, get) => {
       artifacts: s.artifacts,
       classId: s.classId,
       winStreak: s.winStreak,
+      progress: s.progress,
     });
   }
 
@@ -231,6 +241,7 @@ export const useGameStore = create<GameState>((set, get) => {
     artifacts: defaultArtifactLevels(),
     classId: DEFAULT_CLASS_ID,
     winStreak: 0,
+    progress: defaultProgress(),
     shopStock: [],
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
@@ -254,6 +265,7 @@ export const useGameStore = create<GameState>((set, get) => {
           artifacts: loaded.artifacts,
           classId: loaded.classId,
           winStreak: loaded.winStreak,
+          progress: loaded.progress,
           hydrated: true,
         });
       } else {
@@ -290,6 +302,7 @@ export const useGameStore = create<GameState>((set, get) => {
         artifacts: defaultArtifactLevels(),
         classId: DEFAULT_CLASS_ID,
         winStreak: 0,
+        progress: defaultProgress(),
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -469,6 +482,7 @@ export const useGameStore = create<GameState>((set, get) => {
           player: { ...state.player, gold: goldAfter },
           inventory: [...state.inventory, { ...entry.equipment }],
           shopStock: markSold(),
+          progress: { ...state.progress, discoveredItems: addUnique(state.progress.discoveredItems, entry.equipment.id) },
         });
       } else if (entry.kind === "consumable" && entry.consumable) {
         const c = entry.consumable;
@@ -557,6 +571,7 @@ export const useGameStore = create<GameState>((set, get) => {
         gachaPoints: state.gachaPoints - GACHA_COST,
         inventory: [...state.inventory, pulled],
         lastPull: pulled,
+        progress: { ...state.progress, discoveredItems: addUnique(state.progress.discoveredItems, pulled.id) },
       });
       persist();
     },
@@ -566,9 +581,17 @@ export const useGameStore = create<GameState>((set, get) => {
     casinoSettle: (goldDelta: number, prize?: Equipment | null) => {
       const state = get();
       const gold = Math.max(0, state.player.gold + goldDelta);
+      const progress = prize
+        ? {
+            ...state.progress,
+            jackpots: state.progress.jackpots + 1,
+            discoveredItems: addUnique(state.progress.discoveredItems, prize.id),
+          }
+        : state.progress;
       set({
         player: { ...state.player, gold },
         inventory: prize ? [...state.inventory, { ...prize }] : state.inventory,
+        progress,
       });
       persist();
     },
@@ -606,6 +629,11 @@ export const useGameStore = create<GameState>((set, get) => {
         // Rebirth returns you to the base class.
         classId: DEFAULT_CLASS_ID,
         winStreak: 0,
+        progress: {
+          ...state.progress,
+          rebirths: state.progress.rebirths + 1,
+          maxFloor: Math.max(state.progress.maxFloor, state.currentFloor),
+        },
         diceFaces: applyEquipmentModifiers([equipped.weapon, equipped.armor, equipped.accessory]),
       });
       persist();
@@ -713,16 +741,30 @@ export const useGameStore = create<GameState>((set, get) => {
       streakBonusPct,
     };
 
+    const newFloor = state.currentFloor + 1;
+    const progress: Progress = {
+      ...state.progress,
+      kills: state.progress.kills + 1,
+      bossKills: state.progress.bossKills + (enemy.isBoss ? 1 : 0),
+      maxFloor: Math.max(state.progress.maxFloor, newFloor),
+      maxStreak: Math.max(state.progress.maxStreak, winStreak),
+      defeatedEnemies: addUnique(state.progress.defeatedEnemies, enemy.templateId),
+      discoveredItems: drop
+        ? addUnique(state.progress.discoveredItems, drop.id)
+        : state.progress.discoveredItems,
+    };
+
     return {
       player: leveledPlayer,
       inventory,
       currentEnemy: enemy,
-      currentFloor: state.currentFloor + 1,
+      currentFloor: newFloor,
       battleState: "won",
       battleLog: finalLog,
       lastResult: result,
       activeBuffs: buffs,
       winStreak,
+      progress,
     };
   }
 
@@ -782,6 +824,7 @@ export const useGameStore = create<GameState>((set, get) => {
       artifacts: snap.artifacts ?? s.artifacts,
       classId: snap.classId ?? s.classId,
       winStreak: snap.winStreak ?? s.winStreak,
+      progress: snap.progress ?? s.progress,
     });
   }
 });

@@ -192,6 +192,8 @@ export interface EnemyTemplate {
 
 export interface Enemy {
   id: string;
+  /** Stable template id (e.g. "slime", "boss") for collection tracking. */
+  templateId: string;
   name: string;
   emoji: string;
   maxHp: number;
@@ -274,6 +276,22 @@ export interface BattleResult {
   streakBonusPct: number;
 }
 
+// ===== Progress / achievements =====
+
+/** Cumulative run/meta progress used for achievements and unlocks. */
+export interface Progress {
+  maxFloor: number;
+  kills: number;
+  bossKills: number;
+  rebirths: number;
+  jackpots: number;
+  maxStreak: number;
+  /** Base ids of equipment ever obtained. */
+  discoveredItems: string[];
+  /** Template ids of enemies ever defeated. */
+  defeatedEnemies: string[];
+}
+
 // ===== Persistence =====
 
 /** A persisted equipment reference: base id plus an optional rolled affix. */
@@ -301,4 +319,6 @@ export interface SaveData {
   classId?: ClassId;
   /** Consecutive-win count (optional for old saves). */
   winStreak?: number;
+  /** Cumulative progress for achievements/collection (optional for old saves). */
+  progress?: Progress;
 }
