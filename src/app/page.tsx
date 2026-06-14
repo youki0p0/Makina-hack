@@ -24,6 +24,8 @@ export default function TitlePage() {
   const markHelpSeen = useGameStore((s) => s.markHelpSeen);
   const difficulty = useGameStore((s) => s.difficulty);
   const setDifficulty = useGameStore((s) => s.setDifficulty);
+  const handedness = useGameStore((s) => s.handedness);
+  const setHandedness = useGameStore((s) => s.setHandedness);
   const daily = getDailyBonus();
 
   const hasProgress = hydrated && (floor > 1 || player.level > 1);
@@ -130,6 +132,26 @@ export default function TitlePage() {
                   }`}
                 >
                   {d.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] text-gray-500">利き手（決定ボタンの位置）</p>
+            <div className="mt-1 flex gap-1">
+              {([
+                ["left", "👈 左手"],
+                ["right", "右手 👉"],
+              ] as const).map(([h, label]) => (
+                <button
+                  key={h}
+                  onClick={() => setHandedness(h)}
+                  className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 ${
+                    handedness === h ? "bg-sky-600 text-white" : "bg-white/10 text-gray-300"
+                  }`}
+                >
+                  {label}
                 </button>
               ))}
             </div>

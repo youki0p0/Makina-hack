@@ -50,7 +50,10 @@ export default function BattleScreen() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col gap-3 p-3">
+    <div
+      className="flex h-[100dvh] flex-col gap-2 overflow-hidden px-3 pt-2"
+      style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
+    >
       <div className="flex items-center justify-between">
         <Link
           href="/"
@@ -83,15 +86,20 @@ export default function BattleScreen() {
         </div>
       </div>
 
-      <EnemyCard />
-
-      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-        <DiceDisplay />
+      {/* Scrollable middle so the action bar stays pinned and visible. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+        <EnemyCard />
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+          <DiceDisplay />
+        </div>
+        <BattleLog />
       </div>
 
-      <BattleLog />
-
-      <div className="mt-auto flex flex-col gap-3">
+      {/* Pinned action area, padded above the browser/system bar. */}
+      <div
+        className="flex flex-col gap-2"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
         <PlayerStatus />
         <ActionButtons />
       </div>

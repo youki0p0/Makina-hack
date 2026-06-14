@@ -347,4 +347,6 @@ export interface SaveData {
   titleId?: string;
   /** Difficulty id ("normal"|"hard"|"hell"). */
   difficulty?: string;
+  /** Preferred hand for action buttons ("right"|"left"). */
+  handedness?: string;
 }
