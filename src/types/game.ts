@@ -133,6 +133,21 @@ export interface ComputedStats {
   rerolls: number;
 }
 
+// ===== Artifacts (rebirth meta-progression) =====
+
+export type ArtifactId = "might" | "guard" | "vitality" | "fortune";
+
+/** Owned level of each artifact (persists across rebirths). */
+export type ArtifactLevels = Record<ArtifactId, number>;
+
+/** A flat stat bonus contributed by artifacts. */
+export interface StatBonus {
+  attack: number;
+  defense: number;
+  maxHp: number;
+  reroll: number;
+}
+
 // ===== Enemies =====
 
 export interface EnemyTemplate {
@@ -226,4 +241,8 @@ export interface SaveData {
   currentFloor: number;
   /** Gacha currency from scrapping equipment (optional for old saves). */
   gachaPoints?: number;
+  /** Rebirth currency (optional for old saves). */
+  souls?: number;
+  /** Permanent artifact levels carried across rebirths (optional for old saves). */
+  artifacts?: ArtifactLevels;
 }

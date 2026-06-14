@@ -6,6 +6,7 @@ import type {
   Enemy,
   EquippedItems,
   Player,
+  StatBonus,
   StatusEffect,
   StatusKind,
 } from "@/types/game";
@@ -19,11 +20,14 @@ export const EQUIP_SLOTS: ReadonlyArray<keyof EquippedItems> = [
   "accessory",
 ];
 
-/** Aggregate base player stats with equipment bonuses and temporary buffs. */
+const NO_BONUS: StatBonus = { attack: 0, defense: 0, maxHp: 0, reroll: 0 };
+
+/** Aggregate base player stats with equipment, temporary buffs, and artifacts. */
 export function computeStats(
   player: Player,
   equipped: EquippedItems,
   buffs: ReadonlyArray<ActiveBuff> = [],
+  artifacts: StatBonus = NO_BONUS,
 ): ComputedStats {
   let attack = player.baseAttack;
   let defense = player.baseDefense;
@@ -49,13 +53,13 @@ export function computeStats(
     else if (b.kind === "reroll") buffReroll += b.value;
   }
 
-  // Spec: base 1 reroll, equipment shifts it; clamp. Buff rerolls add on top.
-  const rerolls = clamp(BASE_REROLLS + rerollMod, 0, MAX_REROLLS) + buffReroll;
+  // Spec: base 1 reroll, equipment shifts it; clamp. Buff/artifact rerolls add on top.
+  const rerolls = clamp(BASE_REROLLS + rerollMod, 0, MAX_REROLLS) + buffReroll + artifacts.reroll;
 
   return {
-    attack: attack + buffAttack,
-    defense: defense + buffDefense,
-    maxHp,
+    attack: attack + buffAttack + artifacts.attack,
+    defense: defense + buffDefense + artifacts.defense,
+    maxHp: maxHp + artifacts.maxHp,
     rerolls,
   };
 }
