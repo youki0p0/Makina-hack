@@ -108,6 +108,8 @@ interface GameState {
   winStreak: number;
   /** Cumulative progress for achievements/collection. */
   progress: Progress;
+  /** Favorited item keys (id:affix) pinned to the inventory top. */
+  favorites: string[];
   /** Items for sale at the current shop floor (not persisted). */
   shopStock: ShopEntry[];
 
@@ -137,6 +139,9 @@ interface GameState {
   // equipment
   equipItem: (itemIndex: number) => void;
   unequipItem: (slot: keyof EquippedItems) => void;
+
+  // inventory
+  toggleFavorite: (key: string) => void;
 
   // gacha
   scrapItem: (itemIndex: number) => void;
@@ -170,6 +175,7 @@ export const useGameStore = create<GameState>((set, get) => {
       classId: s.classId,
       winStreak: s.winStreak,
       progress: s.progress,
+      favorites: s.favorites,
     });
   }
 
@@ -244,6 +250,7 @@ export const useGameStore = create<GameState>((set, get) => {
     classId: DEFAULT_CLASS_ID,
     winStreak: 0,
     progress: defaultProgress(),
+    favorites: [],
     shopStock: [],
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
@@ -268,6 +275,7 @@ export const useGameStore = create<GameState>((set, get) => {
           classId: loaded.classId,
           winStreak: loaded.winStreak,
           progress: loaded.progress,
+          favorites: loaded.favorites,
           hydrated: true,
         });
       } else {
@@ -305,6 +313,7 @@ export const useGameStore = create<GameState>((set, get) => {
         classId: DEFAULT_CLASS_ID,
         winStreak: 0,
         progress: defaultProgress(),
+        favorites: [],
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -588,6 +597,15 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
+    toggleFavorite: (key: string) => {
+      const state = get();
+      const favorites = state.favorites.includes(key)
+        ? state.favorites.filter((k) => k !== key)
+        : [...state.favorites, key];
+      set({ favorites });
+      persist();
+    },
+
     scrapItem: (itemIndex: number) => {
       const state = get();
       const item = state.inventory[itemIndex];
@@ -863,6 +881,7 @@ export const useGameStore = create<GameState>((set, get) => {
       classId: snap.classId ?? s.classId,
       winStreak: snap.winStreak ?? s.winStreak,
       progress: snap.progress ?? s.progress,
+      favorites: snap.favorites ?? s.favorites,
     });
   }
 });
