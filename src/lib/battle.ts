@@ -138,7 +138,8 @@ export function resolvePlayerAction(
   let enemyDamage = 0;
 
   if (e.damageMultiplier > 0) {
-    const perHit = Math.max(1, Math.round(stats.attack * e.damageMultiplier) - enemy.defense);
+    const enemyDef = enemy.defense + (enemy.bonusDefense ?? 0);
+    const perHit = Math.max(1, Math.round(stats.attack * e.damageMultiplier) - enemyDef);
     enemyDamage = perHit * hits;
     if (hits > 1) {
       logs.push(`${face.name}！ ${hits}回攻撃で ${enemyDamage} ダメージ`);
@@ -212,6 +213,68 @@ export function resolveEnemyAttack(
 ): { damage: number; log: string } {
   const damage = Math.max(1, enemy.attack - stats.defense - guard);
   return { damage, log: `${enemy.name} の攻撃！ ${damage} ダメージ` };
+}
+
+/** Chance per turn that an enemy uses its special ability. */
+const ABILITY_CHANCE = 0.35;
+
+export interface EnemyTurnResult {
+  playerDamage: number;
+  enemyHeal: number;
+  /** If > 0, set the enemy's bonus defense to this value. */
+  defendValue: number;
+  logs: string[];
+}
+
+/**
+ * Decide and resolve the enemy's turn: either a special ability or a normal
+ * attack. Pure function — caller applies the deltas.
+ */
+export function resolveEnemyTurn(
+  enemy: Enemy,
+  stats: ComputedStats,
+  guard: number,
+): EnemyTurnResult {
+  const normal = () => Math.max(1, enemy.attack - stats.defense - guard);
+
+  if (enemy.ability && Math.random() < ABILITY_CHANCE) {
+    if (enemy.ability === "multiAttack") {
+      const per = Math.max(1, Math.round(enemy.attack * 0.7) - stats.defense - guard);
+      const damage = per * 2;
+      return {
+        playerDamage: damage,
+        enemyHeal: 0,
+        defendValue: 0,
+        logs: [`${enemy.name} の連続攻撃！ ${damage} ダメージ`],
+      };
+    }
+    if (enemy.ability === "heal") {
+      const heal = Math.max(1, Math.round(enemy.maxHp * 0.2));
+      return {
+        playerDamage: 0,
+        enemyHeal: heal,
+        defendValue: 0,
+        logs: [`${enemy.name} は回復した！ (+${heal})`],
+      };
+    }
+    if (enemy.ability === "defend") {
+      const defendValue = Math.max(3, Math.round(enemy.attack * 0.8));
+      return {
+        playerDamage: 0,
+        enemyHeal: 0,
+        defendValue,
+        logs: [`${enemy.name} は身を固めた！ (防御+${defendValue})`],
+      };
+    }
+  }
+
+  const damage = normal();
+  return {
+    playerDamage: damage,
+    enemyHeal: 0,
+    defendValue: 0,
+    logs: [`${enemy.name} の攻撃！ ${damage} ダメージ`],
+  };
 }
 
 // ===== leveling =====

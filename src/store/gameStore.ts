@@ -21,7 +21,7 @@ import {
   EQUIP_SLOTS,
   expForLevel,
   luckFloor,
-  resolveEnemyAttack,
+  resolveEnemyTurn,
   resolvePlayerAction,
   tickBuffs,
   tickEnemyStatuses,
@@ -365,21 +365,34 @@ export const useGameStore = create<GameState>((set, get) => {
         statuses = addStatus(statuses, action.status);
       }
 
-      // 6) Enemy retaliates — unless stunned. Stun applied this turn skips now.
+      // 6) Enemy turn — unless stunned. Stun applied this turn skips now.
       let stunTurns = (enemy.stunTurns ?? 0) + action.stun;
+      let bonusDefense = enemy.bonusDefense ?? 0;
+      let bonusDefenseTurns = enemy.bonusDefenseTurns ?? 0;
       if (stunTurns > 0) {
         stunTurns -= 1;
         log = pushLogs(log, [{ text: `${enemy.name} はスタンして動けない！`, tone: "good" }]);
       } else {
-        const enemyAtk = resolveEnemyAttack(enemy, stats, action.guard);
-        playerHp -= enemyAtk.damage;
-        log = pushLogs(log, [{ text: enemyAtk.log, tone: "bad" }]);
+        // Special ability or normal attack.
+        const turn = resolveEnemyTurn(enemy, stats, action.guard);
+        if (turn.enemyHeal > 0) {
+          enemyHp = Math.min(enemy.maxHp, enemyHp + turn.enemyHeal);
+        }
+        if (turn.defendValue > 0) {
+          bonusDefense = turn.defendValue;
+          bonusDefenseTurns = 2;
+        } else if (bonusDefenseTurns > 0) {
+          bonusDefenseTurns -= 1;
+          if (bonusDefenseTurns === 0) bonusDefense = 0;
+        }
+        playerHp -= turn.playerDamage;
+        log = pushLogs(log, turn.logs.map((text) => ({ text, tone: "bad" as const })));
 
         if (playerHp <= 0) {
           const lost = finishDefeat(
             { ...state, player: { ...state.player, hp: 0 } },
             log,
-            { ...enemy, statuses, stunTurns },
+            { ...enemy, statuses, stunTurns, bonusDefense, bonusDefenseTurns },
             enemyHp,
           );
           set(lost);
@@ -390,7 +403,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
       // Next turn: fresh roll + rerolls.
       set({
-        currentEnemy: { ...enemy, hp: enemyHp, statuses, stunTurns },
+        currentEnemy: { ...enemy, hp: enemyHp, statuses, stunTurns, bonusDefense, bonusDefenseTurns },
         player: { ...state.player, hp: playerHp },
         diceValue: rollWithLuck(),
         rerollsLeft: stats.rerolls,
