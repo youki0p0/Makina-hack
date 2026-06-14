@@ -1,57 +1,81 @@
-import type { Enemy, EnemyTemplate } from "@/types/game";
+import type { Enemy, EnemyAbility, EnemyTemplate } from "@/types/game";
 
-export const ENEMY_TEMPLATES: readonly EnemyTemplate[] = [
-  {
-    id: "slime",
-    name: "スライム",
-    emoji: "🟢",
-    baseHp: 18,
-    baseAttack: 4,
-    baseDefense: 0,
-    baseExp: 6,
-    baseGold: 5,
-    dropRate: 0.25,
-    isBoss: false,
-  },
-  {
-    id: "goblin",
-    name: "ゴブリン",
-    emoji: "👺",
-    baseHp: 26,
-    baseAttack: 6,
-    baseDefense: 1,
-    baseExp: 9,
-    baseGold: 8,
-    dropRate: 0.3,
-    isBoss: false,
-  },
-  {
-    id: "skeleton",
-    name: "スケルトン",
-    emoji: "💀",
-    baseHp: 34,
-    baseAttack: 8,
-    baseDefense: 2,
-    baseExp: 13,
-    baseGold: 12,
-    dropRate: 0.35,
-    isBoss: false,
-    ability: "defend",
-  },
-  {
-    id: "orc",
-    name: "オーク",
-    emoji: "👹",
-    baseHp: 48,
-    baseAttack: 11,
-    baseDefense: 3,
-    baseExp: 18,
-    baseGold: 18,
-    dropRate: 0.4,
-    isBoss: false,
-    ability: "multiAttack",
-  },
+/**
+ * 50 normal enemy archetypes ordered weak → strong. Stats scale with the
+ * index; abilities are sprinkled in. generateEnemy applies floor scaling on top.
+ */
+type EnemyDef = [id: string, name: string, emoji: string, ability: EnemyAbility | null];
+
+const ENEMY_DEFS: EnemyDef[] = [
+  ["slime", "スライム", "🟢", null],
+  ["bat", "コウモリ", "🦇", null],
+  ["rat", "大ネズミ", "🐀", null],
+  ["goblin", "ゴブリン", "👺", null],
+  ["spider", "毒グモ", "🕷️", "lifesteal"],
+  ["snake", "大蛇", "🐍", "lifesteal"],
+  ["wolf", "狼", "🐺", "multiAttack"],
+  ["skeleton", "スケルトン", "💀", "defend"],
+  ["zombie", "ゾンビ", "🧟", null],
+  ["imp", "インプ", "😈", null],
+  ["boar", "猪", "🐗", "fierce"],
+  ["orc", "オーク", "👹", "multiAttack"],
+  ["ghost", "亡霊", "👻", "guardBreak"],
+  ["mushroom", "マッシュ", "🍄", "heal"],
+  ["scorpion", "サソリ", "🦂", "lifesteal"],
+  ["crab", "岩ガニ", "🦀", "defend"],
+  ["bee", "殺人蜂", "🐝", "multiAttack"],
+  ["mummy", "ミイラ", "🪦", "heal"],
+  ["cyclops", "サイクロプス", "👁️", "fierce"],
+  ["harpy", "ハーピー", "🦅", "multiAttack"],
+  ["lizardman", "リザードマン", "🦎", null],
+  ["gargoyle", "ガーゴイル", "🗿", "defend"],
+  ["wraith", "レイス", "🌫️", "guardBreak"],
+  ["werewolf", "人狼", "🐺", "fierce"],
+  ["vampire", "吸血鬼", "🧛", "lifesteal"],
+  ["golem", "ゴーレム", "🪨", "defend"],
+  ["troll", "トロル", "👹", "heal"],
+  ["minotaur", "ミノタウロス", "🐂", "fierce"],
+  ["wisp", "ウィスプ", "✨", "guardBreak"],
+  ["slimeking", "キングスライム", "🟩", "heal"],
+  ["banshee", "バンシー", "💀", "guardBreak"],
+  ["chimera", "キマイラ", "🦁", "multiAttack"],
+  ["basilisk", "バジリスク", "🐲", "lifesteal"],
+  ["wyvern", "ワイバーン", "🐉", "fierce"],
+  ["ogremage", "オーガメイジ", "🧙", "heal"],
+  ["darkknight", "暗黒騎士", "🗡️", "guardBreak"],
+  ["lich", "リッチ", "☠️", "lifesteal"],
+  ["behemoth", "ベヒモス", "🦏", "fierce"],
+  ["kraken", "クラーケン", "🐙", "multiAttack"],
+  ["phoenix", "フェニックス", "🔥", "heal"],
+  ["cerberus", "ケルベロス", "🐕", "multiAttack"],
+  ["manticore", "マンティコア", "🦂", "fierce"],
+  ["djinn", "ジン", "🌀", "guardBreak"],
+  ["hydra", "ヒュドラ", "🐍", "multiAttack"],
+  ["titan", "タイタン", "🗿", "fierce"],
+  ["specter", "スペクター", "👻", "guardBreak"],
+  ["nightmare", "ナイトメア", "🌑", "lifesteal"],
+  ["seraph", "堕天使", "😇", "heal"],
+  ["leviathan", "リヴァイアサン", "🌊", "fierce"],
+  ["voidlord", "虚無の王", "🕳️", "guardBreak"],
 ];
+
+function buildEnemyTemplates(): EnemyTemplate[] {
+  return ENEMY_DEFS.map(([id, name, emoji, ability], i) => ({
+    id,
+    name,
+    emoji,
+    baseHp: 16 + i * 5,
+    baseAttack: 3 + Math.round(i * 0.9),
+    baseDefense: Math.round(i * 0.5),
+    baseExp: 5 + i * 2,
+    baseGold: 4 + Math.round(i * 1.8),
+    dropRate: Math.min(0.5, 0.22 + i * 0.006),
+    isBoss: false,
+    ...(ability ? { ability } : {}),
+  }));
+}
+
+export const ENEMY_TEMPLATES: readonly EnemyTemplate[] = buildEnemyTemplates();
 
 export const BOSS_TEMPLATE: EnemyTemplate = {
   id: "boss",

@@ -4,6 +4,7 @@ import { CLASSES, isClassUnlocked } from "@/data/classes";
 import { getDifficulty } from "@/data/difficulty";
 import { defaultProgress } from "@/data/achievements";
 import { getDailyBonus } from "@/lib/daily";
+import { ENEMY_TEMPLATES, generateEnemy } from "@/data/enemies";
 
 describe("artifacts", () => {
   it("bonus scales with level", () => {
@@ -49,5 +50,20 @@ describe("difficulty", () => {
 describe("daily bonus", () => {
   it("is deterministic for the same seed", () => {
     expect(getDailyBonus("2026-06-14").id).toBe(getDailyBonus("2026-06-14").id);
+  });
+});
+
+describe("enemies", () => {
+  it("has 50 distinct normal templates", () => {
+    expect(ENEMY_TEMPLATES.length).toBe(50);
+    const ids = new Set(ENEMY_TEMPLATES.map((e) => e.id));
+    expect(ids.size).toBe(50);
+  });
+
+  it("generates a boss on every 5th floor with gimmick fields", () => {
+    const boss = generateEnemy(5);
+    expect(boss.isBoss).toBe(true);
+    expect(boss.enraged).toBe(false);
+    expect(boss.weakenTurns).toBe(0);
   });
 });

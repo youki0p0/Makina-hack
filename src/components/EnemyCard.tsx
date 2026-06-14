@@ -10,9 +10,12 @@ const STATUS_UI: Record<StatusKind, { icon: string; cls: string }> = {
 };
 
 const ABILITY_LABEL: Record<EnemyAbility, string> = {
-  multiAttack: "連撃持ち",
-  heal: "回復持ち",
-  defend: "防御持ち",
+  multiAttack: "連撃",
+  heal: "回復",
+  defend: "防御",
+  lifesteal: "吸血",
+  fierce: "剛撃",
+  guardBreak: "防御無視",
 };
 
 /** Collapse stacked statuses into one badge per kind: total dmg/turn + max turns. */
