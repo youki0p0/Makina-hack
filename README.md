@@ -55,6 +55,7 @@ npm install      # 依存関係をインストール
 npm run dev      # http://localhost:3000 で開発サーバー起動
 npm run build    # 本番ビルド（型チェック込み）
 npm run start    # ビルド済みアプリを起動
+npm run test     # ユニットテスト（Vitest）
 ```
 
 スマホ縦画面想定のため、ブラウザのデバイスツールバーで縦長表示にすると確認しやすいです。
