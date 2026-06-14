@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { canEquip } from "@/data/classes";
 import { SCRAP_VALUE } from "@/lib/loot";
 import { itemKey, rarityLabel, rarityRank, rarityStyle, slotLabel } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 import type { Equipment, EquipmentSlot, Rarity } from "@/types/game";
+
+const TAG_LABEL: Record<string, string> = { light: "軽", heavy: "重", magic: "魔" };
 
 const BULK_OPTIONS: { rarity: Rarity; label: string }[] = [
   { rarity: "common", label: "≤コモン" },
@@ -50,6 +53,7 @@ export default function InventoryList() {
   const scrapItem = useGameStore((s) => s.scrapItem);
   const scrapBulk = useGameStore((s) => s.scrapBulk);
   const toggleFavorite = useGameStore((s) => s.toggleFavorite);
+  const classId = useGameStore((s) => s.classId);
   const [selected, setSelected] = useState<number | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("rarity");
@@ -145,9 +149,15 @@ export default function InventoryList() {
                 </button>
                 <button onClick={() => setSelected(index)} className="flex min-w-0 flex-1 items-center justify-between text-left active:scale-[0.98]">
                   <div className="min-w-0">
-                    <p className={`truncate font-bold ${rarityStyle[item.rarity].text}`}>{item.name}</p>
+                    <p className={`truncate font-bold ${rarityStyle[item.rarity].text}`}>
+                      {item.name}
+                      {item.equipTag && (
+                        <span className="ml-1 text-[9px] text-gray-400">[{TAG_LABEL[item.equipTag]}]</span>
+                      )}
+                    </p>
                     <p className="text-[10px] text-gray-400">
                       {slotLabel[item.slot]} ・ {rarityLabel[item.rarity]}
+                      {!canEquip(item, classId) && <span className="ml-1 text-red-400">装備不可</span>}
                     </p>
                   </div>
                   <span className="ml-2 shrink-0 text-xs text-gray-400">詳細 ›</span>
@@ -163,6 +173,7 @@ export default function InventoryList() {
           item={selectedItem}
           equippedItem={equipped[selectedItem.slot]}
           favorite={favorites.includes(itemKey(selectedItem))}
+          equippable={canEquip(selectedItem, classId)}
           onToggleFavorite={() => toggleFavorite(itemKey(selectedItem))}
           onEquip={() => {
             equipItem(selected);
@@ -194,6 +205,7 @@ function EquipmentDetailModal({
   item,
   equippedItem,
   favorite,
+  equippable,
   onToggleFavorite,
   onEquip,
   onScrap,
@@ -202,6 +214,7 @@ function EquipmentDetailModal({
   item: Equipment;
   equippedItem: Equipment | null;
   favorite: boolean;
+  equippable: boolean;
   onToggleFavorite: () => void;
   onEquip: () => void;
   onScrap: () => void;
@@ -285,8 +298,12 @@ function EquipmentDetailModal({
           >
             {favorite ? "🔒 ロック中" : `分解 +${SCRAP_VALUE[item.rarity]}`}
           </button>
-          <button onClick={onEquip} className="h-12 flex-1 rounded-xl bg-emerald-600 font-bold text-white active:scale-95">
-            装備する
+          <button
+            onClick={onEquip}
+            disabled={!equippable}
+            className="h-12 flex-1 rounded-xl bg-emerald-600 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
+          >
+            {equippable ? "装備する" : "職業不適合"}
           </button>
         </div>
       </div>

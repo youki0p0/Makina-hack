@@ -4,6 +4,9 @@ export type Rarity = "common" | "rare" | "epic" | "legendary" | "cursed";
 
 export type EquipmentSlot = "weapon" | "armor" | "accessory";
 
+/** Equipment category used for class-based equip restrictions. */
+export type EquipTag = "light" | "heavy" | "magic";
+
 export type DiceValue = 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
@@ -118,6 +121,8 @@ export interface Equipment {
   affixId?: string;
   /** Earliest dungeon floor this item starts dropping (default 1). */
   minFloor?: number;
+  /** Category for class equip restrictions (undefined = any class). */
+  equipTag?: EquipTag;
 }
 
 export type EquippedItems = {

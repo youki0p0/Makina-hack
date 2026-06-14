@@ -1,4 +1,4 @@
-import type { ClassId, DiceModifier, Progress, StatBonus } from "@/types/game";
+import type { ClassId, DiceModifier, EquipTag, Equipment, Progress, StatBonus } from "@/types/game";
 
 export interface CharacterClass {
   id: ClassId;
@@ -168,6 +168,27 @@ export function normalizeClassId(id?: ClassId): ClassId {
 
 export function classStatBonus(id: ClassId): StatBonus {
   return getClass(id).statMods;
+}
+
+/** Which equipment categories each class may equip. */
+const CLASS_EQUIP_TAGS: Record<ClassId, EquipTag[]> = {
+  adventurer: ["light", "heavy", "magic"],
+  warrior: ["light", "heavy"],
+  rogue: ["light"],
+  mage: ["magic", "light"],
+  berserker: ["light", "heavy"],
+  paladin: ["light", "heavy"],
+  hexer: ["magic", "light"],
+};
+
+export function classEquipTags(id: ClassId): EquipTag[] {
+  return CLASS_EQUIP_TAGS[id] ?? ["light", "heavy", "magic"];
+}
+
+/** Whether the given class may equip the item (untagged items are universal). */
+export function canEquip(item: Equipment, id: ClassId): boolean {
+  if (!item.equipTag) return true;
+  return classEquipTags(id).includes(item.equipTag);
 }
 
 /** Whether a class is unlocked for the given progress (no unlock = always). */

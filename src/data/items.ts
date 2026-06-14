@@ -1,5 +1,5 @@
 import { applyAffix, getAffixById } from "@/data/affixes";
-import type { Equipment, EquipmentSlot, Rarity } from "@/types/game";
+import type { EquipTag, Equipment, EquipmentSlot, Rarity } from "@/types/game";
 
 /**
  * Hand-crafted "signature" items — the ones with dice-rewrite effects.
@@ -16,6 +16,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "錆びた剣",
     rarity: "common",
     slot: "weapon",
+    equipTag: "light",
     attack: 2,
     defense: 0,
     maxHp: 0,
@@ -28,6 +29,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "鉄の剣",
     rarity: "common",
     slot: "weapon",
+    equipTag: "light",
     attack: 4,
     defense: 0,
     maxHp: 0,
@@ -47,6 +49,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "盗賊の短剣",
     rarity: "rare",
     slot: "weapon",
+    equipTag: "light",
     attack: 3,
     defense: 0,
     maxHp: 0,
@@ -65,6 +68,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "吸血の剣",
     rarity: "epic",
     slot: "weapon",
+    equipTag: "light",
     attack: 5,
     defense: 0,
     maxHp: 0,
@@ -84,6 +88,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "呪いの斧",
     rarity: "cursed",
     slot: "weapon",
+    equipTag: "heavy",
     attack: 10,
     defense: 0,
     maxHp: 0,
@@ -110,6 +115,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "毒牙の短剣",
     rarity: "epic",
     slot: "weapon",
+    equipTag: "light",
     attack: 3,
     defense: 0,
     maxHp: 0,
@@ -130,6 +136,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "業火の剣",
     rarity: "legendary",
     slot: "weapon",
+    equipTag: "heavy",
     attack: 6,
     defense: 0,
     maxHp: 0,
@@ -153,6 +160,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "雷神の鎚",
     rarity: "epic",
     slot: "weapon",
+    equipTag: "heavy",
     attack: 5,
     defense: 0,
     maxHp: 0,
@@ -172,6 +180,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "呪詛のロッド",
     rarity: "rare",
     slot: "weapon",
+    equipTag: "magic",
     attack: 3,
     defense: 0,
     maxHp: 0,
@@ -193,6 +202,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "革の鎧",
     rarity: "common",
     slot: "armor",
+    equipTag: "light",
     attack: 0,
     defense: 2,
     maxHp: 0,
@@ -205,6 +215,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "鉄の鎧",
     rarity: "rare",
     slot: "armor",
+    equipTag: "heavy",
     attack: 0,
     defense: 5,
     maxHp: 5,
@@ -223,6 +234,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "重装鎧",
     rarity: "epic",
     slot: "armor",
+    equipTag: "heavy",
     attack: 0,
     defense: 9,
     maxHp: 10,
@@ -302,6 +314,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "竜殺しの大剣",
     rarity: "legendary",
     slot: "weapon",
+    equipTag: "heavy",
     attack: 8,
     defense: 0,
     maxHp: 0,
@@ -386,9 +399,16 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
 const MATERIALS = [
   "木", "銅", "青銅", "鉄", "鋼", "銀", "金剛", "ミスリル", "アダマント", "竜骨", "星鉄", "神鉄",
 ];
-const WEAPON_NOUNS = ["短剣", "剣", "斧", "槍", "戦鎚", "大剣"];
+const WEAPON_NOUNS = ["短剣", "剣", "槍", "斧", "大剣", "杖"];
 const ARMOR_NOUNS = ["布鎧", "革鎧", "鎖鎧", "板鎧", "重鎧"];
 const ACC_NOUNS = ["指輪", "腕輪", "護符", "宝珠", "首飾り"];
+
+const WEAPON_TAG: Record<string, EquipTag> = {
+  短剣: "light", 剣: "light", 槍: "heavy", 斧: "heavy", 大剣: "heavy", 杖: "magic",
+};
+const ARMOR_TAG: Record<string, EquipTag> = {
+  布鎧: "magic", 革鎧: "light", 鎖鎧: "heavy", 板鎧: "heavy", 重鎧: "heavy",
+};
 
 function rarityForTier(t: number): Rarity {
   if (t <= 15) return "common";
@@ -414,10 +434,12 @@ function generatedItem(slot: EquipmentSlot, t: number, noun: string): Equipment 
   };
   if (slot === "weapon") {
     item.attack = Math.round(2 + t * 0.8);
+    item.equipTag = WEAPON_TAG[noun];
     item.description = `攻撃+${item.attack}`;
   } else if (slot === "armor") {
     item.defense = Math.round(1 + t * 0.7);
     item.maxHp = Math.round(t * 1.5);
+    item.equipTag = ARMOR_TAG[noun];
     item.description = `防御+${item.defense} / HP+${item.maxHp}`;
   } else {
     item.maxHp = Math.round(t * 1.2);
