@@ -1,0 +1,19 @@
+{
+  "name": "ダイスダンジョン",
+  "short_name": "ダイス",
+  "description": "装備で出目が書き換わるスマホ向けコマンド式ハクスラRPG",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0a12",
+  "theme_color": "#0b0a12",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

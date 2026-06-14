@@ -1,10 +1,21 @@
 import type { Metadata, Viewport } from "next";
 import AudioController from "@/components/AudioController";
+import PWARegister from "@/components/PWARegister";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "ダイスダンジョン",
   description: "装備で出目が書き換わる、スマホ向けコマンド式ハクスラRPG",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "ダイスダンジョン",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export const viewport: Viewport = {
@@ -24,6 +35,7 @@ export default function RootLayout({
     <html lang="ja">
       <body>
         <AudioController />
+        <PWARegister />
         <div className="app-shell">{children}</div>
       </body>
     </html>
