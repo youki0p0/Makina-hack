@@ -157,6 +157,9 @@ export interface StatBonus {
 
 // ===== Enemies =====
 
+/** Special enemy behaviors that can fire on the enemy's turn. */
+export type EnemyAbility = "multiAttack" | "heal" | "defend";
+
 export interface EnemyTemplate {
   id: string;
   name: string;
@@ -169,6 +172,8 @@ export interface EnemyTemplate {
   /** Drop chance 0-1. */
   dropRate: number;
   isBoss: boolean;
+  /** Optional special action. */
+  ability?: EnemyAbility;
 }
 
 export interface Enemy {
@@ -187,6 +192,12 @@ export interface Enemy {
   statuses: ActiveStatus[];
   /** Remaining enemy turns to skip due to stun. */
   stunTurns: number;
+  /** Special action this enemy can perform (null if none). */
+  ability: EnemyAbility | null;
+  /** Temporary defense bonus from the "defend" ability. */
+  bonusDefense: number;
+  /** Remaining turns of the defense bonus. */
+  bonusDefenseTurns: number;
 }
 
 // ===== Consumables =====

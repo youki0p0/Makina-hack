@@ -1,11 +1,17 @@
 "use client";
 
 import { useGameStore } from "@/store/gameStore";
-import type { ActiveStatus, StatusKind } from "@/types/game";
+import type { ActiveStatus, EnemyAbility, StatusKind } from "@/types/game";
 
 const STATUS_UI: Record<StatusKind, { icon: string; cls: string }> = {
   poison: { icon: "☠️", cls: "bg-lime-500/20 text-lime-300" },
   burn: { icon: "🔥", cls: "bg-orange-500/20 text-orange-300" },
+};
+
+const ABILITY_LABEL: Record<EnemyAbility, string> = {
+  multiAttack: "連撃持ち",
+  heal: "回復持ち",
+  defend: "防御持ち",
 };
 
 /** Collapse stacked statuses into one badge per kind: total dmg/turn + max turns. */
@@ -61,14 +67,22 @@ export default function EnemyCard() {
       </div>
 
       <div className="mt-2 text-xs text-gray-400">
-        ⚔️ {enemy.attack} ／ 🛡️ {enemy.defense}
+        ⚔️ {enemy.attack} ／ 🛡️ {enemy.defense + (enemy.bonusDefense ?? 0)}
+        {enemy.ability && (
+          <span className="ml-2 text-rose-300">{ABILITY_LABEL[enemy.ability]}</span>
+        )}
       </div>
 
-      {(statuses.length > 0 || (enemy.stunTurns ?? 0) > 0) && (
+      {(statuses.length > 0 || (enemy.stunTurns ?? 0) > 0 || (enemy.bonusDefenseTurns ?? 0) > 0) && (
         <div className="mt-2 flex flex-wrap justify-center gap-1 text-[10px]">
           {(enemy.stunTurns ?? 0) > 0 && (
             <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 font-bold text-yellow-300">
               ⚡ スタン ({enemy.stunTurns}T)
+            </span>
+          )}
+          {(enemy.bonusDefenseTurns ?? 0) > 0 && (
+            <span className="rounded-full bg-blue-500/20 px-2 py-0.5 font-bold text-blue-300">
+              🛡️↑ 防御+{enemy.bonusDefense} ({enemy.bonusDefenseTurns}T)
             </span>
           )}
           {statuses.map((s) => (

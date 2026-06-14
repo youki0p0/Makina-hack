@@ -36,6 +36,7 @@ export const ENEMY_TEMPLATES: readonly EnemyTemplate[] = [
     baseGold: 12,
     dropRate: 0.35,
     isBoss: false,
+    ability: "defend",
   },
   {
     id: "orc",
@@ -48,6 +49,7 @@ export const ENEMY_TEMPLATES: readonly EnemyTemplate[] = [
     baseGold: 18,
     dropRate: 0.4,
     isBoss: false,
+    ability: "multiAttack",
   },
 ];
 
@@ -62,6 +64,7 @@ export const BOSS_TEMPLATE: EnemyTemplate = {
   baseGold: 60,
   dropRate: 1,
   isBoss: true,
+  ability: "heal",
 };
 
 /**
@@ -98,6 +101,9 @@ export function generateEnemy(floor: number): Enemy {
     isBoss: template.isBoss,
     statuses: [],
     stunTurns: 0,
+    ability: template.ability ?? null,
+    bonusDefense: 0,
+    bonusDefenseTurns: 0,
   };
 }
 
