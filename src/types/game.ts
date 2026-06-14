@@ -252,6 +252,10 @@ export interface BattleResult {
   consumable: Consumable | null;
   /** HP restored by an auto-used heal consumable. */
   healed: number;
+  /** Consecutive-win count after this battle. */
+  winStreak: number;
+  /** Bonus percent applied to gold/exp from the win streak (0 = none). */
+  streakBonusPct: number;
 }
 
 // ===== Persistence =====
@@ -269,4 +273,6 @@ export interface SaveData {
   artifacts?: ArtifactLevels;
   /** Current character class (optional for old saves). */
   classId?: ClassId;
+  /** Consecutive-win count (optional for old saves). */
+  winStreak?: number;
 }
