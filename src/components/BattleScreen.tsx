@@ -97,6 +97,18 @@ function ResultOverlay() {
             ) : (
               <p className="text-xs text-gray-500">ドロップなし</p>
             )}
+            {result.consumable && (
+              <div className="mt-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-2">
+                <p className="font-bold text-emerald-300">
+                  ✨ {result.consumable.name} を使用
+                </p>
+                <p className="mt-0.5 text-xs text-gray-300">
+                  {result.consumable.kind === "heal"
+                    ? `HP +${result.healed}`
+                    : result.consumable.description}
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="mt-3 space-y-1 text-sm text-gray-200">

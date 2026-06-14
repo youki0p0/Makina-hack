@@ -1,5 +1,6 @@
+import { CONSUMABLES } from "@/data/consumables";
 import { ITEMS } from "@/data/items";
-import type { Enemy, Equipment, Rarity } from "@/types/game";
+import type { Consumable, Enemy, Equipment, Rarity } from "@/types/game";
 
 /** Relative weight of each rarity in the drop table. */
 const RARITY_WEIGHT: Record<Rarity, number> = {
@@ -40,4 +41,24 @@ export function rollLoot(enemy: Enemy, floor: number): Equipment | null {
     }
   }
   return { ...weighted[weighted.length - 1].item };
+}
+
+/**
+ * Roll for a consumable after victory (independent of the equipment drop).
+ * Consumables are auto-used on pickup, so this just decides what to apply.
+ */
+export function rollConsumable(enemy: Enemy): Consumable | null {
+  const chance = enemy.isBoss ? 0.6 : 0.3;
+  if (Math.random() > chance) return null;
+
+  const weighted = CONSUMABLES.map((c) => ({ c, weight: RARITY_WEIGHT[c.rarity] }));
+  const total = weighted.reduce((sum, w) => sum + w.weight, 0);
+  let roll = Math.random() * total;
+  for (const { c, weight } of weighted) {
+    roll -= weight;
+    if (roll <= 0) {
+      return { ...c };
+    }
+  }
+  return { ...weighted[weighted.length - 1].c };
 }

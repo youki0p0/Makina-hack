@@ -163,6 +163,35 @@ export interface Enemy {
   statuses: ActiveStatus[];
 }
 
+// ===== Consumables =====
+
+/**
+ * Consumables are auto-used the instant they drop.
+ * - "heal": instantly restore HP.
+ * - "attack"/"defense"/"reroll": temporary buff lasting `battles` battles.
+ * - "luck": dice manipulation — the die rolls at least `value` for `battles` battles.
+ */
+export type ConsumableKind = "heal" | "attack" | "defense" | "reroll" | "luck";
+
+export interface Consumable {
+  id: string;
+  name: string;
+  rarity: Rarity;
+  kind: ConsumableKind;
+  /** Heal HP, buff magnitude, or minimum die value (luck). */
+  value: number;
+  /** Duration in battles for buffs (0 for instant heal). */
+  battles: number;
+  description: string;
+}
+
+/** A temporary buff currently in effect, counting down per battle. */
+export interface ActiveBuff {
+  kind: Exclude<ConsumableKind, "heal">;
+  value: number;
+  battlesLeft: number;
+}
+
 // ===== Battle =====
 
 export type BattleState = "idle" | "player" | "won" | "lost";
@@ -180,6 +209,10 @@ export interface BattleResult {
   goldLost: number;
   drop: Equipment | null;
   leveledUp: boolean;
+  /** Consumable that dropped and was auto-used this victory. */
+  consumable: Consumable | null;
+  /** HP restored by an auto-used heal consumable. */
+  healed: number;
 }
 
 // ===== Persistence =====

@@ -9,18 +9,22 @@ import {
   computeStats,
   EQUIP_SLOTS,
   expForLevel,
+  luckFloor,
   resolveEnemyAttack,
   resolvePlayerAction,
+  tickBuffs,
   tickEnemyStatuses,
 } from "@/lib/battle";
 import { applyEquipmentModifiers, rollDice } from "@/lib/dice";
-import { rollLoot } from "@/lib/loot";
+import { rollConsumable, rollLoot } from "@/lib/loot";
 import { clearSave, loadGame, saveGame } from "@/lib/save";
 import type {
+  ActiveBuff,
   BattleLogEntry,
   BattleResult,
   BattleState,
   ComputedStats,
+  Consumable,
   DiceFace,
   DiceValue,
   Enemy,
@@ -62,6 +66,8 @@ interface GameState {
   rerollsLeft: number;
   battleLog: BattleLogEntry[];
   lastResult: BattleResult | null;
+  /** Temporary consumable buffs in effect, counting down per battle. */
+  activeBuffs: ActiveBuff[];
 
   // selectors
   stats: () => ComputedStats;
@@ -114,6 +120,12 @@ export const useGameStore = create<GameState>((set, get) => {
     ]);
   }
 
+  /** Roll the die, honoring any active "luck" buff (minimum value). */
+  function rollWithLuck(): DiceValue {
+    const min = luckFloor(get().activeBuffs);
+    return Math.max(rollDice(), min) as DiceValue;
+  }
+
   return {
     hydrated: false,
     player: createPlayer(),
@@ -127,8 +139,9 @@ export const useGameStore = create<GameState>((set, get) => {
     rerollsLeft: 1,
     battleLog: [],
     lastResult: null,
+    activeBuffs: [],
 
-    stats: () => computeStats(get().player, get().equipped),
+    stats: () => computeStats(get().player, get().equipped, get().activeBuffs),
     currentFace: () => faceByValue(get().diceFaces, get().diceValue),
 
     hydrate: () => {
@@ -169,6 +182,7 @@ export const useGameStore = create<GameState>((set, get) => {
         battleState: "idle",
         battleLog: [],
         lastResult: null,
+        activeBuffs: [],
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -177,7 +191,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
     startBattle: () => {
       const { currentFloor, player } = get();
-      const stats = computeStats(player, get().equipped);
+      const stats = computeStats(player, get().equipped, get().activeBuffs);
       const enemy = generateEnemy(currentFloor);
       // Heal a little between fights so runs are survivable but not free.
       const healed = Math.min(stats.maxHp, player.hp + Math.round(stats.maxHp * 0.15));
@@ -185,7 +199,7 @@ export const useGameStore = create<GameState>((set, get) => {
         currentEnemy: enemy,
         battleState: "player",
         diceFaces: refreshFaces(),
-        diceValue: rollDice(),
+        diceValue: rollWithLuck(),
         rerollsLeft: stats.rerolls,
         lastResult: null,
         player: { ...player, hp: healed },
@@ -199,7 +213,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const { rerollsLeft, battleState } = get();
       if (battleState !== "player" || rerollsLeft <= 0) return;
       set({
-        diceValue: rollDice(),
+        diceValue: rollWithLuck(),
         rerollsLeft: rerollsLeft - 1,
       });
     },
@@ -208,7 +222,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const state = get();
       if (state.battleState !== "player" || !state.currentEnemy) return;
 
-      const stats = computeStats(state.player, state.equipped);
+      const stats = computeStats(state.player, state.equipped, state.activeBuffs);
       const face = faceByValue(state.diceFaces, state.diceValue);
       const enemy = state.currentEnemy;
 
@@ -285,7 +299,7 @@ export const useGameStore = create<GameState>((set, get) => {
       set({
         currentEnemy: { ...enemy, hp: enemyHp, statuses },
         player: { ...state.player, hp: playerHp },
-        diceValue: rollDice(),
+        diceValue: rollWithLuck(),
         rerollsLeft: stats.rerolls,
         battleLog: log,
       });
@@ -349,20 +363,43 @@ export const useGameStore = create<GameState>((set, get) => {
     const goldGained = enemy.gold;
     const drop = rollLoot(enemy, state.currentFloor);
 
-    const withHp: Player = { ...state.player, hp: playerHp, gold: state.player.gold + goldGained };
-    const { player: leveled, leveledUp } = applyExp(withHp, expGained);
+    let leveledPlayer: Player = { ...state.player, hp: playerHp, gold: state.player.gold + goldGained };
+    const { player: leveled, leveledUp } = applyExp(leveledPlayer, expGained);
+    leveledPlayer = leveled;
 
     let finalLog = pushLogs(log, [
       { text: `EXP +${expGained} / ゴールド +${goldGained}`, tone: "good" },
     ]);
     if (leveledUp) {
       finalLog = pushLogs(finalLog, [
-        { text: `レベルアップ！ Lv${leveled.level} (全回復)`, tone: "good" },
+        { text: `レベルアップ！ Lv${leveledPlayer.level} (全回復)`, tone: "good" },
       ]);
     }
     const inventory = drop ? [...state.inventory, drop] : state.inventory;
     if (drop) {
       finalLog = pushLogs(finalLog, [{ text: `${drop.name} を手に入れた！`, tone: "good" }]);
+    }
+
+    // Consumables are auto-used the instant they drop.
+    // Count down existing buffs (active this battle) before adding any new one.
+    let buffs = tickBuffs(state.activeBuffs);
+    const consumable: Consumable | null = rollConsumable(enemy);
+    let healed = 0;
+    if (consumable) {
+      if (consumable.kind === "heal") {
+        const maxHp = computeStats(leveledPlayer, state.equipped, buffs).maxHp;
+        const before = leveledPlayer.hp;
+        leveledPlayer = { ...leveledPlayer, hp: Math.min(maxHp, before + consumable.value) };
+        healed = leveledPlayer.hp - before;
+        finalLog = pushLogs(finalLog, [
+          { text: `${consumable.name} を使用！ HP +${healed}`, tone: "good" },
+        ]);
+      } else {
+        buffs = [...buffs, { kind: consumable.kind, value: consumable.value, battlesLeft: consumable.battles }];
+        finalLog = pushLogs(finalLog, [
+          { text: `${consumable.name} を使用！ ${consumable.description}`, tone: "good" },
+        ]);
+      }
     }
 
     const result: BattleResult = {
@@ -372,16 +409,19 @@ export const useGameStore = create<GameState>((set, get) => {
       goldLost: 0,
       drop,
       leveledUp,
+      consumable,
+      healed,
     };
 
     return {
-      player: leveled,
+      player: leveledPlayer,
       inventory,
       currentEnemy: enemy,
       currentFloor: state.currentFloor + 1,
       battleState: "won",
       battleLog: finalLog,
       lastResult: result,
+      activeBuffs: buffs,
     };
   }
 
@@ -405,6 +445,8 @@ export const useGameStore = create<GameState>((set, get) => {
       goldLost,
       drop: null,
       leveledUp: false,
+      consumable: null,
+      healed: 0,
     };
 
     const finalLog = pushLogs(log, [
@@ -419,6 +461,8 @@ export const useGameStore = create<GameState>((set, get) => {
       battleState: "lost",
       battleLog: finalLog,
       lastResult: result,
+      // Temporary buffs don't survive a run reset.
+      activeBuffs: [],
     };
   }
 
