@@ -17,9 +17,13 @@ export default function TitlePage() {
     hydrate();
   }, [hydrate]);
 
+  const seenHelp = useGameStore((s) => s.seenHelp);
+  const markHelpSeen = useGameStore((s) => s.markHelpSeen);
+
   const hasProgress = hydrated && (floor > 1 || player.level > 1);
   const artifactsUnlocked = isFeatureUnlocked("artifacts", progress);
   const casinoUnlocked = isFeatureUnlocked("casino", progress);
+  const showFirstRun = hydrated && !seenHelp;
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6 text-center">
@@ -94,6 +98,13 @@ export default function TitlePage() {
             📚 実績 / 図鑑
           </Link>
 
+          <Link
+            href="/help"
+            className="h-12 rounded-2xl bg-white/10 pt-3 font-bold active:scale-95"
+          >
+            ❓ 遊び方
+          </Link>
+
           {hasProgress && (
             <button
               onClick={() => {
@@ -112,6 +123,35 @@ export default function TitlePage() {
       <p className="text-[10px] text-gray-600">
         操作は「リロール」と「決定」だけ。
       </p>
+
+      {showFirstRun && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-6">
+          <div className="w-full max-w-xs animate-pop rounded-2xl border border-white/15 bg-[#15131f] p-5 text-center">
+            <div className="text-3xl">🎲</div>
+            <h2 className="mt-1 text-lg font-extrabold">ようこそ！</h2>
+            <p className="mt-2 text-xs text-gray-300">
+              ターンごとに振られるダイスを、<br />
+              「リロール」で振り直し「決定」で発動。<br />
+              <span className="text-amber-300">装備や職業で出目の効果が変わる</span>のが肝です。
+            </p>
+            <div className="mt-4 flex flex-col gap-2">
+              <Link
+                href="/help"
+                onClick={markHelpSeen}
+                className="h-12 rounded-xl bg-emerald-600 pt-3 font-bold text-white active:scale-95"
+              >
+                遊び方を見る
+              </Link>
+              <button
+                onClick={markHelpSeen}
+                className="h-10 rounded-xl bg-white/10 font-bold active:scale-95"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

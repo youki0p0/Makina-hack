@@ -37,12 +37,20 @@ export default function BattleScreen() {
         >
           ← タイトル
         </Link>
-        <Link
-          href="/inventory"
-          className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
-        >
-          🎒 装備
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/help"
+            className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
+          >
+            ❓
+          </Link>
+          <Link
+            href="/inventory"
+            className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
+          >
+            🎒 装備
+          </Link>
+        </div>
       </div>
 
       <EnemyCard />

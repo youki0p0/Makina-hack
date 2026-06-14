@@ -110,6 +110,8 @@ interface GameState {
   progress: Progress;
   /** Favorited item keys (id:affix) pinned to the inventory top. */
   favorites: string[];
+  /** Whether the first-run help has been dismissed. */
+  seenHelp: boolean;
   /** Items for sale at the current shop floor (not persisted). */
   shopStock: ShopEntry[];
 
@@ -140,8 +142,9 @@ interface GameState {
   equipItem: (itemIndex: number) => void;
   unequipItem: (slot: keyof EquippedItems) => void;
 
-  // inventory
+  // misc
   toggleFavorite: (key: string) => void;
+  markHelpSeen: () => void;
 
   // gacha
   scrapItem: (itemIndex: number) => void;
@@ -176,6 +179,7 @@ export const useGameStore = create<GameState>((set, get) => {
       winStreak: s.winStreak,
       progress: s.progress,
       favorites: s.favorites,
+      seenHelp: s.seenHelp,
     });
   }
 
@@ -251,6 +255,7 @@ export const useGameStore = create<GameState>((set, get) => {
     winStreak: 0,
     progress: defaultProgress(),
     favorites: [],
+    seenHelp: false,
     shopStock: [],
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
@@ -276,6 +281,7 @@ export const useGameStore = create<GameState>((set, get) => {
           winStreak: loaded.winStreak,
           progress: loaded.progress,
           favorites: loaded.favorites,
+          seenHelp: loaded.seenHelp,
           hydrated: true,
         });
       } else {
@@ -314,6 +320,7 @@ export const useGameStore = create<GameState>((set, get) => {
         winStreak: 0,
         progress: defaultProgress(),
         favorites: [],
+        seenHelp: true,
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -606,6 +613,12 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
+    markHelpSeen: () => {
+      if (get().seenHelp) return;
+      set({ seenHelp: true });
+      persist();
+    },
+
     scrapItem: (itemIndex: number) => {
       const state = get();
       const item = state.inventory[itemIndex];
@@ -882,6 +895,7 @@ export const useGameStore = create<GameState>((set, get) => {
       winStreak: snap.winStreak ?? s.winStreak,
       progress: snap.progress ?? s.progress,
       favorites: snap.favorites ?? s.favorites,
+      seenHelp: snap.seenHelp ?? s.seenHelp,
     });
   }
 });
