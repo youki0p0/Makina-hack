@@ -4,7 +4,7 @@ import { CLASSES, isClassUnlocked } from "@/data/classes";
 import { getDifficulty } from "@/data/difficulty";
 import { defaultProgress } from "@/data/achievements";
 import { getDailyBonus } from "@/lib/daily";
-import { ENEMY_TEMPLATES, generateEnemy } from "@/data/enemies";
+import { BOSS_TEMPLATES, ENEMY_TEMPLATES, generateEnemy } from "@/data/enemies";
 
 describe("artifacts", () => {
   it("bonus scales with level", () => {
@@ -65,5 +65,10 @@ describe("enemies", () => {
     expect(boss.isBoss).toBe(true);
     expect(boss.enraged).toBe(false);
     expect(boss.weakenTurns).toBe(0);
+  });
+
+  it("has multiple boss types that rotate by tier", () => {
+    expect(BOSS_TEMPLATES.length).toBeGreaterThanOrEqual(5);
+    expect(generateEnemy(5).templateId).not.toBe(generateEnemy(10).templateId);
   });
 });

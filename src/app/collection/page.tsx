@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ACHIEVEMENTS, achievedCount } from "@/data/achievements";
-import { BOSS_TEMPLATE, ENEMY_ABILITY_LABEL, ENEMY_TEMPLATES } from "@/data/enemies";
+import { BOSS_TEMPLATES, ENEMY_ABILITY_LABEL, ENEMY_TEMPLATES } from "@/data/enemies";
 import { ITEMS } from "@/data/items";
 import { TITLES, isTitleUnlocked } from "@/data/titles";
 import { rarityLabel, rarityStyle } from "@/lib/ui";
@@ -29,7 +29,7 @@ export default function CollectionPage() {
     );
   }
 
-  const enemies = [...ENEMY_TEMPLATES, BOSS_TEMPLATE];
+  const enemies = [...ENEMY_TEMPLATES, ...BOSS_TEMPLATES];
 
   return (
     <main className="flex min-h-dvh flex-col gap-3 p-3">
