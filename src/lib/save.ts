@@ -121,3 +121,29 @@ export function clearSave(): void {
     // ignore
   }
 }
+
+/** Export the raw save as a base64 transfer code (empty if no save). */
+export function exportSave(): string {
+  if (typeof window === "undefined") return "";
+  const raw = window.localStorage.getItem(STORAGE_KEY);
+  if (!raw) return "";
+  try {
+    return btoa(unescape(encodeURIComponent(raw)));
+  } catch {
+    return "";
+  }
+}
+
+/** Import a base64 transfer code into localStorage. Returns success. */
+export function importSave(code: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const json = decodeURIComponent(escape(atob(code.trim())));
+    const data = JSON.parse(json) as Partial<SaveData>;
+    if (!data || typeof data !== "object" || !data.player) return false;
+    window.localStorage.setItem(STORAGE_KEY, json);
+    return true;
+  } catch {
+    return false;
+  }
+}

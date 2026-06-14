@@ -135,6 +135,13 @@ export default function TitlePage() {
             </div>
           </div>
 
+          <Link
+            href="/data"
+            className="mt-1 text-xs text-gray-500 underline active:scale-95"
+          >
+            💾 データ引き継ぎ
+          </Link>
+
           {hasProgress && (
             <button
               onClick={() => {

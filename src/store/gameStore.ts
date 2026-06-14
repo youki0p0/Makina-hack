@@ -35,7 +35,7 @@ import {
 import { applyEquipmentModifiers, rollDice } from "@/lib/dice";
 import { GACHA_COST, pullGachaItem, rollConsumable, rollLoot, SCRAP_VALUE } from "@/lib/loot";
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
-import { clearSave, loadGame, saveGame } from "@/lib/save";
+import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState } from "@/lib/save";
 import { itemKey, rarityRank } from "@/lib/ui";
 import type {
   ActiveBuff,
@@ -155,6 +155,8 @@ interface GameState {
   markHelpSeen: () => void;
   setTitle: (id: string) => void;
   setDifficulty: (id: Difficulty) => void;
+  exportSaveData: () => string;
+  importSaveData: (code: string) => boolean;
 
   // gacha
   scrapItem: (itemIndex: number) => void;
@@ -254,6 +256,34 @@ export const useGameStore = create<GameState>((set, get) => {
     return computeStats(player, equipped, buffs, passiveBonus());
   }
 
+  /** Apply a loaded save into state (used by hydrate and import). */
+  function applyLoaded(loaded: LoadedState): void {
+    set({
+      player: loaded.player,
+      equipped: loaded.equipped,
+      inventory: loaded.inventory,
+      currentFloor: loaded.currentFloor,
+      gachaPoints: loaded.gachaPoints,
+      souls: loaded.souls,
+      artifacts: loaded.artifacts,
+      classId: loaded.classId,
+      winStreak: loaded.winStreak,
+      progress: loaded.progress,
+      favorites: loaded.favorites,
+      seenHelp: loaded.seenHelp,
+      titleId: loaded.titleId,
+      difficulty: normalizeDifficulty(loaded.difficulty),
+      hydrated: true,
+      currentEnemy: null,
+      battleState: "idle",
+      battleLog: [],
+      lastResult: null,
+      activeBuffs: [],
+      shopStock: [],
+    });
+    set({ diceFaces: refreshFaces() });
+  }
+
   return {
     hydrated: false,
     player: createPlayer(),
@@ -292,23 +322,7 @@ export const useGameStore = create<GameState>((set, get) => {
       if (get().hydrated) return;
       const loaded = loadGame();
       if (loaded) {
-        set({
-          player: loaded.player,
-          equipped: loaded.equipped,
-          inventory: loaded.inventory,
-          currentFloor: loaded.currentFloor,
-          gachaPoints: loaded.gachaPoints,
-          souls: loaded.souls,
-          artifacts: loaded.artifacts,
-          classId: loaded.classId,
-          winStreak: loaded.winStreak,
-          progress: loaded.progress,
-          favorites: loaded.favorites,
-          seenHelp: loaded.seenHelp,
-          titleId: loaded.titleId,
-          difficulty: normalizeDifficulty(loaded.difficulty),
-          hydrated: true,
-        });
+        applyLoaded(loaded);
       } else {
         // Fresh save: start with a humble weapon already equipped.
         const starter = getItemById("rusty_sword");
@@ -654,6 +668,16 @@ export const useGameStore = create<GameState>((set, get) => {
     setDifficulty: (id: Difficulty) => {
       set({ difficulty: id });
       persist();
+    },
+
+    exportSaveData: () => exportSave(),
+
+    importSaveData: (code: string) => {
+      if (!importSave(code)) return false;
+      const loaded = loadGame();
+      if (!loaded) return false;
+      applyLoaded(loaded);
+      return true;
     },
 
     scrapItem: (itemIndex: number) => {
