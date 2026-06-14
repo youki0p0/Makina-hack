@@ -101,6 +101,48 @@ export const ITEMS: readonly Equipment[] = [
       },
     ],
   },
+  {
+    id: "venom_fang",
+    name: "毒牙の短剣",
+    rarity: "epic",
+    slot: "weapon",
+    attack: 3,
+    defense: 0,
+    maxHp: 0,
+    rerollModifier: 1,
+    description: "攻撃力+3、リロール+1。2以上で毒を付与(継続ダメージ・累積)。",
+    diceModifiers: [
+      {
+        faces: [2, 3, 4, 5, 6],
+        effect: {
+          statusEffect: { kind: "poison", damagePerTurnMultiplier: 0.2, turns: 4 },
+        },
+        description: "2以上: 毒を付与 (4T・累積)",
+      },
+    ],
+  },
+  {
+    id: "flame_brand",
+    name: "業火の剣",
+    rarity: "legendary",
+    slot: "weapon",
+    attack: 6,
+    defense: 0,
+    maxHp: 0,
+    rerollModifier: 0,
+    description: "攻撃力+6。4以上で燃焼(強力な継続ダメージ)を付与。",
+    diceModifiers: [
+      {
+        faces: [4, 5, 6],
+        effect: {
+          kind: "fireball",
+          statusEffect: { kind: "burn", damagePerTurnMultiplier: 0.45, turns: 3 },
+        },
+        label: "業火",
+        description: "4以上: 燃焼を付与 (3T)",
+      },
+    ],
+  },
 
   // ===== armor =====
   {

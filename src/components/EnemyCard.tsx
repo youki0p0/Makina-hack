@@ -1,6 +1,27 @@
 "use client";
 
 import { useGameStore } from "@/store/gameStore";
+import type { ActiveStatus, StatusKind } from "@/types/game";
+
+const STATUS_UI: Record<StatusKind, { icon: string; cls: string }> = {
+  poison: { icon: "☠️", cls: "bg-lime-500/20 text-lime-300" },
+  burn: { icon: "🔥", cls: "bg-orange-500/20 text-orange-300" },
+};
+
+/** Collapse stacked statuses into one badge per kind: total dmg/turn + max turns. */
+function summarize(statuses: ActiveStatus[]): { kind: StatusKind; dps: number; turns: number }[] {
+  const map = new Map<StatusKind, { kind: StatusKind; dps: number; turns: number }>();
+  for (const s of statuses) {
+    const cur = map.get(s.kind);
+    if (cur) {
+      cur.dps += s.damagePerTurn;
+      cur.turns = Math.max(cur.turns, s.remainingTurns);
+    } else {
+      map.set(s.kind, { kind: s.kind, dps: s.damagePerTurn, turns: s.remainingTurns });
+    }
+  }
+  return [...map.values()];
+}
 
 export default function EnemyCard() {
   const enemy = useGameStore((s) => s.currentEnemy);
@@ -9,6 +30,7 @@ export default function EnemyCard() {
   if (!enemy) return null;
 
   const hpPct = Math.max(0, Math.round((enemy.hp / enemy.maxHp) * 100));
+  const statuses = summarize(enemy.statuses ?? []);
 
   return (
     <div
@@ -41,6 +63,19 @@ export default function EnemyCard() {
       <div className="mt-2 text-xs text-gray-400">
         ⚔️ {enemy.attack} ／ 🛡️ {enemy.defense}
       </div>
+
+      {statuses.length > 0 && (
+        <div className="mt-2 flex flex-wrap justify-center gap-1 text-[10px]">
+          {statuses.map((s) => (
+            <span
+              key={s.kind}
+              className={`rounded-full px-2 py-0.5 font-bold ${STATUS_UI[s.kind].cls}`}
+            >
+              {STATUS_UI[s.kind].icon} {s.dps}/T ({s.turns}T)
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
