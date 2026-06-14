@@ -13,7 +13,12 @@ export default function ShopScreen() {
   const leave = useGameStore((s) => s.leaveShop);
 
   return (
-    <div className="flex min-h-dvh flex-col gap-3 p-3">
+    <div
+      className="flex h-[100dvh] flex-col gap-2 overflow-hidden px-3"
+      style={{
+        paddingTop: "max(0.5rem, env(safe-area-inset-top))",
+      }}
+    >
       <div className="flex items-center justify-between">
         <Link href="/" className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">
           ← タイトル
@@ -21,13 +26,13 @@ export default function ShopScreen() {
         <span className="text-xs text-amber-300">💰 {gold}</span>
       </div>
 
-      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-center">
-        <div className="text-3xl">🏪</div>
-        <h1 className="font-bold text-amber-200">{floor}階 — ショップ</h1>
+      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-2 text-center">
+        <h1 className="font-bold text-amber-200">🏪 {floor}階 — ショップ</h1>
         <p className="text-[10px] text-gray-400">ゴールドで装備や消費アイテムを購入できる。</p>
       </div>
 
-      <div className="space-y-2">
+      {/* Scrollable stock list so the bottom actions stay pinned. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         {stock.map((entry) => {
           const name =
             entry.kind === "equipment" ? entry.equipment!.name : entry.consumable!.name;
@@ -63,7 +68,11 @@ export default function ShopScreen() {
         })}
       </div>
 
-      <div className="mt-auto flex flex-col gap-3">
+      {/* Pinned action area, padded above the browser/system bar. */}
+      <div
+        className="flex flex-col gap-2"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
         <PlayerStatus />
         <button
           onClick={leave}
