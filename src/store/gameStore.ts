@@ -12,6 +12,7 @@ import {
   classStatBonus,
   DEFAULT_CLASS_ID,
   getClass,
+  isClassUnlocked,
 } from "@/data/classes";
 import { generateEnemy } from "@/data/enemies";
 import { getItemById } from "@/data/items";
@@ -643,6 +644,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const state = get();
       if (!(state.classId === DEFAULT_CLASS_ID || state.currentFloor % 3 === 0)) return;
       if (id === state.classId) return;
+      if (!isClassUnlocked(id, state.progress)) return;
       const cls = getClass(id);
       const diceFaces = applyEquipmentModifiers([
         { name: cls.name, diceModifiers: cls.diceModifiers },

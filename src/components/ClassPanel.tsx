@@ -1,6 +1,6 @@
 "use client";
 
-import { CLASSES } from "@/data/classes";
+import { CLASSES, isClassUnlocked } from "@/data/classes";
 import { useGameStore } from "@/store/gameStore";
 import type { StatBonus } from "@/types/game";
 
@@ -17,6 +17,7 @@ export default function ClassPanel() {
   const classId = useGameStore((s) => s.classId);
   const canChange = useGameStore((s) => s.canChangeClass());
   const changeClass = useGameStore((s) => s.changeClass);
+  const progress = useGameStore((s) => s.progress);
 
   return (
     <div className="space-y-2">
@@ -30,34 +31,45 @@ export default function ClassPanel() {
       <div className="space-y-2">
         {CLASSES.map((c) => {
           const current = c.id === classId;
+          const unlocked = isClassUnlocked(c.id, progress);
           return (
             <div
               key={c.id}
               className={`rounded-xl border p-2 ${
-                current ? "border-emerald-500/60 bg-emerald-500/10" : "border-white/10 bg-black/20"
+                current
+                  ? "border-emerald-500/60 bg-emerald-500/10"
+                  : unlocked
+                    ? "border-white/10 bg-black/20"
+                    : "border-white/10 bg-black/20 opacity-60"
               }`}
             >
               <div className="flex items-center justify-between">
                 <p className="font-bold">
-                  {c.icon} {c.name}
+                  {unlocked ? c.icon : "🔒"} {c.name}
                   {current && <span className="ml-2 text-[10px] text-emerald-300">現在</span>}
                 </p>
                 <button
                   onClick={() => changeClass(c.id)}
-                  disabled={current || !canChange}
+                  disabled={current || !canChange || !unlocked}
                   className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-bold text-white active:scale-95 disabled:opacity-40"
                 >
-                  {current ? "選択中" : "転職"}
+                  {current ? "選択中" : unlocked ? "転職" : "未解放"}
                 </button>
               </div>
-              <p className="mt-0.5 text-[10px] text-gray-400">{c.description}</p>
-              <p className="mt-1 text-[10px] text-sky-300">{statSummary(c.statMods)}</p>
-              {c.diceModifiers.length > 0 && (
-                <ul className="mt-1 space-y-0.5 text-[10px] text-amber-200">
-                  {c.diceModifiers.map((m, i) => (
-                    <li key={i}>✦ {m.description}</li>
-                  ))}
-                </ul>
+              {unlocked ? (
+                <>
+                  <p className="mt-0.5 text-[10px] text-gray-400">{c.description}</p>
+                  <p className="mt-1 text-[10px] text-sky-300">{statSummary(c.statMods)}</p>
+                  {c.diceModifiers.length > 0 && (
+                    <ul className="mt-1 space-y-0.5 text-[10px] text-amber-200">
+                      {c.diceModifiers.map((m, i) => (
+                        <li key={i}>✦ {m.description}</li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : (
+                <p className="mt-0.5 text-[10px] text-amber-300">🔒 {c.unlockHint}</p>
               )}
             </div>
           );

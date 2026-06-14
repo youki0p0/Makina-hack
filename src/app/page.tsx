@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { isFeatureUnlocked, FEATURE_UNLOCKS } from "@/data/unlocks";
 import { useGameStore } from "@/store/gameStore";
 
 export default function TitlePage() {
@@ -10,12 +11,15 @@ export default function TitlePage() {
   const newGame = useGameStore((s) => s.newGame);
   const floor = useGameStore((s) => s.currentFloor);
   const player = useGameStore((s) => s.player);
+  const progress = useGameStore((s) => s.progress);
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
 
   const hasProgress = hydrated && (floor > 1 || player.level > 1);
+  const artifactsUnlocked = isFeatureUnlocked("artifacts", progress);
+  const casinoUnlocked = isFeatureUnlocked("casino", progress);
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6 text-center">
@@ -57,19 +61,31 @@ export default function TitlePage() {
             ⚔️ 転職
           </Link>
 
-          <Link
-            href="/artifacts"
-            className="h-12 rounded-2xl bg-indigo-600/80 pt-3 font-bold active:scale-95"
-          >
-            🔮 アーティファクト / 転生
-          </Link>
+          {artifactsUnlocked ? (
+            <Link
+              href="/artifacts"
+              className="h-12 rounded-2xl bg-indigo-600/80 pt-3 font-bold active:scale-95"
+            >
+              🔮 アーティファクト / 転生
+            </Link>
+          ) : (
+            <div className="h-12 rounded-2xl bg-white/5 pt-3 text-center text-sm text-gray-500">
+              🔒 アーティファクト（{FEATURE_UNLOCKS.artifacts.hint}）
+            </div>
+          )}
 
-          <Link
-            href="/casino"
-            className="h-12 rounded-2xl bg-fuchsia-600/80 pt-3 font-bold active:scale-95"
-          >
-            🎰 カジノ
-          </Link>
+          {casinoUnlocked ? (
+            <Link
+              href="/casino"
+              className="h-12 rounded-2xl bg-fuchsia-600/80 pt-3 font-bold active:scale-95"
+            >
+              🎰 カジノ
+            </Link>
+          ) : (
+            <div className="h-12 rounded-2xl bg-white/5 pt-3 text-center text-sm text-gray-500">
+              🔒 カジノ（{FEATURE_UNLOCKS.casino.hint}）
+            </div>
+          )}
 
           <Link
             href="/collection"
