@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { artifactBonus, artifactUpgradeCost, computeRebirthGain } from "@/data/artifacts";
-import { CLASSES, isClassUnlocked } from "@/data/classes";
+import { canEquip, CLASSES, isClassUnlocked } from "@/data/classes";
+import { getItemById } from "@/data/items";
 import { getDifficulty } from "@/data/difficulty";
 import { defaultProgress } from "@/data/achievements";
 import { getDailyBonus } from "@/lib/daily";
@@ -37,6 +38,18 @@ describe("class unlocks", () => {
   it("there are no duplicate class ids", () => {
     const ids = new Set(CLASSES.map((c) => c.id));
     expect(ids.size).toBe(CLASSES.length);
+  });
+
+  it("enforces class equip restrictions", () => {
+    const heavyAxe = getItemById("cursed_axe")!; // heavy
+    const magicRod = getItemById("hex_rod")!; // magic
+    const ring = getItemById("lucky_ring")!; // untagged (universal)
+    expect(canEquip(heavyAxe, "rogue")).toBe(false);
+    expect(canEquip(heavyAxe, "warrior")).toBe(true);
+    expect(canEquip(magicRod, "warrior")).toBe(false);
+    expect(canEquip(magicRod, "mage")).toBe(true);
+    expect(canEquip(ring, "rogue")).toBe(true); // accessories are universal
+    expect(canEquip(heavyAxe, "adventurer")).toBe(true); // adventurer equips all
   });
 });
 

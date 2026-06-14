@@ -11,6 +11,7 @@ import {
   defaultArtifactLevels,
 } from "@/data/artifacts";
 import {
+  canEquip,
   classStatBonus,
   DEFAULT_CLASS_ID,
   getClass,
@@ -671,6 +672,8 @@ export const useGameStore = create<GameState>((set, get) => {
       const state = get();
       const item = state.inventory[itemIndex];
       if (!item) return;
+      // Class equip restriction.
+      if (!canEquip(item, state.classId)) return;
 
       const slot = item.slot;
       const previously = state.equipped[slot];
@@ -864,14 +867,26 @@ export const useGameStore = create<GameState>((set, get) => {
       if (id === state.classId) return;
       if (!isClassUnlocked(id, state.progress)) return;
       const cls = getClass(id);
+
+      // Unequip gear the new class can't use; return it to the inventory.
+      const equipped: EquippedItems = { ...state.equipped };
+      const inventory = [...state.inventory];
+      for (const slot of EQUIP_SLOTS) {
+        const it = equipped[slot];
+        if (it && !canEquip(it, id)) {
+          inventory.push(it);
+          equipped[slot] = null;
+        }
+      }
+
       const diceFaces = applyEquipmentModifiers([
         { name: cls.name, diceModifiers: cls.diceModifiers },
-        state.equipped.weapon,
-        state.equipped.armor,
-        state.equipped.accessory,
+        equipped.weapon,
+        equipped.armor,
+        equipped.accessory,
       ]);
       // Re-clamp hp to the new class's max (don't auto-heal).
-      const stats = computeStats(state.player, state.equipped, state.activeBuffs, {
+      const stats = computeStats(state.player, equipped, state.activeBuffs, {
         attack: artifactBonus(state.artifacts).attack + cls.statMods.attack,
         defense: artifactBonus(state.artifacts).defense + cls.statMods.defense,
         maxHp: artifactBonus(state.artifacts).maxHp + cls.statMods.maxHp,
@@ -879,6 +894,8 @@ export const useGameStore = create<GameState>((set, get) => {
       });
       set({
         classId: id,
+        equipped,
+        inventory,
         diceFaces,
         player: { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) },
       });
