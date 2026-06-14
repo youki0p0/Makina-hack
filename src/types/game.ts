@@ -174,7 +174,13 @@ export interface StatBonus {
 // ===== Enemies =====
 
 /** Special enemy behaviors that can fire on the enemy's turn. */
-export type EnemyAbility = "multiAttack" | "heal" | "defend";
+export type EnemyAbility =
+  | "multiAttack"
+  | "heal"
+  | "defend"
+  | "lifesteal"
+  | "fierce"
+  | "guardBreak";
 
 export interface EnemyTemplate {
   id: string;

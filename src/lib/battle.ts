@@ -281,6 +281,35 @@ export function resolveEnemyTurn(
         logs: [`${enemy.name} は身を固めた！ (防御+${defendValue})`],
       };
     }
+    if (enemy.ability === "lifesteal") {
+      const damage = normal();
+      const heal = Math.max(1, Math.round(damage * 0.5));
+      return {
+        playerDamage: damage,
+        enemyHeal: heal,
+        defendValue: 0,
+        logs: [`${enemy.name} は吸血！ ${damage} ダメージ (自身 +${heal})`],
+      };
+    }
+    if (enemy.ability === "fierce") {
+      const damage = Math.max(1, Math.round(atk * 1.8) - stats.defense - guard);
+      return {
+        playerDamage: damage,
+        enemyHeal: 0,
+        defendValue: 0,
+        logs: [`${enemy.name} の渾身の一撃！ ${damage} ダメージ`],
+      };
+    }
+    if (enemy.ability === "guardBreak") {
+      // Ignores the player's guard for this turn.
+      const damage = Math.max(1, atk - stats.defense);
+      return {
+        playerDamage: damage,
+        enemyHeal: 0,
+        defendValue: 0,
+        logs: [`${enemy.name} の防御無視攻撃！ ${damage} ダメージ`],
+      };
+    }
   }
 
   const damage = normal();
