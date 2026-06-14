@@ -2,24 +2,31 @@ import { baseDiceFaces } from "@/data/diceFaces";
 import type {
   DiceFace,
   DiceFaceEffect,
+  DiceModifier,
   DiceValue,
-  Equipment,
 } from "@/types/game";
 
 export function rollDice(): DiceValue {
   return (Math.floor(Math.random() * 6) + 1) as DiceValue;
 }
 
+/** Anything that can rewrite dice faces: an equipment item or a character class. */
+export interface ModifierSource {
+  name: string;
+  diceModifiers: ReadonlyArray<DiceModifier>;
+}
+
 /**
  * THE CORE SYSTEM.
  *
  * Takes the base dice table and rewrites each face according to the
- * dice modifiers of every equipped item. Later items override earlier ones
- * for the same face, and every contributing item is tracked in `modifiedBy`
- * so the UI can highlight changed faces.
+ * dice modifiers of every source (character class first, then equipment).
+ * Later sources override earlier ones for the same face, and every
+ * contributing source is tracked in `modifiedBy` so the UI can highlight
+ * changed faces.
  */
 export function applyEquipmentModifiers(
-  equipped: ReadonlyArray<Equipment | null>,
+  equipped: ReadonlyArray<ModifierSource | null>,
 ): DiceFace[] {
   // Deep-ish clone so we never mutate the base table.
   const faces: DiceFace[] = baseDiceFaces.map((f) => ({

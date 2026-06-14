@@ -133,6 +133,10 @@ export interface ComputedStats {
   rerolls: number;
 }
 
+// ===== Character classes (転職) =====
+
+export type ClassId = "adventurer" | "warrior" | "rogue" | "mage" | "berserker";
+
 // ===== Artifacts (rebirth meta-progression) =====
 
 export type ArtifactId = "might" | "guard" | "vitality" | "fortune";
@@ -245,4 +249,6 @@ export interface SaveData {
   souls?: number;
   /** Permanent artifact levels carried across rebirths (optional for old saves). */
   artifacts?: ArtifactLevels;
+  /** Current character class (optional for old saves). */
+  classId?: ClassId;
 }
