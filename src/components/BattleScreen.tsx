@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import ActionButtons from "@/components/ActionButtons";
 import BattleLog from "@/components/BattleLog";
 import DiceDisplay from "@/components/DiceDisplay";
@@ -16,7 +16,10 @@ import { useGameStore } from "@/store/gameStore";
 export default function BattleScreen() {
   const battleState = useGameStore((s) => s.battleState);
   const currentEnemy = useGameStore((s) => s.currentEnemy);
+  const diceValue = useGameStore((s) => s.diceValue);
   const enterCurrentFloor = useGameStore((s) => s.enterCurrentFloor);
+  const confirm = useGameStore((s) => s.confirm);
+  const [auto, setAuto] = useState(false);
 
   // On entering with nothing in progress, resolve the floor (battle or shop).
   useEffect(() => {
@@ -25,6 +28,22 @@ export default function BattleScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-battle: take the current roll each turn, auto-advance on victory.
+  // Pauses on shop floors; stops on defeat. (diceValue retriggers each turn.)
+  useEffect(() => {
+    if (!auto) return;
+    if (battleState === "player") {
+      const t = setTimeout(() => confirm(), 450);
+      return () => clearTimeout(t);
+    }
+    if (battleState === "won") {
+      const t = setTimeout(() => enterCurrentFloor(), 750);
+      return () => clearTimeout(t);
+    }
+    if (battleState === "lost") setAuto(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto, battleState, diceValue]);
 
   if (battleState === "shop") {
     return <ShopScreen />;
@@ -40,6 +59,14 @@ export default function BattleScreen() {
           ← タイトル
         </Link>
         <div className="flex gap-2">
+          <button
+            onClick={() => setAuto((a) => !a)}
+            className={`rounded-lg px-3 py-1 text-xs font-bold active:scale-95 ${
+              auto ? "bg-amber-500 text-black" : "bg-white/10 text-gray-300"
+            }`}
+          >
+            {auto ? "⏩ オート中" : "⏵ オート"}
+          </button>
           <SoundToggle />
           <Link
             href="/help"
