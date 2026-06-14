@@ -218,6 +218,12 @@ export interface Enemy {
   weakenAmount: number;
   /** Remaining turns of weaken. */
   weakenTurns: number;
+  /** Boss gimmick: enraged (attack up below half HP). */
+  enraged: boolean;
+  /** Boss gimmick: charging a big attack next turn. */
+  charging: boolean;
+  /** Boss gimmick: turns counted toward the next charge. */
+  chargeCounter: number;
 }
 
 // ===== Consumables =====

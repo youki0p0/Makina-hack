@@ -292,6 +292,75 @@ export function resolveEnemyTurn(
   };
 }
 
+export interface BossTurnResult {
+  playerDamage: number;
+  enemyHeal: number;
+  charging: boolean;
+  chargeCounter: number;
+  logs: string[];
+}
+
+/** Turns between a boss's telegraphed charge attacks. */
+const CHARGE_EVERY = 3;
+
+/**
+ * Boss turn with gimmicks: enrage (attack up when enraged), a telegraphed
+ * charge → devastating hit cycle, and occasional self-heal.
+ */
+export function resolveBossTurn(
+  enemy: Enemy,
+  stats: ComputedStats,
+  guard: number,
+): BossTurnResult {
+  const weaken = enemy.weakenTurns > 0 ? enemy.weakenAmount : 0;
+  const eatk = Math.max(1, Math.round(enemy.attack * (enemy.enraged ? 1.5 : 1)) - weaken);
+
+  // Unleash the charged attack.
+  if (enemy.charging) {
+    const damage = Math.max(1, Math.round(eatk * 2.5) - stats.defense - guard);
+    return {
+      playerDamage: damage,
+      enemyHeal: 0,
+      charging: false,
+      chargeCounter: 0,
+      logs: [`${enemy.name} の渾身の一撃！ ${damage} ダメージ`],
+    };
+  }
+
+  // Time to start charging (telegraph).
+  const counter = enemy.chargeCounter + 1;
+  if (counter >= CHARGE_EVERY) {
+    return {
+      playerDamage: 0,
+      enemyHeal: 0,
+      charging: true,
+      chargeCounter: 0,
+      logs: [`${enemy.name} が力を溜め始めた…（次のターンに大技！）`],
+    };
+  }
+
+  // Occasional heal.
+  if (Math.random() < 0.2) {
+    const heal = Math.max(1, Math.round(enemy.maxHp * 0.12));
+    return {
+      playerDamage: 0,
+      enemyHeal: heal,
+      charging: false,
+      chargeCounter: counter,
+      logs: [`${enemy.name} は回復した！ (+${heal})`],
+    };
+  }
+
+  const damage = Math.max(1, eatk - stats.defense - guard);
+  return {
+    playerDamage: damage,
+    enemyHeal: 0,
+    charging: false,
+    chargeCounter: counter,
+    logs: [`${enemy.name} の攻撃！ ${damage} ダメージ`],
+  };
+}
+
 // ===== leveling =====
 
 export function expForLevel(level: number): number {

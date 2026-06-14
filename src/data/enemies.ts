@@ -107,6 +107,9 @@ export function generateEnemy(floor: number): Enemy {
     bonusDefenseTurns: 0,
     weakenAmount: 0,
     weakenTurns: 0,
+    enraged: false,
+    charging: false,
+    chargeCounter: 0,
   };
 }
 
