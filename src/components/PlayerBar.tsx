@@ -1,0 +1,87 @@
+"use client";
+
+import { getClass } from "@/data/classes";
+import { consumableIcon } from "@/data/consumables";
+import { getTitle } from "@/data/titles";
+import { useDamageFx } from "@/hooks/useDamageFx";
+import { useGameStore } from "@/store/gameStore";
+
+const BUFF_LABEL: Record<string, string> = {
+  attack: "攻",
+  defense: "防",
+  reroll: "振直",
+  luck: "幸運",
+};
+
+/** Compact player bar for the battle screen (HP/atk/def + vertical EXP gauge). */
+export default function PlayerBar() {
+  const player = useGameStore((s) => s.player);
+  const stats = useGameStore((s) => s.stats());
+  const buffs = useGameStore((s) => s.activeBuffs);
+  const cls = getClass(useGameStore((s) => s.classId));
+  const title = getTitle(useGameStore((s) => s.titleId));
+  const streak = useGameStore((s) => s.winStreak);
+  const playerStatuses = useGameStore((s) => s.playerStatuses);
+  const playerStunTurns = useGameStore((s) => s.playerStunTurns);
+  const poison = playerStatuses.reduce((sum, s) => sum + s.damagePerTurn, 0);
+  const { floaters } = useDamageFx(player.hp, "player", "hurt");
+
+  const hpPct = Math.max(0, Math.round((player.hp / stats.maxHp) * 100));
+  const expPct = Math.min(100, Math.round((player.exp / player.expToNext) * 100));
+
+  return (
+    <div className="relative flex gap-3 rounded-xl border border-white/10 bg-black/30 p-3">
+      {floaters.map((f) => (
+        <span key={f.id} className={`dmg-float text-xl ${f.cls}`}>
+          {f.text}
+        </span>
+      ))}
+
+      {/* Vertical EXP gauge — fills from the bottom upward. */}
+      <div className="relative w-2.5 shrink-0 self-stretch overflow-hidden rounded-full bg-gray-800">
+        <div
+          className="absolute bottom-0 left-0 w-full bg-sky-400 transition-all"
+          style={{ height: `${expPct}%` }}
+        />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="truncate font-bold">
+            {title.id && <span className="text-amber-300">《{title.name}》</span>} {cls.icon} {cls.name} Lv{player.level}
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            {streak >= 2 && <span className="text-orange-300">🔥{streak}</span>}
+            <span className="text-amber-300">💰{player.gold}</span>
+          </span>
+        </div>
+
+        <div className="mt-1 flex items-center gap-2">
+          <div className="h-3 flex-1 overflow-hidden rounded-full bg-gray-800">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all"
+              style={{ width: `${hpPct}%` }}
+            />
+          </div>
+          <span className="shrink-0 text-[11px] text-gray-300">
+            {Math.max(0, player.hp)}/{stats.maxHp}
+          </span>
+        </div>
+
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-300">
+          <span>⚔️{stats.attack}</span>
+          <span>🛡️{stats.defense}</span>
+          <span>🎲{stats.rerolls}</span>
+          {buffs.map((b, i) => (
+            <span key={`${b.kind}-${i}`} className="text-emerald-300">
+              {consumableIcon[b.kind]}{BUFF_LABEL[b.kind]}
+              {b.kind === "luck" ? `≥${b.value}` : `+${b.value}`}
+            </span>
+          ))}
+          {poison > 0 && <span className="text-lime-300">☠️{poison}/T</span>}
+          {playerStunTurns > 0 && <span className="text-yellow-300">⚡スタン</span>}
+        </div>
+      </div>
+    </div>
+  );
+}

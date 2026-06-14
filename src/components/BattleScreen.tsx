@@ -6,7 +6,7 @@ import ActionButtons from "@/components/ActionButtons";
 import BattleLog from "@/components/BattleLog";
 import DiceDisplay from "@/components/DiceDisplay";
 import EnemyCard from "@/components/EnemyCard";
-import PlayerStatus from "@/components/PlayerStatus";
+import PlayerBar from "@/components/PlayerBar";
 import ShopScreen from "@/components/ShopScreen";
 import SoundToggle from "@/components/SoundToggle";
 import { sfx } from "@/lib/audio";
@@ -89,6 +89,7 @@ export default function BattleScreen() {
       {/* Scrollable middle so the action bar stays pinned and visible. */}
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         <EnemyCard />
+        <PlayerBar />
         <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
           <DiceDisplay />
         </div>
@@ -100,7 +101,6 @@ export default function BattleScreen() {
         className="flex flex-col gap-2"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
-        <PlayerStatus />
         <ActionButtons />
       </div>
 
