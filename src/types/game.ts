@@ -333,4 +333,6 @@ export interface SaveData {
   seenHelp?: boolean;
   /** Selected title id shown next to the player's name. */
   titleId?: string;
+  /** Difficulty id ("normal"|"hard"|"hell"). */
+  difficulty?: string;
 }

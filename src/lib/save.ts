@@ -35,6 +35,7 @@ export interface LoadedState {
   favorites: string[];
   seenHelp: boolean;
   titleId: string;
+  difficulty: string;
 }
 
 export function saveGame(state: LoadedState): void {
@@ -57,6 +58,7 @@ export function saveGame(state: LoadedState): void {
     favorites: state.favorites,
     seenHelp: state.seenHelp,
     titleId: state.titleId,
+    difficulty: state.difficulty,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -104,6 +106,7 @@ export function loadGame(): LoadedState | null {
       favorites: Array.isArray(data.favorites) ? data.favorites : [],
       seenHelp: data.seenHelp ?? false,
       titleId: data.titleId ?? "",
+      difficulty: data.difficulty ?? "normal",
     };
   } catch {
     return null;
