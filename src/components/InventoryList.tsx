@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SCRAP_VALUE } from "@/lib/loot";
 import { rarityLabel, rarityStyle, slotLabel } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 import type { Equipment } from "@/types/game";
@@ -8,6 +9,7 @@ import type { Equipment } from "@/types/game";
 export default function InventoryList() {
   const inventory = useGameStore((s) => s.inventory);
   const equipItem = useGameStore((s) => s.equipItem);
+  const scrapItem = useGameStore((s) => s.scrapItem);
   const [selected, setSelected] = useState<number | null>(null);
 
   const selectedItem = selected !== null ? inventory[selected] : null;
@@ -53,6 +55,10 @@ export default function InventoryList() {
             equipItem(selected);
             setSelected(null);
           }}
+          onScrap={() => {
+            scrapItem(selected);
+            setSelected(null);
+          }}
           onClose={() => setSelected(null)}
         />
       )}
@@ -63,10 +69,12 @@ export default function InventoryList() {
 function EquipmentDetailModal({
   item,
   onEquip,
+  onScrap,
   onClose,
 }: {
   item: Equipment;
   onEquip: () => void;
+  onScrap: () => void;
   onClose: () => void;
 }) {
   const style = rarityStyle[item.rarity];
@@ -114,6 +122,12 @@ function EquipmentDetailModal({
             className="h-12 flex-1 rounded-xl bg-white/10 font-bold active:scale-95"
           >
             閉じる
+          </button>
+          <button
+            onClick={onScrap}
+            className="h-12 flex-1 rounded-xl bg-amber-700/80 text-sm font-bold text-white active:scale-95"
+          >
+            分解 +{SCRAP_VALUE[item.rarity]}
           </button>
           <button
             onClick={onEquip}

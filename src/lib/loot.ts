@@ -11,6 +11,42 @@ const RARITY_WEIGHT: Record<Rarity, number> = {
   legendary: 3,
 };
 
+/** Items that can drop from enemies (gacha-exclusive items excluded). */
+const DROPPABLE = ITEMS.filter((i) => !i.gachaOnly);
+
+/** Gacha currency gained by scrapping equipment, by rarity. */
+export const SCRAP_VALUE: Record<Rarity, number> = {
+  common: 1,
+  rare: 3,
+  epic: 6,
+  cursed: 5,
+  legendary: 12,
+};
+
+/** Cost of a single gacha pull. */
+export const GACHA_COST = 10;
+
+/**
+ * Pull a single equipment from the gacha. Includes gacha-exclusive items and
+ * tilts toward rarer gear than normal drops.
+ */
+export function pullGachaItem(): Equipment {
+  const weighted = ITEMS.map((item) => {
+    let weight = RARITY_WEIGHT[item.rarity];
+    // Gacha leans premium: boost rare+ and make exclusives meaningfully likely.
+    if (item.rarity !== "common") weight += 10;
+    if (item.gachaOnly) weight += 20;
+    return { item, weight };
+  });
+  const total = weighted.reduce((sum, w) => sum + w.weight, 0);
+  let roll = Math.random() * total;
+  for (const { item, weight } of weighted) {
+    roll -= weight;
+    if (roll <= 0) return { ...item };
+  }
+  return { ...weighted[weighted.length - 1].item };
+}
+
 /**
  * Roll for loot after defeating an enemy.
  * Bosses always drop; otherwise the enemy's dropRate decides.
@@ -21,7 +57,7 @@ export function rollLoot(enemy: Enemy, floor: number): Equipment | null {
   // Higher floors tilt the table toward better gear.
   const floorBonus = Math.min(floor * 1.5, 40);
 
-  const weighted = ITEMS.map((item) => {
+  const weighted = DROPPABLE.map((item) => {
     let weight = RARITY_WEIGHT[item.rarity];
     if (item.rarity === "epic" || item.rarity === "legendary" || item.rarity === "cursed") {
       weight += floorBonus;
