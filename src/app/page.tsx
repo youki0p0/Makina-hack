@@ -50,6 +50,13 @@ export default function TitlePage() {
             🎒 装備を見る
           </Link>
 
+          <Link
+            href="/artifacts"
+            className="h-12 rounded-2xl bg-indigo-600/80 pt-3 font-bold active:scale-95"
+          >
+            🔮 アーティファクト / 転生
+          </Link>
+
           {hasProgress && (
             <button
               onClick={() => {

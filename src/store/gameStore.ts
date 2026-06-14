@@ -1,6 +1,12 @@
 "use client";
 
 import { create } from "zustand";
+import {
+  artifactBonus,
+  artifactUpgradeCost,
+  computeRebirthGain,
+  defaultArtifactLevels,
+} from "@/data/artifacts";
 import { generateEnemy } from "@/data/enemies";
 import { getItemById } from "@/data/items";
 import {
@@ -20,6 +26,8 @@ import { GACHA_COST, pullGachaItem, rollConsumable, rollLoot, SCRAP_VALUE } from
 import { clearSave, loadGame, saveGame } from "@/lib/save";
 import type {
   ActiveBuff,
+  ArtifactId,
+  ArtifactLevels,
   BattleLogEntry,
   BattleResult,
   BattleState,
@@ -72,10 +80,16 @@ interface GameState {
   gachaPoints: number;
   /** The most recent gacha pull, for the result popup (not persisted). */
   lastPull: Equipment | null;
+  /** Rebirth currency. */
+  souls: number;
+  /** Permanent artifact levels (persist across rebirths). */
+  artifacts: ArtifactLevels;
 
   // selectors
   stats: () => ComputedStats;
   currentFace: () => DiceFace;
+  /** Souls that would be earned by rebirthing right now. */
+  rebirthGain: () => number;
 
   // lifecycle
   hydrate: () => void;
@@ -94,6 +108,10 @@ interface GameState {
   scrapItem: (itemIndex: number) => void;
   pullGacha: () => void;
   clearLastPull: () => void;
+
+  // artifacts / rebirth
+  upgradeArtifact: (id: ArtifactId) => void;
+  rebirth: () => void;
 }
 
 let logCounter = 0;
@@ -107,6 +125,8 @@ export const useGameStore = create<GameState>((set, get) => {
       inventory: s.inventory,
       currentFloor: s.currentFloor,
       gachaPoints: s.gachaPoints,
+      souls: s.souls,
+      artifacts: s.artifacts,
     });
   }
 
@@ -136,6 +156,15 @@ export const useGameStore = create<GameState>((set, get) => {
     return Math.max(rollDice(), min) as DiceValue;
   }
 
+  /** Compute stats including the player's permanent artifact bonuses. */
+  function currentStats(
+    player: Player,
+    equipped: EquippedItems,
+    buffs: ActiveBuff[] = [],
+  ): ComputedStats {
+    return computeStats(player, equipped, buffs, artifactBonus(get().artifacts));
+  }
+
   return {
     hydrated: false,
     player: createPlayer(),
@@ -152,9 +181,12 @@ export const useGameStore = create<GameState>((set, get) => {
     activeBuffs: [],
     gachaPoints: 0,
     lastPull: null,
+    souls: 0,
+    artifacts: defaultArtifactLevels(),
 
-    stats: () => computeStats(get().player, get().equipped, get().activeBuffs),
+    stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
     currentFace: () => faceByValue(get().diceFaces, get().diceValue),
+    rebirthGain: () => computeRebirthGain(get().currentFloor, get().player.level),
 
     hydrate: () => {
       if (get().hydrated) return;
@@ -166,6 +198,8 @@ export const useGameStore = create<GameState>((set, get) => {
           inventory: loaded.inventory,
           currentFloor: loaded.currentFloor,
           gachaPoints: loaded.gachaPoints,
+          souls: loaded.souls,
+          artifacts: loaded.artifacts,
           hydrated: true,
         });
       } else {
@@ -198,6 +232,8 @@ export const useGameStore = create<GameState>((set, get) => {
         activeBuffs: [],
         gachaPoints: 0,
         lastPull: null,
+        souls: 0,
+        artifacts: defaultArtifactLevels(),
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -206,7 +242,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
     startBattle: () => {
       const { currentFloor, player } = get();
-      const stats = computeStats(player, get().equipped, get().activeBuffs);
+      const stats = currentStats(player, get().equipped, get().activeBuffs);
       const enemy = generateEnemy(currentFloor);
       // Heal a little between fights so runs are survivable but not free.
       const healed = Math.min(stats.maxHp, player.hp + Math.round(stats.maxHp * 0.15));
@@ -237,7 +273,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const state = get();
       if (state.battleState !== "player" || !state.currentEnemy) return;
 
-      const stats = computeStats(state.player, state.equipped, state.activeBuffs);
+      const stats = currentStats(state.player, state.equipped, state.activeBuffs);
       const face = faceByValue(state.diceFaces, state.diceValue);
       const enemy = state.currentEnemy;
 
@@ -334,7 +370,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const equipped: EquippedItems = { ...state.equipped, [slot]: item };
 
       // Re-clamp hp to the new computed max.
-      const stats = computeStats(state.player, equipped);
+      const stats = currentStats(state.player, equipped);
       const player = { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) };
 
       set({
@@ -352,7 +388,7 @@ export const useGameStore = create<GameState>((set, get) => {
       if (!item) return;
       const equipped: EquippedItems = { ...state.equipped, [slot]: null };
       const inventory = [...state.inventory, item];
-      const stats = computeStats(state.player, equipped);
+      const stats = currentStats(state.player, equipped);
       const player = { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) };
       set({
         equipped,
@@ -388,6 +424,41 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     clearLastPull: () => set({ lastPull: null }),
+
+    upgradeArtifact: (id: ArtifactId) => {
+      const state = get();
+      const level = state.artifacts[id] ?? 0;
+      const cost = artifactUpgradeCost(id, level);
+      if (state.souls < cost) return;
+      const artifacts: ArtifactLevels = { ...state.artifacts, [id]: level + 1 };
+      // Recompute hp cap against the new artifact maxHp (don't auto-heal).
+      set({ souls: state.souls - cost, artifacts });
+      persist();
+    },
+
+    rebirth: () => {
+      const state = get();
+      const gain = computeRebirthGain(state.currentFloor, state.player.level);
+      const starter = getItemById("rusty_sword");
+      const equipped: EquippedItems = { ...emptyEquipped(), weapon: starter };
+      // Reset the run; keep only souls (+gain) and permanent artifacts.
+      set({
+        player: createPlayer(),
+        equipped,
+        inventory: [],
+        currentFloor: 1,
+        currentEnemy: null,
+        battleState: "idle",
+        battleLog: [],
+        lastResult: null,
+        activeBuffs: [],
+        gachaPoints: 0,
+        lastPull: null,
+        souls: state.souls + gain,
+        diceFaces: applyEquipmentModifiers([equipped.weapon, equipped.armor, equipped.accessory]),
+      });
+      persist();
+    },
   };
 
   // ===== victory / defeat helpers (closures over set/get not needed) =====
@@ -428,7 +499,7 @@ export const useGameStore = create<GameState>((set, get) => {
     let healed = 0;
     if (consumable) {
       if (consumable.kind === "heal") {
-        const maxHp = computeStats(leveledPlayer, state.equipped, buffs).maxHp;
+        const maxHp = currentStats(leveledPlayer, state.equipped, buffs).maxHp;
         const before = leveledPlayer.hp;
         leveledPlayer = { ...leveledPlayer, hp: Math.min(maxHp, before + consumable.value) };
         healed = leveledPlayer.hp - before;
@@ -515,6 +586,8 @@ export const useGameStore = create<GameState>((set, get) => {
       inventory: snap.inventory ?? s.inventory,
       currentFloor: snap.currentFloor ?? s.currentFloor,
       gachaPoints: snap.gachaPoints ?? s.gachaPoints,
+      souls: snap.souls ?? s.souls,
+      artifacts: snap.artifacts ?? s.artifacts,
     });
   }
 });
