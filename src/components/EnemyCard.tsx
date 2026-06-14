@@ -64,8 +64,13 @@ export default function EnemyCard() {
         ⚔️ {enemy.attack} ／ 🛡️ {enemy.defense}
       </div>
 
-      {statuses.length > 0 && (
+      {(statuses.length > 0 || (enemy.stunTurns ?? 0) > 0) && (
         <div className="mt-2 flex flex-wrap justify-center gap-1 text-[10px]">
+          {(enemy.stunTurns ?? 0) > 0 && (
+            <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 font-bold text-yellow-300">
+              ⚡ スタン ({enemy.stunTurns}T)
+            </span>
+          )}
           {statuses.map((s) => (
             <span
               key={s.kind}

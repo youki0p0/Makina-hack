@@ -91,6 +91,8 @@ export interface PlayerActionOutcome {
   logs: string[];
   /** Status to apply to the enemy this turn (null if none). */
   status: ActiveStatus | null;
+  /** Enemy turns to stun this turn (0 if none). */
+  stun: number;
 }
 
 export const STATUS_LABEL: Record<StatusKind, string> = {
@@ -128,6 +130,7 @@ export function resolvePlayerAction(
       hits: 0,
       logs: ["攻撃を外した！"],
       status: null,
+      stun: 0,
     };
   }
 
@@ -164,7 +167,12 @@ export function resolvePlayerAction(
     logs.push(`${STATUS_LABEL[status.kind]}を付与！ (${status.damagePerTurn}/T × ${status.remainingTurns}T)`);
   }
 
-  return { enemyDamage, selfDamage, heal, guard, hits, logs, status };
+  const stun = e.stun && e.stun > 0 ? e.stun : 0;
+  if (stun > 0) {
+    logs.push(`スタン！ 敵は${stun}ターン動けない`);
+  }
+
+  return { enemyDamage, selfDamage, heal, guard, hits, logs, status, stun };
 }
 
 export interface StatusTickResult {

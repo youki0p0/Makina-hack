@@ -365,26 +365,32 @@ export const useGameStore = create<GameState>((set, get) => {
         statuses = addStatus(statuses, action.status);
       }
 
-      // 6) Enemy retaliates.
-      const enemyAtk = resolveEnemyAttack(enemy, stats, action.guard);
-      playerHp -= enemyAtk.damage;
-      log = pushLogs(log, [{ text: enemyAtk.log, tone: "bad" }]);
+      // 6) Enemy retaliates — unless stunned. Stun applied this turn skips now.
+      let stunTurns = (enemy.stunTurns ?? 0) + action.stun;
+      if (stunTurns > 0) {
+        stunTurns -= 1;
+        log = pushLogs(log, [{ text: `${enemy.name} はスタンして動けない！`, tone: "good" }]);
+      } else {
+        const enemyAtk = resolveEnemyAttack(enemy, stats, action.guard);
+        playerHp -= enemyAtk.damage;
+        log = pushLogs(log, [{ text: enemyAtk.log, tone: "bad" }]);
 
-      if (playerHp <= 0) {
-        const lost = finishDefeat(
-          { ...state, player: { ...state.player, hp: 0 } },
-          log,
-          { ...enemy, statuses },
-          enemyHp,
-        );
-        set(lost);
-        persistFromSnapshot(lost);
-        return;
+        if (playerHp <= 0) {
+          const lost = finishDefeat(
+            { ...state, player: { ...state.player, hp: 0 } },
+            log,
+            { ...enemy, statuses, stunTurns },
+            enemyHp,
+          );
+          set(lost);
+          persistFromSnapshot(lost);
+          return;
+        }
       }
 
       // Next turn: fresh roll + rerolls.
       set({
-        currentEnemy: { ...enemy, hp: enemyHp, statuses },
+        currentEnemy: { ...enemy, hp: enemyHp, statuses, stunTurns },
         player: { ...state.player, hp: playerHp },
         diceValue: rollWithLuck(),
         rerollsLeft: stats.rerolls,

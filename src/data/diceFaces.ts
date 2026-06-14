@@ -116,6 +116,7 @@ export const diceKindIcon: Record<string, string> = {
   fireball: "🔥",
   defend: "🛡️",
   selfDamage: "🩸",
+  stun: "⚡",
 };
 
 export function faceByValue(faces: readonly DiceFace[], value: DiceValue): DiceFace {
