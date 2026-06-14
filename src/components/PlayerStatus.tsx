@@ -18,6 +18,7 @@ export default function PlayerStatus() {
 
   const hpPct = Math.max(0, Math.round((player.hp / stats.maxHp) * 100));
   const cls = getClass(useGameStore((s) => s.classId));
+  const streak = useGameStore((s) => s.winStreak);
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/30 p-3">
@@ -25,7 +26,10 @@ export default function PlayerStatus() {
         <span className="font-bold">
           {cls.icon} {cls.name} Lv{player.level}
         </span>
-        <span className="text-amber-300">💰 {player.gold}</span>
+        <span className="flex items-center gap-2">
+          {streak >= 2 && <span className="text-orange-300">🔥{streak}</span>}
+          <span className="text-amber-300">💰 {player.gold}</span>
+        </span>
       </div>
 
       <div className="mt-2">

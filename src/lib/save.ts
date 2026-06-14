@@ -22,6 +22,7 @@ export interface LoadedState {
   souls: number;
   artifacts: ArtifactLevels;
   classId: ClassId;
+  winStreak: number;
 }
 
 export function saveGame(state: LoadedState): void {
@@ -39,6 +40,7 @@ export function saveGame(state: LoadedState): void {
     souls: state.souls,
     artifacts: state.artifacts,
     classId: state.classId,
+    winStreak: state.winStreak,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -73,6 +75,7 @@ export function loadGame(): LoadedState | null {
       souls: data.souls ?? 0,
       artifacts: normalizeArtifacts(data.artifacts),
       classId: normalizeClassId(data.classId),
+      winStreak: data.winStreak ?? 0,
     };
   } catch {
     return null;

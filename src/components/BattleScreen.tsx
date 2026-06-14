@@ -88,6 +88,11 @@ function ResultOverlay() {
           <div className="mt-3 space-y-1 text-sm text-gray-200">
             <p>EXP +{result.expGained}</p>
             <p>ゴールド +{result.goldGained}</p>
+            {result.streakBonusPct > 0 && (
+              <p className="text-orange-300">
+                🔥 {result.winStreak}連勝 ボーナス +{result.streakBonusPct}%
+              </p>
+            )}
             {result.leveledUp && <p className="text-yellow-300">レベルアップ！</p>}
             {result.drop ? (
               <div

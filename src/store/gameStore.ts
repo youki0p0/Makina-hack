@@ -94,6 +94,8 @@ interface GameState {
   artifacts: ArtifactLevels;
   /** Current character class. */
   classId: ClassId;
+  /** Consecutive-win count. */
+  winStreak: number;
   /** Items for sale at the current shop floor (not persisted). */
   shopStock: ShopEntry[];
 
@@ -154,6 +156,7 @@ export const useGameStore = create<GameState>((set, get) => {
       souls: s.souls,
       artifacts: s.artifacts,
       classId: s.classId,
+      winStreak: s.winStreak,
     });
   }
 
@@ -226,6 +229,7 @@ export const useGameStore = create<GameState>((set, get) => {
     souls: 0,
     artifacts: defaultArtifactLevels(),
     classId: DEFAULT_CLASS_ID,
+    winStreak: 0,
     shopStock: [],
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
@@ -248,6 +252,7 @@ export const useGameStore = create<GameState>((set, get) => {
           souls: loaded.souls,
           artifacts: loaded.artifacts,
           classId: loaded.classId,
+          winStreak: loaded.winStreak,
           hydrated: true,
         });
       } else {
@@ -283,6 +288,7 @@ export const useGameStore = create<GameState>((set, get) => {
         souls: 0,
         artifacts: defaultArtifactLevels(),
         classId: DEFAULT_CLASS_ID,
+        winStreak: 0,
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -587,6 +593,7 @@ export const useGameStore = create<GameState>((set, get) => {
         souls: state.souls + gain,
         // Rebirth returns you to the base class.
         classId: DEFAULT_CLASS_ID,
+        winStreak: 0,
         diceFaces: applyEquipmentModifiers([equipped.weapon, equipped.armor, equipped.accessory]),
       });
       persist();
@@ -629,8 +636,12 @@ export const useGameStore = create<GameState>((set, get) => {
     playerHp: number,
     enemy: Enemy,
   ): Snapshot {
-    const expGained = enemy.exp;
-    const goldGained = enemy.gold;
+    // Win-streak bonus: +10% gold/exp per consecutive win after the first, capped +50%.
+    const winStreak = state.winStreak + 1;
+    const streakBonusPct = Math.min(50, (winStreak - 1) * 10);
+    const mult = 1 + streakBonusPct / 100;
+    const expGained = Math.round(enemy.exp * mult);
+    const goldGained = Math.round(enemy.gold * mult);
     const drop = rollLoot(enemy, state.currentFloor);
 
     let leveledPlayer: Player = { ...state.player, hp: playerHp, gold: state.player.gold + goldGained };
@@ -640,6 +651,11 @@ export const useGameStore = create<GameState>((set, get) => {
     let finalLog = pushLogs(log, [
       { text: `EXP +${expGained} / ゴールド +${goldGained}`, tone: "good" },
     ]);
+    if (streakBonusPct > 0) {
+      finalLog = pushLogs(finalLog, [
+        { text: `🔥 ${winStreak}連勝！ ボーナス +${streakBonusPct}%`, tone: "good" },
+      ]);
+    }
     if (leveledUp) {
       finalLog = pushLogs(finalLog, [
         { text: `レベルアップ！ Lv${leveledPlayer.level} (全回復)`, tone: "good" },
@@ -681,6 +697,8 @@ export const useGameStore = create<GameState>((set, get) => {
       leveledUp,
       consumable,
       healed,
+      winStreak,
+      streakBonusPct,
     };
 
     return {
@@ -692,6 +710,7 @@ export const useGameStore = create<GameState>((set, get) => {
       battleLog: finalLog,
       lastResult: result,
       activeBuffs: buffs,
+      winStreak,
     };
   }
 
@@ -717,6 +736,8 @@ export const useGameStore = create<GameState>((set, get) => {
       leveledUp: false,
       consumable: null,
       healed: 0,
+      winStreak: 0,
+      streakBonusPct: 0,
     };
 
     const finalLog = pushLogs(log, [
@@ -731,8 +752,9 @@ export const useGameStore = create<GameState>((set, get) => {
       battleState: "lost",
       battleLog: finalLog,
       lastResult: result,
-      // Temporary buffs don't survive a run reset.
+      // Temporary buffs and the win streak don't survive a run reset.
       activeBuffs: [],
+      winStreak: 0,
     };
   }
 
@@ -747,6 +769,7 @@ export const useGameStore = create<GameState>((set, get) => {
       souls: snap.souls ?? s.souls,
       artifacts: snap.artifacts ?? s.artifacts,
       classId: snap.classId ?? s.classId,
+      winStreak: snap.winStreak ?? s.winStreak,
     });
   }
 });
