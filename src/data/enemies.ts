@@ -71,7 +71,7 @@ export const BOSS_TEMPLATE: EnemyTemplate = {
  * Build an enemy scaled to the given floor.
  * Every 5th floor spawns the boss.
  */
-export function generateEnemy(floor: number): Enemy {
+export function generateEnemy(floor: number, enemyMult = 1): Enemy {
   const isBossFloor = floor % 5 === 0;
   const template = isBossFloor ? BOSS_TEMPLATE : pickNormalTemplate(floor);
 
@@ -81,8 +81,8 @@ export function generateEnemy(floor: number): Enemy {
   const atkScale = 1 + floor * 0.12;
   const defScale = 1 + floor * 0.08;
 
-  const maxHp = Math.round(template.baseHp * hpScale + (isBossFloor ? tier * 30 : 0));
-  const attack = Math.round(template.baseAttack * atkScale + (isBossFloor ? tier * 3 : 0));
+  const maxHp = Math.round((template.baseHp * hpScale + (isBossFloor ? tier * 30 : 0)) * enemyMult);
+  const attack = Math.round((template.baseAttack * atkScale + (isBossFloor ? tier * 3 : 0)) * enemyMult);
   const defense = Math.round(template.baseDefense * defScale);
   const exp = Math.round(template.baseExp * (1 + floor * 0.15));
   const gold = Math.round(template.baseGold * (1 + floor * 0.15));

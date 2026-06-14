@@ -2,6 +2,8 @@
 
 import { create } from "zustand";
 import { defaultProgress } from "@/data/achievements";
+import { getDifficulty, normalizeDifficulty, type Difficulty } from "@/data/difficulty";
+import { getDailyBonus } from "@/lib/daily";
 import {
   artifactBonus,
   artifactUpgradeCost,
@@ -116,6 +118,8 @@ interface GameState {
   seenHelp: boolean;
   /** Selected title id shown next to the player's name. */
   titleId: string;
+  /** Difficulty setting. */
+  difficulty: Difficulty;
   /** Items for sale at the current shop floor (not persisted). */
   shopStock: ShopEntry[];
 
@@ -150,6 +154,7 @@ interface GameState {
   toggleFavorite: (key: string) => void;
   markHelpSeen: () => void;
   setTitle: (id: string) => void;
+  setDifficulty: (id: Difficulty) => void;
 
   // gacha
   scrapItem: (itemIndex: number) => void;
@@ -188,6 +193,7 @@ export const useGameStore = create<GameState>((set, get) => {
       favorites: s.favorites,
       seenHelp: s.seenHelp,
       titleId: s.titleId,
+      difficulty: s.difficulty,
     });
   }
 
@@ -220,15 +226,22 @@ export const useGameStore = create<GameState>((set, get) => {
     return Math.max(rollDice(), min) as DiceValue;
   }
 
-  /** Sum of permanent artifact bonuses and the current class's stat mods. */
+  /** Sum of artifacts, the current class's mods, and the daily bonus. */
   function passiveBonus(): StatBonus {
     const a = artifactBonus(get().artifacts);
     const c = classStatBonus(get().classId);
+    const daily = getDailyBonus();
+    const d: StatBonus = {
+      attack: daily.stat === "attack" ? daily.value : 0,
+      defense: daily.stat === "defense" ? daily.value : 0,
+      maxHp: 0,
+      reroll: daily.stat === "reroll" ? daily.value : 0,
+    };
     return {
-      attack: a.attack + c.attack,
-      defense: a.defense + c.defense,
-      maxHp: a.maxHp + c.maxHp,
-      reroll: a.reroll + c.reroll,
+      attack: a.attack + c.attack + d.attack,
+      defense: a.defense + c.defense + d.defense,
+      maxHp: a.maxHp + c.maxHp + d.maxHp,
+      reroll: a.reroll + c.reroll + d.reroll,
     };
   }
 
@@ -265,6 +278,7 @@ export const useGameStore = create<GameState>((set, get) => {
     favorites: [],
     seenHelp: false,
     titleId: "",
+    difficulty: "normal",
     shopStock: [],
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
@@ -292,6 +306,7 @@ export const useGameStore = create<GameState>((set, get) => {
           favorites: loaded.favorites,
           seenHelp: loaded.seenHelp,
           titleId: loaded.titleId,
+          difficulty: normalizeDifficulty(loaded.difficulty),
           hydrated: true,
         });
       } else {
@@ -332,6 +347,7 @@ export const useGameStore = create<GameState>((set, get) => {
         favorites: [],
         seenHelp: true,
         titleId: "",
+        difficulty: get().difficulty,
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -341,7 +357,7 @@ export const useGameStore = create<GameState>((set, get) => {
     startBattle: () => {
       const { currentFloor, player } = get();
       const stats = currentStats(player, get().equipped, get().activeBuffs);
-      const enemy = generateEnemy(currentFloor);
+      const enemy = generateEnemy(currentFloor, getDifficulty(get().difficulty).enemyMult);
       // Heal a little between fights so runs are survivable but not free.
       const healed = Math.min(stats.maxHp, player.hp + Math.round(stats.maxHp * 0.15));
       set({
@@ -635,6 +651,11 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
+    setDifficulty: (id: Difficulty) => {
+      set({ difficulty: id });
+      persist();
+    },
+
     scrapItem: (itemIndex: number) => {
       const state = get();
       const item = state.inventory[itemIndex];
@@ -784,9 +805,13 @@ export const useGameStore = create<GameState>((set, get) => {
     // Win-streak bonus: +10% gold/exp per consecutive win after the first, capped +50%.
     const winStreak = state.winStreak + 1;
     const streakBonusPct = Math.min(50, (winStreak - 1) * 10);
-    const mult = 1 + streakBonusPct / 100;
-    const expGained = Math.round(enemy.exp * mult);
-    const goldGained = Math.round(enemy.gold * mult);
+    const streakMult = 1 + streakBonusPct / 100;
+    // Difficulty reward multiplier + daily gold bonus.
+    const rewardMult = getDifficulty(state.difficulty).rewardMult;
+    const daily = getDailyBonus();
+    const goldMult = streakMult * rewardMult * (daily.stat === "gold" ? 1 + daily.value / 100 : 1);
+    const expGained = Math.round(enemy.exp * streakMult * rewardMult);
+    const goldGained = Math.round(enemy.gold * goldMult);
     const drop = rollLoot(enemy, state.currentFloor);
 
     let leveledPlayer: Player = { ...state.player, hp: playerHp, gold: state.player.gold + goldGained };
@@ -933,6 +958,7 @@ export const useGameStore = create<GameState>((set, get) => {
       favorites: snap.favorites ?? s.favorites,
       seenHelp: snap.seenHelp ?? s.seenHelp,
       titleId: snap.titleId ?? s.titleId,
+      difficulty: snap.difficulty ?? s.difficulty,
     });
   }
 });

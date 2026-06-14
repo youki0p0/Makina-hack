@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import SoundToggle from "@/components/SoundToggle";
+import { DIFFICULTY_LIST } from "@/data/difficulty";
 import { isFeatureUnlocked, FEATURE_UNLOCKS } from "@/data/unlocks";
+import { getDailyBonus } from "@/lib/daily";
 import { useGameStore } from "@/store/gameStore";
 
 export default function TitlePage() {
@@ -20,6 +22,9 @@ export default function TitlePage() {
 
   const seenHelp = useGameStore((s) => s.seenHelp);
   const markHelpSeen = useGameStore((s) => s.markHelpSeen);
+  const difficulty = useGameStore((s) => s.difficulty);
+  const setDifficulty = useGameStore((s) => s.setDifficulty);
+  const daily = getDailyBonus();
 
   const hasProgress = hydrated && (floor > 1 || player.level > 1);
   const artifactsUnlocked = isFeatureUnlocked("artifacts", progress);
@@ -108,6 +113,27 @@ export default function TitlePage() {
           >
             ❓ 遊び方
           </Link>
+
+          <div className="mt-1 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
+            🗓️ 本日のボーナス: <span className="font-bold">{daily.label}</span>
+          </div>
+
+          <div>
+            <p className="text-[10px] text-gray-500">難易度</p>
+            <div className="mt-1 flex gap-1">
+              {DIFFICULTY_LIST.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => setDifficulty(d.id)}
+                  className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 ${
+                    difficulty === d.id ? "bg-rose-600 text-white" : "bg-white/10 text-gray-300"
+                  }`}
+                >
+                  {d.name}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {hasProgress && (
             <button
