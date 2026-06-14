@@ -31,6 +31,7 @@ import {
   tickBuffs,
   tickEnemyStatuses,
   WEAKEN_TURNS,
+  PLAYER_POISON_TURNS,
 } from "@/lib/battle";
 import { applyEquipmentModifiers, rollDice } from "@/lib/dice";
 import { GACHA_COST, pullGachaItem, rollConsumable, rollLoot, SCRAP_VALUE } from "@/lib/loot";
@@ -39,6 +40,7 @@ import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState
 import { itemKey, rarityRank } from "@/lib/ui";
 import type {
   ActiveBuff,
+  ActiveStatus,
   ArtifactId,
   ArtifactLevels,
   ClassId,
@@ -98,6 +100,10 @@ interface GameState {
   lastResult: BattleResult | null;
   /** Temporary consumable buffs in effect, counting down per battle. */
   activeBuffs: ActiveBuff[];
+  /** Status-over-time afflicting the player (poison/burn), battle-scoped. */
+  playerStatuses: ActiveStatus[];
+  /** Turns the player is stunned (loses rerolls), battle-scoped. */
+  playerStunTurns: number;
   /** Gacha currency from scrapping equipment. */
   gachaPoints: number;
   /** The most recent gacha pull, for the result popup (not persisted). */
@@ -298,6 +304,8 @@ export const useGameStore = create<GameState>((set, get) => {
     battleLog: [],
     lastResult: null,
     activeBuffs: [],
+    playerStatuses: [],
+    playerStunTurns: 0,
     gachaPoints: 0,
     lastPull: null,
     souls: 0,
@@ -382,6 +390,9 @@ export const useGameStore = create<GameState>((set, get) => {
         rerollsLeft: stats.rerolls,
         lastResult: null,
         player: { ...player, hp: healed },
+        // Player statuses are battle-scoped — clear at the start of each fight.
+        playerStatuses: [],
+        playerStunTurns: 0,
         battleLog: pushLogs([], [
           { text: `${currentFloor}階 — ${enemy.name} が現れた！`, tone: "neutral" },
         ]),
@@ -472,6 +483,9 @@ export const useGameStore = create<GameState>((set, get) => {
       let enraged = enemy.enraged ?? false;
       let charging = enemy.charging ?? false;
       let chargeCounter = enemy.chargeCounter ?? 0;
+      // Player-side statuses inflicted by enemies (poison/stun).
+      let playerStatuses = state.playerStatuses ?? [];
+      let playerStunTurns = state.playerStunTurns ?? 0;
       // Enrage when a boss drops to half HP.
       if (enemy.isBoss && !enraged && enemyHp <= enemy.maxHp / 2) {
         enraged = true;
@@ -525,6 +539,15 @@ export const useGameStore = create<GameState>((set, get) => {
         decayWeaken();
         playerHp -= turn.playerDamage;
         log = pushLogs(log, turn.logs.map((text) => ({ text, tone: "bad" as const })));
+        // Enemy-inflicted player statuses.
+        if (turn.playerPoison > 0) {
+          playerStatuses = addStatus(playerStatuses, {
+            kind: "poison",
+            damagePerTurn: turn.playerPoison,
+            remainingTurns: PLAYER_POISON_TURNS,
+          });
+        }
+        if (turn.playerStun > 0) playerStunTurns += turn.playerStun;
 
         if (playerHp <= 0) {
           const lost = finishDefeat(
@@ -539,12 +562,47 @@ export const useGameStore = create<GameState>((set, get) => {
         }
       }
 
+      // Player poison/burn ticks at the end of the round.
+      if (playerStatuses.length > 0) {
+        let dot = 0;
+        const remain: ActiveStatus[] = [];
+        for (const s of playerStatuses) {
+          dot += s.damagePerTurn;
+          if (s.remainingTurns - 1 > 0) remain.push({ ...s, remainingTurns: s.remainingTurns - 1 });
+        }
+        playerStatuses = remain;
+        if (dot > 0) {
+          playerHp -= dot;
+          log = pushLogs(log, [{ text: `毒で ${dot} ダメージ`, tone: "bad" }]);
+          if (playerHp <= 0) {
+            const lost = finishDefeat(
+              { ...state, player: { ...state.player, hp: 0 } },
+              log,
+              { ...enemy, hp: enemyHp, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns, enraged, charging, chargeCounter },
+              enemyHp,
+            );
+            set(lost);
+            persistFromSnapshot(lost);
+            return;
+          }
+        }
+      }
+
+      // Stun makes the player lose rerolls next turn, then ticks down.
+      const nextRerolls = playerStunTurns > 0 ? 0 : stats.rerolls;
+      const nextStun = Math.max(0, playerStunTurns - 1);
+      if (playerStunTurns > 0) {
+        log = pushLogs(log, [{ text: "スタン！ 次のターンはリロール不可", tone: "bad" }]);
+      }
+
       // Next turn: fresh roll + rerolls.
       set({
         currentEnemy: { ...enemy, hp: enemyHp, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns, enraged, charging, chargeCounter },
         player: { ...state.player, hp: playerHp },
         diceValue: rollWithLuck(),
-        rerollsLeft: stats.rerolls,
+        rerollsLeft: nextRerolls,
+        playerStatuses,
+        playerStunTurns: nextStun,
         battleLog: log,
       });
     },

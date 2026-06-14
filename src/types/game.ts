@@ -180,7 +180,9 @@ export type EnemyAbility =
   | "defend"
   | "lifesteal"
   | "fierce"
-  | "guardBreak";
+  | "guardBreak"
+  | "poison"
+  | "shock";
 
 export interface EnemyTemplate {
   id: string;

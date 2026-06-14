@@ -22,6 +22,9 @@ export default function PlayerStatus() {
   const cls = getClass(useGameStore((s) => s.classId));
   const streak = useGameStore((s) => s.winStreak);
   const title = getTitle(useGameStore((s) => s.titleId));
+  const playerStatuses = useGameStore((s) => s.playerStatuses);
+  const playerStunTurns = useGameStore((s) => s.playerStunTurns);
+  const poison = playerStatuses.reduce((sum, s) => sum + s.damagePerTurn, 0);
   const { floaters } = useDamageFx(player.hp, "player", "hurt");
 
   return (
@@ -89,6 +92,21 @@ export default function PlayerStatus() {
               {b.kind === "luck" ? `≥${b.value}` : `+${b.value}`} ({b.battlesLeft}戦)
             </span>
           ))}
+        </div>
+      )}
+
+      {(poison > 0 || playerStunTurns > 0) && (
+        <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
+          {poison > 0 && (
+            <span className="rounded-full bg-lime-600/25 px-2 py-0.5 font-bold text-lime-300">
+              ☠️ 毒 {poison}/T
+            </span>
+          )}
+          {playerStunTurns > 0 && (
+            <span className="rounded-full bg-yellow-500/25 px-2 py-0.5 font-bold text-yellow-300">
+              ⚡ スタン (リロール不可)
+            </span>
+          )}
         </div>
       )}
     </div>
