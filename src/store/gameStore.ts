@@ -114,6 +114,8 @@ interface GameState {
   favorites: string[];
   /** Whether the first-run help has been dismissed. */
   seenHelp: boolean;
+  /** Selected title id shown next to the player's name. */
+  titleId: string;
   /** Items for sale at the current shop floor (not persisted). */
   shopStock: ShopEntry[];
 
@@ -147,6 +149,7 @@ interface GameState {
   // misc
   toggleFavorite: (key: string) => void;
   markHelpSeen: () => void;
+  setTitle: (id: string) => void;
 
   // gacha
   scrapItem: (itemIndex: number) => void;
@@ -184,6 +187,7 @@ export const useGameStore = create<GameState>((set, get) => {
       progress: s.progress,
       favorites: s.favorites,
       seenHelp: s.seenHelp,
+      titleId: s.titleId,
     });
   }
 
@@ -260,6 +264,7 @@ export const useGameStore = create<GameState>((set, get) => {
     progress: defaultProgress(),
     favorites: [],
     seenHelp: false,
+    titleId: "",
     shopStock: [],
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
@@ -286,6 +291,7 @@ export const useGameStore = create<GameState>((set, get) => {
           progress: loaded.progress,
           favorites: loaded.favorites,
           seenHelp: loaded.seenHelp,
+          titleId: loaded.titleId,
           hydrated: true,
         });
       } else {
@@ -325,6 +331,7 @@ export const useGameStore = create<GameState>((set, get) => {
         progress: defaultProgress(),
         favorites: [],
         seenHelp: true,
+        titleId: "",
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -620,6 +627,11 @@ export const useGameStore = create<GameState>((set, get) => {
     markHelpSeen: () => {
       if (get().seenHelp) return;
       set({ seenHelp: true });
+      persist();
+    },
+
+    setTitle: (id: string) => {
+      set({ titleId: id });
       persist();
     },
 
@@ -920,6 +932,7 @@ export const useGameStore = create<GameState>((set, get) => {
       progress: snap.progress ?? s.progress,
       favorites: snap.favorites ?? s.favorites,
       seenHelp: snap.seenHelp ?? s.seenHelp,
+      titleId: snap.titleId ?? s.titleId,
     });
   }
 });

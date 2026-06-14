@@ -331,4 +331,6 @@ export interface SaveData {
   favorites?: string[];
   /** Whether the first-run help has been dismissed. */
   seenHelp?: boolean;
+  /** Selected title id shown next to the player's name. */
+  titleId?: string;
 }
