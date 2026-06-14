@@ -2,7 +2,36 @@ import { describe, expect, it } from "vitest";
 import { getAffixById } from "@/data/affixes";
 import { getItemById, getItemInstance, ITEMS } from "@/data/items";
 import { pullGachaItem, rollLoot, SCRAP_VALUE } from "@/lib/loot";
+import { generateShopStock } from "@/lib/shop";
 import { applyAffix } from "@/data/affixes";
+
+describe("item registry", () => {
+  it("has around 200 items", () => {
+    expect(ITEMS.length).toBeGreaterThanOrEqual(200);
+  });
+});
+
+describe("shop", () => {
+  it("never stocks casino-exclusive gear", () => {
+    for (let floor = 1; floor <= 60; floor += 7) {
+      for (let i = 0; i < 20; i++) {
+        for (const entry of generateShopStock(floor)) {
+          if (entry.kind === "equipment") {
+            expect(entry.equipment!.casinoOnly).not.toBe(true);
+          }
+        }
+      }
+    }
+  });
+
+  it("only stocks gear unlocked by the floor", () => {
+    for (const entry of generateShopStock(3)) {
+      if (entry.kind === "equipment") {
+        expect(entry.equipment!.minFloor ?? 1).toBeLessThanOrEqual(3);
+      }
+    }
+  });
+});
 
 describe("pullGachaItem", () => {
   it("never returns a casino-exclusive item", () => {
@@ -21,6 +50,7 @@ describe("rollLoot", () => {
       expect(drop).not.toBeNull();
       expect(drop!.gachaOnly).not.toBe(true);
       expect(drop!.casinoOnly).not.toBe(true);
+      expect(drop!.minFloor ?? 1).toBeLessThanOrEqual(10);
     }
   });
 });

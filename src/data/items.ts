@@ -1,14 +1,15 @@
 import { applyAffix, getAffixById } from "@/data/affixes";
-import type { Equipment } from "@/types/game";
+import type { Equipment, EquipmentSlot, Rarity } from "@/types/game";
 
 /**
- * Master registry of every equipment item in the game.
+ * Hand-crafted "signature" items — the ones with dice-rewrite effects.
+ * Combined with the generated progression items below into {@link ITEMS}.
  *
  * IMPORTANT: only item *ids* are persisted to localStorage. Items are always
  * rehydrated from this registry by id, so the dice-rewrite data here is the
  * single source of truth.
  */
-export const ITEMS: readonly Equipment[] = [
+const SIGNATURE_ITEMS: readonly Equipment[] = [
   // ===== weapons =====
   {
     id: "rusty_sword",
@@ -68,6 +69,7 @@ export const ITEMS: readonly Equipment[] = [
     defense: 0,
     maxHp: 0,
     rerollModifier: 0,
+    minFloor: 6,
     description: "攻撃力+5。4以上で与ダメージの25%回復。",
     diceModifiers: [
       {
@@ -86,6 +88,7 @@ export const ITEMS: readonly Equipment[] = [
     defense: 0,
     maxHp: 0,
     rerollModifier: 0,
+    minFloor: 9,
     description: "攻撃力+10。1〜2で自傷、5〜6で大ダメージ。",
     diceModifiers: [
       {
@@ -131,6 +134,7 @@ export const ITEMS: readonly Equipment[] = [
     defense: 0,
     maxHp: 0,
     rerollModifier: 0,
+    minFloor: 8,
     description: "攻撃力+6。4以上で燃焼(強力な継続ダメージ)を付与。",
     diceModifiers: [
       {
@@ -223,6 +227,7 @@ export const ITEMS: readonly Equipment[] = [
     defense: 9,
     maxHp: 10,
     rerollModifier: -1,
+    minFloor: 7,
     description: "防御+9、リロール-1。1〜3でもガード効果。",
     diceModifiers: [
       {
@@ -373,6 +378,71 @@ export const ITEMS: readonly Equipment[] = [
     ],
   },
 ];
+
+// ===== generated progression items (weak → strong, floor-gated) =====
+// A broad pool of plain stat items so drops scale with depth and the
+// collection has ~200 entries. Signature items above carry the dice effects.
+
+const MATERIALS = [
+  "木", "銅", "青銅", "鉄", "鋼", "銀", "金剛", "ミスリル", "アダマント", "竜骨", "星鉄", "神鉄",
+];
+const WEAPON_NOUNS = ["短剣", "剣", "斧", "槍", "戦鎚", "大剣"];
+const ARMOR_NOUNS = ["布鎧", "革鎧", "鎖鎧", "板鎧", "重鎧"];
+const ACC_NOUNS = ["指輪", "腕輪", "護符", "宝珠", "首飾り"];
+
+function rarityForTier(t: number): Rarity {
+  if (t <= 15) return "common";
+  if (t <= 30) return "rare";
+  if (t <= 45) return "epic";
+  return "legendary";
+}
+
+function generatedItem(slot: EquipmentSlot, t: number, noun: string): Equipment {
+  const mat = MATERIALS[Math.min(MATERIALS.length - 1, Math.floor((t - 1) / 5))];
+  const item: Equipment = {
+    id: `gen_${slot}_${t}`,
+    name: `${mat}の${noun}`,
+    rarity: rarityForTier(t),
+    slot,
+    attack: 0,
+    defense: 0,
+    maxHp: 0,
+    rerollModifier: 0,
+    description: "",
+    diceModifiers: [],
+    minFloor: t,
+  };
+  if (slot === "weapon") {
+    item.attack = Math.round(2 + t * 0.8);
+    item.description = `攻撃+${item.attack}`;
+  } else if (slot === "armor") {
+    item.defense = Math.round(1 + t * 0.7);
+    item.maxHp = Math.round(t * 1.5);
+    item.description = `防御+${item.defense} / HP+${item.maxHp}`;
+  } else {
+    item.maxHp = Math.round(t * 1.2);
+    item.attack = Math.round(t * 0.3);
+    item.defense = Math.round(t * 0.3);
+    if (t % 8 === 0) item.rerollModifier = 1;
+    item.description =
+      `HP+${item.maxHp} / 攻+${item.attack} / 防+${item.defense}` +
+      (item.rerollModifier ? ` / リロール+${item.rerollModifier}` : "");
+  }
+  return item;
+}
+
+function buildGenerated(): Equipment[] {
+  const out: Equipment[] = [];
+  for (let t = 1; t <= 61; t++) {
+    out.push(generatedItem("weapon", t, WEAPON_NOUNS[(t - 1) % WEAPON_NOUNS.length]));
+    out.push(generatedItem("armor", t, ARMOR_NOUNS[(t - 1) % ARMOR_NOUNS.length]));
+    out.push(generatedItem("accessory", t, ACC_NOUNS[(t - 1) % ACC_NOUNS.length]));
+  }
+  return out;
+}
+
+/** Full registry: signature items + generated progression (~200 total). */
+export const ITEMS: readonly Equipment[] = [...SIGNATURE_ITEMS, ...buildGenerated()];
 
 const ITEM_MAP: Map<string, Equipment> = new Map(ITEMS.map((i) => [i.id, i]));
 

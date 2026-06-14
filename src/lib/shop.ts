@@ -34,7 +34,8 @@ export function isShopFloor(floor: number): boolean {
   return floor % 4 === 0 && floor % 5 !== 0;
 }
 
-const DROPPABLE = ITEMS.filter((i) => !i.gachaOnly);
+// Shop never sells gacha- or casino-exclusive gear.
+const SHOP_POOL = ITEMS.filter((i) => !i.gachaOnly && !i.casinoOnly);
 
 function pickRandom<T>(arr: readonly T[], count: number): T[] {
   const pool = [...arr];
@@ -48,7 +49,10 @@ function pickRandom<T>(arr: readonly T[], count: number): T[] {
 
 /** Build a fresh shop stock for the given floor: 3 equipment + 2 consumables. */
 export function generateShopStock(floor: number): ShopEntry[] {
-  const equipment = pickRandom(DROPPABLE, 3).map((item, i) => {
+  // Only sell gear unlocked by the current floor.
+  let pool = SHOP_POOL.filter((i) => (i.minFloor ?? 1) <= floor);
+  if (pool.length === 0) pool = SHOP_POOL;
+  const equipment = pickRandom(pool, 3).map((item, i) => {
     const rolled = rollAffixedCopy({ ...item });
     return {
       key: `eq-${i}-${item.id}`,
