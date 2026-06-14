@@ -1,3 +1,4 @@
+import { rollAffixedCopy } from "@/data/affixes";
 import { CONSUMABLES } from "@/data/consumables";
 import { ITEMS } from "@/data/items";
 import type { Consumable, Enemy, Equipment, Rarity } from "@/types/game";
@@ -45,9 +46,9 @@ export function pullGachaItem(): Equipment {
   let roll = Math.random() * total;
   for (const { item, weight } of weighted) {
     roll -= weight;
-    if (roll <= 0) return { ...item };
+    if (roll <= 0) return rollAffixedCopy({ ...item });
   }
-  return { ...weighted[weighted.length - 1].item };
+  return rollAffixedCopy({ ...weighted[weighted.length - 1].item });
 }
 
 /**
@@ -76,10 +77,10 @@ export function rollLoot(enemy: Enemy, floor: number): Equipment | null {
   for (const { item, weight } of weighted) {
     roll -= weight;
     if (roll <= 0) {
-      return { ...item };
+      return rollAffixedCopy({ ...item });
     }
   }
-  return { ...weighted[weighted.length - 1].item };
+  return rollAffixedCopy({ ...weighted[weighted.length - 1].item });
 }
 
 /**

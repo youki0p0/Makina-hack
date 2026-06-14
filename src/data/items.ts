@@ -1,3 +1,4 @@
+import { applyAffix, getAffixById } from "@/data/affixes";
 import type { Equipment } from "@/types/game";
 
 /**
@@ -360,6 +361,15 @@ const ITEM_MAP: Map<string, Equipment> = new Map(ITEMS.map((i) => [i.id, i]));
 export function getItemById(id: string): Equipment | null {
   const item = ITEM_MAP.get(id);
   return item ? { ...item } : null;
+}
+
+/** Rehydrate an item instance from a base id plus an optional affix id. */
+export function getItemInstance(id: string, affixId?: string): Equipment | null {
+  const base = getItemById(id);
+  if (!base) return null;
+  if (!affixId) return base;
+  const affix = getAffixById(affixId);
+  return affix ? applyAffix(base, affix) : base;
 }
 
 export const STARTER_WEAPON_ID = "rusty_sword";

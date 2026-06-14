@@ -111,6 +111,8 @@ export interface Equipment {
   gachaOnly?: boolean;
   /** Casino-exclusive: only awarded as a casino prize. */
   casinoOnly?: boolean;
+  /** Random affix applied to this instance (id into the affix registry). */
+  affixId?: string;
 }
 
 export type EquippedItems = {
@@ -260,10 +262,20 @@ export interface BattleResult {
 
 // ===== Persistence =====
 
+/** A persisted equipment reference: base id plus an optional rolled affix. */
+export interface SavedItem {
+  id: string;
+  affixId?: string;
+}
+
 export interface SaveData {
   player: Player;
-  equippedIds: { [K in EquipmentSlot]: string | null };
-  inventoryIds: string[];
+  /** Legacy: plain id arrays (read for old saves). */
+  equippedIds?: { [K in EquipmentSlot]: string | null };
+  inventoryIds?: string[];
+  /** Current: item instances with optional affixes. */
+  equippedItems?: { [K in EquipmentSlot]: SavedItem | null };
+  inventoryItems?: SavedItem[];
   currentFloor: number;
   /** Gacha currency from scrapping equipment (optional for old saves). */
   gachaPoints?: number;
