@@ -61,7 +61,19 @@ export function rollLoot(enemy: Enemy, floor: number): Equipment | null {
   // Higher floors tilt the table toward better gear.
   const floorBonus = Math.min(floor * 1.5, 40);
 
-  const weighted = DROPPABLE.map((item) => {
+  // Floor-gated pool: items unlocked by this floor, within a recent window so
+  // low-tier gear phases out as you descend. Fall back to all unlocked items.
+  const WINDOW = 20;
+  let pool = DROPPABLE.filter((i) => {
+    const mf = i.minFloor ?? 1;
+    return mf <= floor && mf > floor - WINDOW;
+  });
+  if (pool.length === 0) {
+    pool = DROPPABLE.filter((i) => (i.minFloor ?? 1) <= floor);
+  }
+  if (pool.length === 0) pool = DROPPABLE.filter((i) => (i.minFloor ?? 1) <= 1);
+
+  const weighted = pool.map((item) => {
     let weight = RARITY_WEIGHT[item.rarity];
     if (item.rarity === "epic" || item.rarity === "legendary" || item.rarity === "cursed") {
       weight += floorBonus;

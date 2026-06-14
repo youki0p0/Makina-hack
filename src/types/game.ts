@@ -116,6 +116,8 @@ export interface Equipment {
   casinoOnly?: boolean;
   /** Random affix applied to this instance (id into the affix registry). */
   affixId?: string;
+  /** Earliest dungeon floor this item starts dropping (default 1). */
+  minFloor?: number;
 }
 
 export type EquippedItems = {
