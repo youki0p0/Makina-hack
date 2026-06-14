@@ -126,6 +126,8 @@ interface GameState {
   titleId: string;
   /** Difficulty setting. */
   difficulty: Difficulty;
+  /** Preferred hand for the action buttons. */
+  handedness: "right" | "left";
   /** Items for sale at the current shop floor (not persisted). */
   shopStock: ShopEntry[];
 
@@ -161,6 +163,7 @@ interface GameState {
   markHelpSeen: () => void;
   setTitle: (id: string) => void;
   setDifficulty: (id: Difficulty) => void;
+  setHandedness: (h: "right" | "left") => void;
   exportSaveData: () => string;
   importSaveData: (code: string) => boolean;
 
@@ -202,6 +205,7 @@ export const useGameStore = create<GameState>((set, get) => {
       seenHelp: s.seenHelp,
       titleId: s.titleId,
       difficulty: s.difficulty,
+      handedness: s.handedness,
     });
   }
 
@@ -279,6 +283,7 @@ export const useGameStore = create<GameState>((set, get) => {
       seenHelp: loaded.seenHelp,
       titleId: loaded.titleId,
       difficulty: normalizeDifficulty(loaded.difficulty),
+      handedness: loaded.handedness,
       hydrated: true,
       currentEnemy: null,
       battleState: "idle",
@@ -317,6 +322,7 @@ export const useGameStore = create<GameState>((set, get) => {
     seenHelp: false,
     titleId: "",
     difficulty: "normal",
+    handedness: "right",
     shopStock: [],
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
@@ -370,6 +376,7 @@ export const useGameStore = create<GameState>((set, get) => {
         seenHelp: true,
         titleId: "",
         difficulty: get().difficulty,
+        handedness: get().handedness,
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -728,6 +735,11 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
+    setHandedness: (h: "right" | "left") => {
+      set({ handedness: h });
+      persist();
+    },
+
     exportSaveData: () => exportSave(),
 
     importSaveData: (code: string) => {
@@ -1041,6 +1053,7 @@ export const useGameStore = create<GameState>((set, get) => {
       seenHelp: snap.seenHelp ?? s.seenHelp,
       titleId: snap.titleId ?? s.titleId,
       difficulty: snap.difficulty ?? s.difficulty,
+      handedness: snap.handedness ?? s.handedness,
     });
   }
 });

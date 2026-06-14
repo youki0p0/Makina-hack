@@ -36,6 +36,7 @@ export interface LoadedState {
   seenHelp: boolean;
   titleId: string;
   difficulty: string;
+  handedness: "right" | "left";
 }
 
 export function saveGame(state: LoadedState): void {
@@ -59,6 +60,7 @@ export function saveGame(state: LoadedState): void {
     seenHelp: state.seenHelp,
     titleId: state.titleId,
     difficulty: state.difficulty,
+    handedness: state.handedness,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -107,6 +109,7 @@ export function loadGame(): LoadedState | null {
       seenHelp: data.seenHelp ?? false,
       titleId: data.titleId ?? "",
       difficulty: data.difficulty ?? "normal",
+      handedness: data.handedness === "left" ? "left" : "right",
     };
   } catch {
     return null;
