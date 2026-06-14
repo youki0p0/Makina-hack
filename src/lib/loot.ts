@@ -11,8 +11,11 @@ const RARITY_WEIGHT: Record<Rarity, number> = {
   legendary: 3,
 };
 
-/** Items that can drop from enemies (gacha-exclusive items excluded). */
-const DROPPABLE = ITEMS.filter((i) => !i.gachaOnly);
+/** Items that can drop from enemies (gacha/casino-exclusive items excluded). */
+const DROPPABLE = ITEMS.filter((i) => !i.gachaOnly && !i.casinoOnly);
+
+/** Items obtainable from the equipment gacha (casino prizes excluded). */
+const GACHA_POOL = ITEMS.filter((i) => !i.casinoOnly);
 
 /** Gacha currency gained by scrapping equipment, by rarity. */
 export const SCRAP_VALUE: Record<Rarity, number> = {
@@ -31,7 +34,7 @@ export const GACHA_COST = 10;
  * tilts toward rarer gear than normal drops.
  */
 export function pullGachaItem(): Equipment {
-  const weighted = ITEMS.map((item) => {
+  const weighted = GACHA_POOL.map((item) => {
     let weight = RARITY_WEIGHT[item.rarity];
     // Gacha leans premium: boost rare+ and make exclusives meaningfully likely.
     if (item.rarity !== "common") weight += 10;
