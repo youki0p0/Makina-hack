@@ -94,28 +94,59 @@ function buildEnemyTemplates(): EnemyTemplate[] {
 
 export const ENEMY_TEMPLATES: readonly EnemyTemplate[] = buildEnemyTemplates();
 
-export const BOSS_TEMPLATE: EnemyTemplate = {
-  id: "boss",
-  name: "ダンジョンボス",
-  emoji: "🐲",
-  baseHp: 90,
-  baseAttack: 14,
-  baseDefense: 4,
-  baseExp: 50,
-  baseGold: 60,
-  dropRate: 1,
-  isBoss: true,
-  ability: "heal",
-  desc: "階層を統べる強大な存在。激昂し大技を放つ。",
-};
+/** Multiple boss archetypes; one is chosen per boss floor by tier. */
+type BossDef = [
+  id: string,
+  name: string,
+  emoji: string,
+  hp: number,
+  atk: number,
+  def: number,
+  desc: string,
+];
+
+const BOSS_DEFS: BossDef[] = [
+  ["boss_ogre", "鬼神オーガ", "👹", 90, 14, 4, "力の化身。激昂して大技を放つ。"],
+  ["boss_dragon", "古龍", "🐉", 110, 13, 6, "全てを焼き尽くす古の竜。"],
+  ["boss_lich", "死霊王", "☠️", 85, 17, 3, "不死を統べる魔道の王。"],
+  ["boss_golem", "巨像", "🗿", 145, 11, 9, "動く要塞。鉄壁の守り。"],
+  ["boss_demon", "魔王", "😈", 100, 19, 5, "深淵より来たる支配者。"],
+  ["boss_leviathan", "海皇リヴァイア", "🌊", 125, 15, 6, "海を統べる巨獣。"],
+];
+
+export const BOSS_TEMPLATES: EnemyTemplate[] = BOSS_DEFS.map(
+  ([id, name, emoji, hp, atk, def, desc]) => ({
+    id,
+    name,
+    emoji,
+    baseHp: hp,
+    baseAttack: atk,
+    baseDefense: def,
+    baseExp: 50,
+    baseGold: 60,
+    dropRate: 1,
+    isBoss: true,
+    ability: "heal",
+    desc,
+  }),
+);
+
+/** Backwards-compatible alias to the first boss. */
+export const BOSS_TEMPLATE: EnemyTemplate = BOSS_TEMPLATES[0];
+
+/** Pick a boss for the given floor; cycles through the roster by tier. */
+function pickBoss(floor: number): EnemyTemplate {
+  const tier = Math.floor(floor / 5); // 1-based boss number
+  return BOSS_TEMPLATES[(tier - 1 + BOSS_TEMPLATES.length) % BOSS_TEMPLATES.length];
+}
 
 /**
  * Build an enemy scaled to the given floor.
- * Every 5th floor spawns the boss.
+ * Every 5th floor spawns a boss (chosen from the boss roster).
  */
 export function generateEnemy(floor: number, enemyMult = 1): Enemy {
   const isBossFloor = floor % 5 === 0;
-  const template = isBossFloor ? BOSS_TEMPLATE : pickNormalTemplate(floor);
+  const template = isBossFloor ? pickBoss(floor) : pickNormalTemplate(floor);
 
   // Linear-ish scaling with floor. Bosses also scale with how many they've cleared.
   const tier = Math.floor(floor / 5);
