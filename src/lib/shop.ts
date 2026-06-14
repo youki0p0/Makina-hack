@@ -1,3 +1,4 @@
+import { rollAffixedCopy } from "@/data/affixes";
 import { CONSUMABLES } from "@/data/consumables";
 import { ITEMS } from "@/data/items";
 import type { Consumable, Equipment, Rarity } from "@/types/game";
@@ -47,13 +48,17 @@ function pickRandom<T>(arr: readonly T[], count: number): T[] {
 
 /** Build a fresh shop stock for the given floor: 3 equipment + 2 consumables. */
 export function generateShopStock(floor: number): ShopEntry[] {
-  const equipment = pickRandom(DROPPABLE, 3).map((item, i) => ({
-    key: `eq-${i}-${item.id}`,
-    kind: "equipment" as const,
-    equipment: { ...item },
-    price: EQUIP_PRICE[item.rarity] + floor * 3,
-    sold: false,
-  }));
+  const equipment = pickRandom(DROPPABLE, 3).map((item, i) => {
+    const rolled = rollAffixedCopy({ ...item });
+    return {
+      key: `eq-${i}-${item.id}`,
+      kind: "equipment" as const,
+      equipment: rolled,
+      // Affixed items cost a bit more.
+      price: EQUIP_PRICE[item.rarity] + floor * 3 + (rolled.affixId ? 20 : 0),
+      sold: false,
+    };
+  });
   const consumables = pickRandom(CONSUMABLES, 2).map((c, i) => ({
     key: `co-${i}-${c.id}`,
     kind: "consumable" as const,

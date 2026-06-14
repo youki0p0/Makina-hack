@@ -1,6 +1,6 @@
 import { normalizeArtifacts } from "@/data/artifacts";
 import { normalizeClassId } from "@/data/classes";
-import { getItemById } from "@/data/items";
+import { getItemInstance } from "@/data/items";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import type {
   ArtifactLevels,
@@ -8,8 +8,14 @@ import type {
   Equipment,
   EquippedItems,
   Player,
+  SavedItem,
   SaveData,
 } from "@/types/game";
+
+function toSavedItem(item: Equipment | null): SavedItem | null {
+  if (!item) return null;
+  return item.affixId ? { id: item.id, affixId: item.affixId } : { id: item.id };
+}
 
 const STORAGE_KEY = "dice-hackslash-save-v1";
 
@@ -29,12 +35,12 @@ export function saveGame(state: LoadedState): void {
   if (typeof window === "undefined") return;
   const data: SaveData = {
     player: state.player,
-    equippedIds: {
-      weapon: state.equipped.weapon?.id ?? null,
-      armor: state.equipped.armor?.id ?? null,
-      accessory: state.equipped.accessory?.id ?? null,
+    equippedItems: {
+      weapon: toSavedItem(state.equipped.weapon),
+      armor: toSavedItem(state.equipped.armor),
+      accessory: toSavedItem(state.equipped.accessory),
     },
-    inventoryIds: state.inventory.map((i) => i.id),
+    inventoryItems: state.inventory.map((i) => toSavedItem(i)).filter((i): i is SavedItem => i !== null),
     currentFloor: state.currentFloor,
     gachaPoints: state.gachaPoints,
     souls: state.souls,
@@ -58,12 +64,20 @@ export function loadGame(): LoadedState | null {
 
     const equipped: EquippedItems = { weapon: null, armor: null, accessory: null };
     for (const slot of EQUIP_SLOTS) {
-      const id = data.equippedIds[slot];
-      equipped[slot] = id ? getItemById(id) : null;
+      const saved = data.equippedItems?.[slot];
+      if (saved) {
+        equipped[slot] = getItemInstance(saved.id, saved.affixId);
+      } else {
+        // Legacy fallback.
+        const id = data.equippedIds?.[slot];
+        equipped[slot] = id ? getItemInstance(id) : null;
+      }
     }
 
-    const inventory = data.inventoryIds
-      .map((id) => getItemById(id))
+    const savedInventory: SavedItem[] =
+      data.inventoryItems ?? (data.inventoryIds ?? []).map((id) => ({ id }));
+    const inventory = savedInventory
+      .map((s) => getItemInstance(s.id, s.affixId))
       .filter((i): i is Equipment => i !== null);
 
     return {
