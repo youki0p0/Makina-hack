@@ -35,4 +35,5 @@ export const diceKindColor: Record<DiceKind, string> = {
   defend: "text-blue-300",
   selfDamage: "text-red-500",
   stun: "text-yellow-300",
+  weaken: "text-violet-300",
 };

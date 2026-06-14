@@ -25,6 +25,7 @@ import {
   resolvePlayerAction,
   tickBuffs,
   tickEnemyStatuses,
+  WEAKEN_TURNS,
 } from "@/lib/battle";
 import { applyEquipmentModifiers, rollDice } from "@/lib/dice";
 import { GACHA_COST, pullGachaItem, rollConsumable, rollLoot, SCRAP_VALUE } from "@/lib/loot";
@@ -388,12 +389,19 @@ export const useGameStore = create<GameState>((set, get) => {
       let stunTurns = (enemy.stunTurns ?? 0) + action.stun;
       let bonusDefense = enemy.bonusDefense ?? 0;
       let bonusDefenseTurns = enemy.bonusDefenseTurns ?? 0;
+      // Weaken applied this turn affects the enemy's attack starting now.
+      let weakenAmount = enemy.weakenAmount ?? 0;
+      let weakenTurns = enemy.weakenTurns ?? 0;
+      if (action.weaken > 0) {
+        weakenAmount = action.weaken;
+        weakenTurns = WEAKEN_TURNS;
+      }
       if (stunTurns > 0) {
         stunTurns -= 1;
         log = pushLogs(log, [{ text: `${enemy.name} はスタンして動けない！`, tone: "good" }]);
       } else {
-        // Special ability or normal attack.
-        const turn = resolveEnemyTurn(enemy, stats, action.guard);
+        // Special ability or normal attack (weaken reduces its attack).
+        const turn = resolveEnemyTurn({ ...enemy, weakenAmount, weakenTurns }, stats, action.guard);
         if (turn.enemyHeal > 0) {
           enemyHp = Math.min(enemy.maxHp, enemyHp + turn.enemyHeal);
         }
@@ -404,6 +412,10 @@ export const useGameStore = create<GameState>((set, get) => {
           bonusDefenseTurns -= 1;
           if (bonusDefenseTurns === 0) bonusDefense = 0;
         }
+        if (weakenTurns > 0) {
+          weakenTurns -= 1;
+          if (weakenTurns === 0) weakenAmount = 0;
+        }
         playerHp -= turn.playerDamage;
         log = pushLogs(log, turn.logs.map((text) => ({ text, tone: "bad" as const })));
 
@@ -411,7 +423,7 @@ export const useGameStore = create<GameState>((set, get) => {
           const lost = finishDefeat(
             { ...state, player: { ...state.player, hp: 0 } },
             log,
-            { ...enemy, statuses, stunTurns, bonusDefense, bonusDefenseTurns },
+            { ...enemy, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns },
             enemyHp,
           );
           set(lost);
@@ -422,7 +434,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
       // Next turn: fresh roll + rerolls.
       set({
-        currentEnemy: { ...enemy, hp: enemyHp, statuses, stunTurns, bonusDefense, bonusDefenseTurns },
+        currentEnemy: { ...enemy, hp: enemyHp, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns },
         player: { ...state.player, hp: playerHp },
         diceValue: rollWithLuck(),
         rerollsLeft: stats.rerolls,

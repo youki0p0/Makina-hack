@@ -68,5 +68,6 @@ function mergeEffect(
     isMiss: patch.isMiss ?? base.isMiss,
     statusEffect: patch.statusEffect ?? base.statusEffect,
     stun: patch.stun ?? base.stun,
+    weaken: patch.weaken ?? base.weaken,
   };
 }

@@ -67,17 +67,25 @@ export default function EnemyCard() {
       </div>
 
       <div className="mt-2 text-xs text-gray-400">
-        ⚔️ {enemy.attack} ／ 🛡️ {enemy.defense + (enemy.bonusDefense ?? 0)}
+        ⚔️ {Math.max(0, enemy.attack - ((enemy.weakenTurns ?? 0) > 0 ? enemy.weakenAmount : 0))} ／ 🛡️ {enemy.defense + (enemy.bonusDefense ?? 0)}
         {enemy.ability && (
           <span className="ml-2 text-rose-300">{ABILITY_LABEL[enemy.ability]}</span>
         )}
       </div>
 
-      {(statuses.length > 0 || (enemy.stunTurns ?? 0) > 0 || (enemy.bonusDefenseTurns ?? 0) > 0) && (
+      {(statuses.length > 0 ||
+        (enemy.stunTurns ?? 0) > 0 ||
+        (enemy.bonusDefenseTurns ?? 0) > 0 ||
+        (enemy.weakenTurns ?? 0) > 0) && (
         <div className="mt-2 flex flex-wrap justify-center gap-1 text-[10px]">
           {(enemy.stunTurns ?? 0) > 0 && (
             <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 font-bold text-yellow-300">
               ⚡ スタン ({enemy.stunTurns}T)
+            </span>
+          )}
+          {(enemy.weakenTurns ?? 0) > 0 && (
+            <span className="rounded-full bg-violet-500/20 px-2 py-0.5 font-bold text-violet-300">
+              🔻 攻-{enemy.weakenAmount} ({enemy.weakenTurns}T)
             </span>
           )}
           {(enemy.bonusDefenseTurns ?? 0) > 0 && (

@@ -100,6 +100,46 @@ export const CLASSES: readonly CharacterClass[] = [
       },
     ],
   },
+  {
+    id: "paladin",
+    name: "聖騎士",
+    icon: "✝️",
+    description: "粘り強い。3以下でガード、4以上で与ダメ回復。",
+    statMods: { attack: 0, defense: 2, maxHp: 12, reroll: 0 },
+    diceModifiers: [
+      {
+        faces: [1, 2, 3],
+        effect: { guard: 6 },
+        description: "3以下: ガード+6",
+      },
+      {
+        faces: [4, 5, 6],
+        effect: { lifestealPct: 0.2 },
+        description: "4以上: 与ダメ20%回復",
+      },
+    ],
+  },
+  {
+    id: "hexer",
+    name: "呪術師",
+    icon: "🪄",
+    description: "弱体特化。3〜4で敵を弱体化、6で大火球。",
+    statMods: { attack: 1, defense: 0, maxHp: 0, reroll: 0 },
+    diceModifiers: [
+      {
+        faces: [3, 4],
+        effect: { kind: "weaken", weaken: 3 },
+        label: "弱体化",
+        description: "3〜4: 敵の攻撃-3",
+      },
+      {
+        faces: [6],
+        effect: { kind: "fireball", damageMultiplier: 2.8 },
+        label: "大火球",
+        description: "6: 大火球",
+      },
+    ],
+  },
 ];
 
 const CLASS_MAP: Map<ClassId, CharacterClass> = new Map(CLASSES.map((c) => [c.id, c]));
