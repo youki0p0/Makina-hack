@@ -4,7 +4,13 @@ import { useState } from "react";
 import { SCRAP_VALUE } from "@/lib/loot";
 import { itemKey, rarityLabel, rarityRank, rarityStyle, slotLabel } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
-import type { Equipment, EquipmentSlot } from "@/types/game";
+import type { Equipment, EquipmentSlot, Rarity } from "@/types/game";
+
+const BULK_OPTIONS: { rarity: Rarity; label: string }[] = [
+  { rarity: "common", label: "≤コモン" },
+  { rarity: "rare", label: "≤レア" },
+  { rarity: "epic", label: "≤エピック" },
+];
 
 type Filter = "all" | EquipmentSlot;
 type Sort = "rarity" | "attack" | "defense" | "name";
@@ -42,6 +48,7 @@ export default function InventoryList() {
   const favorites = useGameStore((s) => s.favorites);
   const equipItem = useGameStore((s) => s.equipItem);
   const scrapItem = useGameStore((s) => s.scrapItem);
+  const scrapBulk = useGameStore((s) => s.scrapBulk);
   const toggleFavorite = useGameStore((s) => s.toggleFavorite);
   const [selected, setSelected] = useState<number | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -92,6 +99,29 @@ export default function InventoryList() {
           </button>
         ))}
       </div>
+
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-gray-500">一括分解:</span>
+        {BULK_OPTIONS.map((b) => (
+          <button
+            key={b.rarity}
+            onClick={() => {
+              const targets = inventory.filter(
+                (it) => !favorites.includes(itemKey(it)) && rarityRank[it.rarity] <= rarityRank[b.rarity],
+              );
+              if (targets.length === 0) return;
+              const gain = targets.reduce((sum, it) => sum + SCRAP_VALUE[it.rarity], 0);
+              if (confirm(`${b.label} の ${targets.length}個 を分解して素材+${gain}（★は保護）`)) {
+                scrapBulk(b.rarity);
+              }
+            }}
+            className="h-7 flex-1 rounded-lg bg-amber-700/70 text-[11px] font-bold text-white active:scale-95"
+          >
+            {b.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-[10px] text-gray-500">★ を付けた装備は分解されません（ロック）。</p>
 
       {rows.length === 0 ? (
         <p className="rounded-xl border border-white/10 bg-black/20 p-4 text-center text-sm text-gray-500">
@@ -248,8 +278,12 @@ function EquipmentDetailModal({
           <button onClick={onClose} className="h-12 flex-1 rounded-xl bg-white/10 font-bold active:scale-95">
             閉じる
           </button>
-          <button onClick={onScrap} className="h-12 flex-1 rounded-xl bg-amber-700/80 text-sm font-bold text-white active:scale-95">
-            分解 +{SCRAP_VALUE[item.rarity]}
+          <button
+            onClick={onScrap}
+            disabled={favorite}
+            className="h-12 flex-1 rounded-xl bg-amber-700/80 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
+          >
+            {favorite ? "🔒 ロック中" : `分解 +${SCRAP_VALUE[item.rarity]}`}
           </button>
           <button onClick={onEquip} className="h-12 flex-1 rounded-xl bg-emerald-600 font-bold text-white active:scale-95">
             装備する
