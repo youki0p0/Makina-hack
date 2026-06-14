@@ -1,16 +1,21 @@
 "use client";
 
-import { GACHA_COST } from "@/lib/loot";
+import { useState } from "react";
+import { GACHA_COST, PREMIUM_COST, TARGETED_COST } from "@/lib/loot";
 import { rarityLabel, rarityStyle, slotLabel } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
+import type { EquipmentSlot } from "@/types/game";
+
+const SLOTS: EquipmentSlot[] = ["weapon", "armor", "accessory"];
 
 export default function GachaPanel() {
   const points = useGameStore((s) => s.gachaPoints);
   const pull = useGameStore((s) => s.pullGacha);
+  const pullPremium = useGameStore((s) => s.pullPremium);
+  const pullTargeted = useGameStore((s) => s.pullTargeted);
   const lastPull = useGameStore((s) => s.lastPull);
   const clearLastPull = useGameStore((s) => s.clearLastPull);
-
-  const canPull = points >= GACHA_COST;
+  const [slot, setSlot] = useState<EquipmentSlot>("weapon");
 
   return (
     <div className="rounded-xl border border-purple-500/40 bg-purple-500/10 p-3">
@@ -21,13 +26,46 @@ export default function GachaPanel() {
       <p className="mt-1 text-[10px] text-gray-400">
         不要装備を分解して素材に。限定装備も排出。
       </p>
+
       <button
         onClick={pull}
-        disabled={!canPull}
-        className="mt-2 h-12 w-full rounded-xl bg-purple-600 font-bold text-white active:scale-95 disabled:opacity-40"
+        disabled={points < GACHA_COST}
+        className="mt-2 h-11 w-full rounded-xl bg-purple-600 font-bold text-white active:scale-95 disabled:opacity-40"
       >
-        ガチャを引く（素材 {GACHA_COST}）
+        通常ガチャ（素材 {GACHA_COST}）
       </button>
+
+      <button
+        onClick={pullPremium}
+        disabled={points < PREMIUM_COST}
+        className="mt-2 h-11 w-full rounded-xl bg-amber-600 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
+      >
+        ✨ プレミアム（素材 {PREMIUM_COST}・高レア率UP）
+      </button>
+
+      <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2">
+        <p className="text-[10px] text-gray-400">スロット指定ガチャ（高レア率UP）</p>
+        <div className="mt-1 flex gap-1">
+          {SLOTS.map((s) => (
+            <button
+              key={s}
+              onClick={() => setSlot(s)}
+              className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 ${
+                slot === s ? "bg-amber-600 text-white" : "bg-white/10 text-gray-300"
+              }`}
+            >
+              {slotLabel[s]}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => pullTargeted(slot)}
+          disabled={points < TARGETED_COST}
+          className="mt-2 h-11 w-full rounded-xl bg-rose-600 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
+        >
+          🎯 {slotLabel[slot]}指定ガチャ（素材 {TARGETED_COST}）
+        </button>
+      </div>
 
       {lastPull && (
         <div
