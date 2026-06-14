@@ -34,6 +34,7 @@ import { applyEquipmentModifiers, rollDice } from "@/lib/dice";
 import { GACHA_COST, pullGachaItem, rollConsumable, rollLoot, SCRAP_VALUE } from "@/lib/loot";
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, loadGame, saveGame } from "@/lib/save";
+import { itemKey, rarityRank } from "@/lib/ui";
 import type {
   ActiveBuff,
   ArtifactId,
@@ -52,6 +53,7 @@ import type {
   EquippedItems,
   Player,
   Progress,
+  Rarity,
 } from "@/types/game";
 import { faceByValue } from "@/data/diceFaces";
 
@@ -148,6 +150,8 @@ interface GameState {
 
   // gacha
   scrapItem: (itemIndex: number) => void;
+  /** Scrap all non-favorited items at or below the given rarity. */
+  scrapBulk: (maxRarity: Rarity) => void;
   pullGacha: () => void;
   clearLastPull: () => void;
 
@@ -623,11 +627,31 @@ export const useGameStore = create<GameState>((set, get) => {
       const state = get();
       const item = state.inventory[itemIndex];
       if (!item) return;
+      // Favorited items are locked from scrapping.
+      if (state.favorites.includes(itemKey(item))) return;
       const gain = SCRAP_VALUE[item.rarity];
       set({
         inventory: state.inventory.filter((_, i) => i !== itemIndex),
         gachaPoints: state.gachaPoints + gain,
       });
+      persist();
+    },
+
+    scrapBulk: (maxRarity: Rarity) => {
+      const state = get();
+      const threshold = rarityRank[maxRarity];
+      let gain = 0;
+      const kept: Equipment[] = [];
+      for (const item of state.inventory) {
+        const locked = state.favorites.includes(itemKey(item));
+        if (!locked && rarityRank[item.rarity] <= threshold) {
+          gain += SCRAP_VALUE[item.rarity];
+        } else {
+          kept.push(item);
+        }
+      }
+      if (gain === 0) return;
+      set({ inventory: kept, gachaPoints: state.gachaPoints + gain });
       persist();
     },
 
