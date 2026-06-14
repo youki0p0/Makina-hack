@@ -251,6 +251,9 @@ function EquipmentDetailModal({
           {item.rerollModifier !== 0 && (
             <Stat label={`リロール ${item.rerollModifier > 0 ? "+" : ""}${item.rerollModifier}`} />
           )}
+          {item.poisonResist ? <Stat label={`毒耐性 ${Math.round(item.poisonResist * 100)}%`} /> : null}
+          {item.stunResist ? <Stat label={`麻痺耐性 ${Math.round(item.stunResist * 100)}%`} /> : null}
+          {item.volatile && <Stat label="不安定(振れ幅大)" />}
         </div>
 
         {item.diceModifiers.length > 0 && (

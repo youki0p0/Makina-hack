@@ -3,7 +3,7 @@ import { getAffixById } from "@/data/affixes";
 import { getItemById, getItemInstance, ITEMS } from "@/data/items";
 import { pullGachaItem, rollLoot, SCRAP_VALUE } from "@/lib/loot";
 import { generateShopStock } from "@/lib/shop";
-import { applyAffix } from "@/data/affixes";
+import { applyAffix, rollAffixedCopy } from "@/data/affixes";
 
 describe("item registry", () => {
   it("has around 200 items", () => {
@@ -81,5 +81,25 @@ describe("affixes + item instances", () => {
   it("every item has a unique id", () => {
     const ids = new Set(ITEMS.map((i) => i.id));
     expect(ids.size).toBe(ITEMS.length);
+  });
+});
+
+describe("resistance gear", () => {
+  it("exists with resistance and a volatile flag", () => {
+    const charm = getItemById("antidote_charm")!;
+    expect(charm.poisonResist).toBeGreaterThan(0);
+    expect(charm.volatile).toBe(true);
+    const ring = getItemById("ward_ring")!;
+    expect(ring.stunResist).toBeGreaterThan(0);
+  });
+
+  it("volatile items can roll greater (wide-swing) affixes", () => {
+    const base = getItemById("antidote_charm")!;
+    let sawGreater = false;
+    for (let i = 0; i < 400; i++) {
+      const r = rollAffixedCopy({ ...base });
+      if (r.affixId?.startsWith("greater")) sawGreater = true;
+    }
+    expect(sawGreater).toBe(true);
   });
 });

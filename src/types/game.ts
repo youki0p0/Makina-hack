@@ -123,6 +123,12 @@ export interface Equipment {
   minFloor?: number;
   /** Category for class equip restrictions (undefined = any class). */
   equipTag?: EquipTag;
+  /** Fraction (0-1) of enemy-inflicted poison damage reduced. */
+  poisonResist?: number;
+  /** Chance (0-1) to ignore enemy-inflicted stun. */
+  stunResist?: number;
+  /** Higher affix chance + wider affix range (bigger stat swings). */
+  volatile?: boolean;
 }
 
 export type EquippedItems = {
