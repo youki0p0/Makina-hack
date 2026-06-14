@@ -231,7 +231,7 @@ export interface ActiveBuff {
 
 // ===== Battle =====
 
-export type BattleState = "idle" | "player" | "won" | "lost";
+export type BattleState = "idle" | "player" | "won" | "lost" | "shop";
 
 export interface BattleLogEntry {
   id: number;

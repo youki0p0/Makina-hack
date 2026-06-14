@@ -7,23 +7,26 @@ import BattleLog from "@/components/BattleLog";
 import DiceDisplay from "@/components/DiceDisplay";
 import EnemyCard from "@/components/EnemyCard";
 import PlayerStatus from "@/components/PlayerStatus";
+import ShopScreen from "@/components/ShopScreen";
 import { rarityStyle } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 
 export default function BattleScreen() {
   const battleState = useGameStore((s) => s.battleState);
   const currentEnemy = useGameStore((s) => s.currentEnemy);
-  const startBattle = useGameStore((s) => s.startBattle);
+  const enterCurrentFloor = useGameStore((s) => s.enterCurrentFloor);
 
-  // Auto-start a battle when entering with no enemy.
+  // On entering with nothing in progress, resolve the floor (battle or shop).
   useEffect(() => {
-    if (battleState === "idle" || !currentEnemy) {
-      if (battleState !== "won" && battleState !== "lost") {
-        startBattle();
-      }
+    if ((battleState === "idle" || !currentEnemy) && battleState !== "won" && battleState !== "lost" && battleState !== "shop") {
+      enterCurrentFloor();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (battleState === "shop") {
+    return <ShopScreen />;
+  }
 
   return (
     <div className="flex min-h-dvh flex-col gap-3 p-3">
@@ -64,6 +67,7 @@ function ResultOverlay() {
   const battleState = useGameStore((s) => s.battleState);
   const result = useGameStore((s) => s.lastResult);
   const floor = useGameStore((s) => s.currentFloor);
+  const enterCurrentFloor = useGameStore((s) => s.enterCurrentFloor);
   const startBattle = useGameStore((s) => s.startBattle);
 
   if (!result) return null;
@@ -119,7 +123,7 @@ function ResultOverlay() {
 
         <div className="mt-5 flex flex-col gap-2">
           <button
-            onClick={startBattle}
+            onClick={victory ? enterCurrentFloor : startBattle}
             className="h-14 rounded-2xl bg-emerald-600 text-lg font-bold text-white active:scale-95"
           >
             {victory ? `${floor}階へ進む →` : "再挑戦する"}

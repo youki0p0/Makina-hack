@@ -28,6 +28,7 @@ import {
 } from "@/lib/battle";
 import { applyEquipmentModifiers, rollDice } from "@/lib/dice";
 import { GACHA_COST, pullGachaItem, rollConsumable, rollLoot, SCRAP_VALUE } from "@/lib/loot";
+import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, loadGame, saveGame } from "@/lib/save";
 import type {
   ActiveBuff,
@@ -93,6 +94,8 @@ interface GameState {
   artifacts: ArtifactLevels;
   /** Current character class. */
   classId: ClassId;
+  /** Items for sale at the current shop floor (not persisted). */
+  shopStock: ShopEntry[];
 
   // selectors
   stats: () => ComputedStats;
@@ -110,6 +113,12 @@ interface GameState {
   startBattle: () => void;
   reroll: () => void;
   confirm: () => void;
+  /** Decide what happens on the current floor: shop or battle. */
+  enterCurrentFloor: () => void;
+
+  // shop
+  buyShopItem: (key: string) => void;
+  leaveShop: () => void;
 
   // equipment
   equipItem: (itemIndex: number) => void;
@@ -214,6 +223,7 @@ export const useGameStore = create<GameState>((set, get) => {
     souls: 0,
     artifacts: defaultArtifactLevels(),
     classId: DEFAULT_CLASS_ID,
+    shopStock: [],
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
     currentFace: () => faceByValue(get().diceFaces, get().diceValue),
@@ -409,6 +419,58 @@ export const useGameStore = create<GameState>((set, get) => {
         rerollsLeft: stats.rerolls,
         battleLog: log,
       });
+    },
+
+    enterCurrentFloor: () => {
+      const floor = get().currentFloor;
+      if (isShopFloor(floor)) {
+        set({
+          battleState: "shop",
+          currentEnemy: null,
+          shopStock: generateShopStock(floor),
+        });
+      } else {
+        get().startBattle();
+      }
+    },
+
+    buyShopItem: (key: string) => {
+      const state = get();
+      const entry = state.shopStock.find((e) => e.key === key);
+      if (!entry || entry.sold || state.player.gold < entry.price) return;
+
+      const markSold = () =>
+        state.shopStock.map((e) => (e.key === key ? { ...e, sold: true } : e));
+      const goldAfter = state.player.gold - entry.price;
+
+      if (entry.kind === "equipment" && entry.equipment) {
+        set({
+          player: { ...state.player, gold: goldAfter },
+          inventory: [...state.inventory, { ...entry.equipment }],
+          shopStock: markSold(),
+        });
+      } else if (entry.kind === "consumable" && entry.consumable) {
+        const c = entry.consumable;
+        let player = { ...state.player, gold: goldAfter };
+        let buffs = state.activeBuffs;
+        if (c.kind === "heal") {
+          const maxHp = currentStats(player, state.equipped, buffs).maxHp;
+          player = { ...player, hp: Math.min(maxHp, player.hp + c.value) };
+        } else {
+          buffs = [...buffs, { kind: c.kind, value: c.value, battlesLeft: c.battles }];
+        }
+        set({ player, activeBuffs: buffs, shopStock: markSold() });
+      } else {
+        return;
+      }
+      persist();
+    },
+
+    leaveShop: () => {
+      // Move past the shop floor and start the next encounter.
+      set({ currentFloor: get().currentFloor + 1, battleState: "idle" });
+      get().enterCurrentFloor();
+      persist();
     },
 
     equipItem: (itemIndex: number) => {
