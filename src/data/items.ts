@@ -143,6 +143,25 @@ export const ITEMS: readonly Equipment[] = [
       },
     ],
   },
+  {
+    id: "thunder_hammer",
+    name: "雷神の鎚",
+    rarity: "epic",
+    slot: "weapon",
+    attack: 5,
+    defense: 0,
+    maxHp: 0,
+    rerollModifier: 0,
+    description: "攻撃力+5。6で敵をスタン(1ターン行動不能)。",
+    diceModifiers: [
+      {
+        faces: [6],
+        effect: { kind: "stun", stun: 1 },
+        label: "雷撃",
+        description: "6: 敵をスタン(1T)",
+      },
+    ],
+  },
 
   // ===== armor =====
   {

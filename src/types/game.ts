@@ -19,7 +19,8 @@ export type DiceKind =
   | "skill"
   | "fireball"
   | "defend"
-  | "selfDamage";
+  | "selfDamage"
+  | "stun";
 
 /** Continuous status the dice can inflict on the enemy. */
 export type StatusKind = "poison" | "burn";
@@ -64,6 +65,8 @@ export interface DiceFaceEffect {
   isMiss: boolean;
   /** Status-over-time inflicted on the enemy when this face is confirmed. */
   statusEffect?: StatusEffect;
+  /** Number of enemy turns to stun (skip its attack). */
+  stun?: number;
 }
 
 /**
@@ -182,6 +185,8 @@ export interface Enemy {
   isBoss: boolean;
   /** Active status-over-time effects (poison/burn). */
   statuses: ActiveStatus[];
+  /** Remaining enemy turns to skip due to stun. */
+  stunTurns: number;
 }
 
 // ===== Consumables =====
