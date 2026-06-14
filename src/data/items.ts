@@ -250,6 +250,24 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     ],
   },
 
+  {
+    id: "antibody_robe",
+    name: "抗体のローブ",
+    rarity: "epic",
+    slot: "armor",
+    equipTag: "light",
+    attack: 0,
+    defense: 2,
+    maxHp: 0,
+    rerollModifier: 0,
+    minFloor: 7,
+    poisonResist: 0.35,
+    stunResist: 0.2,
+    volatile: true,
+    description: "防御は低いが毒35%・麻痺20%軽減。性能のブレが大きい。",
+    diceModifiers: [],
+  },
+
   // ===== accessory =====
   {
     id: "lucky_ring",
@@ -306,6 +324,37 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
         description: "6: 火球スキル",
       },
     ],
+  },
+
+  {
+    id: "antidote_charm",
+    name: "抗毒の護符",
+    rarity: "rare",
+    slot: "accessory",
+    attack: 0,
+    defense: 0,
+    maxHp: 3,
+    rerollModifier: 0,
+    minFloor: 6,
+    poisonResist: 0.5,
+    volatile: true,
+    description: "基礎性能は低いが毒を50%軽減。ブレが大きい。",
+    diceModifiers: [],
+  },
+  {
+    id: "ward_ring",
+    name: "耐雷の指輪",
+    rarity: "rare",
+    slot: "accessory",
+    attack: 0,
+    defense: 0,
+    maxHp: 2,
+    rerollModifier: 0,
+    minFloor: 8,
+    stunResist: 0.5,
+    volatile: true,
+    description: "基礎性能は低いが麻痺を50%の確率で無効。ブレが大きい。",
+    diceModifiers: [],
   },
 
   // ===== gacha-exclusive (never drops from enemies) =====

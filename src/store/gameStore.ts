@@ -86,6 +86,19 @@ function addUnique(list: string[], id: string): string[] {
   return list.includes(id) ? list : [...list, id];
 }
 
+/** Sum status-resistance from equipped gear (clamped to 0.9). */
+function equippedResist(eq: EquippedItems): { poison: number; stun: number } {
+  let poison = 0;
+  let stun = 0;
+  for (const slot of EQUIP_SLOTS) {
+    const it = eq[slot];
+    if (!it) continue;
+    poison += it.poisonResist ?? 0;
+    stun += it.stunResist ?? 0;
+  }
+  return { poison: Math.min(0.9, poison), stun: Math.min(0.9, stun) };
+}
+
 interface GameState {
   hydrated: boolean;
   player: Player;
@@ -547,15 +560,23 @@ export const useGameStore = create<GameState>((set, get) => {
         decayWeaken();
         playerHp -= turn.playerDamage;
         log = pushLogs(log, turn.logs.map((text) => ({ text, tone: "bad" as const })));
-        // Enemy-inflicted player statuses.
+        // Enemy-inflicted player statuses (mitigated by resistance gear).
+        const resist = equippedResist(state.equipped);
         if (turn.playerPoison > 0) {
+          const dmg = Math.max(1, Math.round(turn.playerPoison * (1 - resist.poison)));
           playerStatuses = addStatus(playerStatuses, {
             kind: "poison",
-            damagePerTurn: turn.playerPoison,
+            damagePerTurn: dmg,
             remainingTurns: PLAYER_POISON_TURNS,
           });
         }
-        if (turn.playerStun > 0) playerStunTurns += turn.playerStun;
+        if (turn.playerStun > 0) {
+          if (Math.random() < resist.stun) {
+            log = pushLogs(log, [{ text: "麻痺を耐えた！", tone: "good" }]);
+          } else {
+            playerStunTurns += turn.playerStun;
+          }
+        }
 
         if (playerHp <= 0) {
           const lost = finishDefeat(
