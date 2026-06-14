@@ -1,21 +1,13 @@
 "use client";
 
+import { ENEMY_ABILITY_LABEL } from "@/data/enemies";
 import { useDamageFx } from "@/hooks/useDamageFx";
 import { useGameStore } from "@/store/gameStore";
-import type { ActiveStatus, EnemyAbility, StatusKind } from "@/types/game";
+import type { ActiveStatus, StatusKind } from "@/types/game";
 
 const STATUS_UI: Record<StatusKind, { icon: string; cls: string }> = {
   poison: { icon: "☠️", cls: "bg-lime-500/20 text-lime-300" },
   burn: { icon: "🔥", cls: "bg-orange-500/20 text-orange-300" },
-};
-
-const ABILITY_LABEL: Record<EnemyAbility, string> = {
-  multiAttack: "連撃",
-  heal: "回復",
-  defend: "防御",
-  lifesteal: "吸血",
-  fierce: "剛撃",
-  guardBreak: "防御無視",
 };
 
 /** Collapse stacked statuses into one badge per kind: total dmg/turn + max turns. */
@@ -81,7 +73,7 @@ export default function EnemyCard() {
       <div className="mt-2 text-xs text-gray-400">
         ⚔️ {Math.max(0, enemy.attack - ((enemy.weakenTurns ?? 0) > 0 ? enemy.weakenAmount : 0))} ／ 🛡️ {enemy.defense + (enemy.bonusDefense ?? 0)}
         {enemy.ability && (
-          <span className="ml-2 text-rose-300">{ABILITY_LABEL[enemy.ability]}</span>
+          <span className="ml-2 text-rose-300">{ENEMY_ABILITY_LABEL[enemy.ability]}</span>
         )}
       </div>
 

@@ -196,6 +196,8 @@ export interface EnemyTemplate {
   isBoss: boolean;
   /** Optional special action. */
   ability?: EnemyAbility;
+  /** Flavor text shown in the bestiary. */
+  desc?: string;
 }
 
 export interface Enemy {
