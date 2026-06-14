@@ -2,6 +2,7 @@
 
 import { getClass } from "@/data/classes";
 import { consumableIcon } from "@/data/consumables";
+import { getTitle } from "@/data/titles";
 import { useDamageFx } from "@/hooks/useDamageFx";
 import { useGameStore } from "@/store/gameStore";
 
@@ -20,6 +21,7 @@ export default function PlayerStatus() {
   const hpPct = Math.max(0, Math.round((player.hp / stats.maxHp) * 100));
   const cls = getClass(useGameStore((s) => s.classId));
   const streak = useGameStore((s) => s.winStreak);
+  const title = getTitle(useGameStore((s) => s.titleId));
   const { floaters } = useDamageFx(player.hp, "player", "hurt");
 
   return (
@@ -31,6 +33,7 @@ export default function PlayerStatus() {
       ))}
       <div className="flex items-center justify-between text-sm">
         <span className="font-bold">
+          {title.id && <span className="text-amber-300">《{title.name}》</span>}{" "}
           {cls.icon} {cls.name} Lv{player.level}
         </span>
         <span className="flex items-center gap-2">

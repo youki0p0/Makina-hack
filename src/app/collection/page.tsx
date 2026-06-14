@@ -5,15 +5,18 @@ import { useEffect, useState } from "react";
 import { ACHIEVEMENTS, achievedCount } from "@/data/achievements";
 import { BOSS_TEMPLATE, ENEMY_TEMPLATES } from "@/data/enemies";
 import { ITEMS } from "@/data/items";
+import { TITLES, isTitleUnlocked } from "@/data/titles";
 import { rarityLabel, rarityStyle } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 
-type Tab = "achievements" | "items" | "enemies";
+type Tab = "achievements" | "items" | "enemies" | "titles";
 
 export default function CollectionPage() {
   const hydrate = useGameStore((s) => s.hydrate);
   const hydrated = useGameStore((s) => s.hydrated);
   const progress = useGameStore((s) => s.progress);
+  const titleId = useGameStore((s) => s.titleId);
+  const setTitle = useGameStore((s) => s.setTitle);
   const [tab, setTab] = useState<Tab>("achievements");
 
   useEffect(() => {
@@ -48,16 +51,16 @@ export default function CollectionPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        {(["achievements", "items", "enemies"] as Tab[]).map((t) => (
+      <div className="grid grid-cols-4 gap-1">
+        {(["achievements", "items", "enemies", "titles"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`h-10 rounded-xl text-xs font-bold active:scale-95 ${
+            className={`h-10 rounded-xl text-[11px] font-bold active:scale-95 ${
               tab === t ? "bg-emerald-600 text-white" : "bg-white/10 text-gray-300"
             }`}
           >
-            {t === "achievements" ? "実績" : t === "items" ? "装備図鑑" : "敵図鑑"}
+            {t === "achievements" ? "実績" : t === "items" ? "装備" : t === "enemies" ? "敵" : "称号"}
           </button>
         ))}
       </div>
@@ -130,6 +133,34 @@ export default function CollectionPage() {
                 <div className="text-3xl">{found ? e.emoji : "❓"}</div>
                 <p className="text-xs font-bold">{found ? e.name : "???"}</p>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab === "titles" && (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-400">名前の前に表示される称号を選べる。</p>
+          {TITLES.map((t) => {
+            const unlocked = isTitleUnlocked(t.id, progress);
+            const current = t.id === titleId;
+            return (
+              <button
+                key={t.id || "none"}
+                onClick={() => unlocked && setTitle(t.id)}
+                disabled={!unlocked}
+                className={`flex w-full items-center justify-between rounded-xl border p-2 text-left active:scale-[0.98] disabled:opacity-50 ${
+                  current ? "border-amber-500/60 bg-amber-500/10" : "border-white/10 bg-black/20"
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className={`font-bold ${current ? "text-amber-200" : unlocked ? "text-gray-100" : "text-gray-500"}`}>
+                    {unlocked ? `《${t.name}》` : "🔒 ???"}
+                  </p>
+                  <p className="text-[10px] text-gray-400">{t.desc}</p>
+                </div>
+                {current && <span className="text-[10px] text-amber-300">選択中</span>}
+              </button>
             );
           })}
         </div>
