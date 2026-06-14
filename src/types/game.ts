@@ -109,6 +109,8 @@ export interface Equipment {
   diceModifiers: DiceModifier[];
   /** Gacha-exclusive: never drops from enemies, only from the equipment gacha. */
   gachaOnly?: boolean;
+  /** Casino-exclusive: only awarded as a casino prize. */
+  casinoOnly?: boolean;
 }
 
 export type EquippedItems = {

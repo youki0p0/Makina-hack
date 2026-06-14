@@ -310,6 +310,48 @@ export const ITEMS: readonly Equipment[] = [
     description: "【限定】HP+8、リロール+2。引き直しの鬼。",
     diceModifiers: [],
   },
+
+  // ===== casino-exclusive prizes (only from the casino) =====
+  {
+    id: "golden_die",
+    name: "黄金のダイス",
+    rarity: "legendary",
+    slot: "weapon",
+    attack: 6,
+    defense: 0,
+    maxHp: 0,
+    rerollModifier: 1,
+    casinoOnly: true,
+    description: "【カジノ景品】攻撃力+6、リロール+1。1〜2を強攻撃に変える。",
+    diceModifiers: [
+      {
+        faces: [1, 2],
+        effect: { kind: "strong", damageMultiplier: 1.5, isMiss: false },
+        label: "強攻撃",
+        description: "1〜2: 強攻撃",
+      },
+    ],
+  },
+  {
+    id: "gamblers_crown",
+    name: "賭博王の王冠",
+    rarity: "legendary",
+    slot: "accessory",
+    attack: 0,
+    defense: 0,
+    maxHp: 12,
+    rerollModifier: 1,
+    casinoOnly: true,
+    description: "【カジノ景品】HP+12、リロール+1。6で超火力。",
+    diceModifiers: [
+      {
+        faces: [6],
+        effect: { kind: "critical", damageMultiplier: 3.5 },
+        label: "超火力",
+        description: "6: 超火力",
+      },
+    ],
+  },
 ];
 
 const ITEM_MAP: Map<string, Equipment> = new Map(ITEMS.map((i) => [i.id, i]));

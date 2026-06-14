@@ -64,6 +64,13 @@ export default function TitlePage() {
             🔮 アーティファクト / 転生
           </Link>
 
+          <Link
+            href="/casino"
+            className="h-12 rounded-2xl bg-fuchsia-600/80 pt-3 font-bold active:scale-95"
+          >
+            🎰 カジノ
+          </Link>
+
           {hasProgress && (
             <button
               onClick={() => {

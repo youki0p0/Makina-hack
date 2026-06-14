@@ -129,6 +129,9 @@ interface GameState {
   pullGacha: () => void;
   clearLastPull: () => void;
 
+  // casino
+  casinoSettle: (goldDelta: number, prize?: Equipment | null) => void;
+
   // artifacts / rebirth
   upgradeArtifact: (id: ArtifactId) => void;
   rebirth: () => void;
@@ -541,6 +544,16 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     clearLastPull: () => set({ lastPull: null }),
+
+    casinoSettle: (goldDelta: number, prize?: Equipment | null) => {
+      const state = get();
+      const gold = Math.max(0, state.player.gold + goldDelta);
+      set({
+        player: { ...state.player, gold },
+        inventory: prize ? [...state.inventory, { ...prize }] : state.inventory,
+      });
+      persist();
+    },
 
     upgradeArtifact: (id: ArtifactId) => {
       const state = get();
