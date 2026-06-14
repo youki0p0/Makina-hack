@@ -329,4 +329,6 @@ export interface SaveData {
   progress?: Progress;
   /** Favorited item keys (id:affix) pinned to the top of the inventory. */
   favorites?: string[];
+  /** Whether the first-run help has been dismissed. */
+  seenHelp?: boolean;
 }
