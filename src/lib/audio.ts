@@ -127,27 +127,131 @@ export function sfx(kind: Sfx): void {
   }
 }
 
-// ===== BGM: a looping chiptune in A minor (square lead + triangle bass) =====
+// ===== BGM: "The Sunless Vault" — a long-form A-minor dungeon loop =====
+// 1 bar = 16 steps @ 150ms. Loop = 32 bars (~77s) that build A → A2 → B → A'.
+// Layers: triangle bass pedal, detuned-sine pad, square arpeggio, sparse
+// square lead, and noise percussion — all via the existing tone()/noise().
 
-const LEAD: number[] = [
-  440, 0, 523, 0, 659, 0, 523, 0,
-  587, 0, 523, 0, 440, 0, 392, 0,
-  440, 0, 659, 0, 880, 0, 659, 0,
-  587, 0, 523, 0, 494, 0, 440, 0,
+const BAR = 16;
+const LOOP_BARS = 32;
+const DETUNE = 1.006; // ~+10 cent chorus for the pad
+
+interface Chord {
+  root: number;
+  fifth: number;
+  arp: [number, number, number, number];
+}
+
+// 8-bar chord cycle: Am F Dm Esus | Am F G Am (i ♭VI iv v / i ♭VI ♭VII i).
+const PROG: Chord[] = [
+  { root: 110.0, fifth: 164.81, arp: [261.63, 329.63, 523.25, 329.63] }, // Am
+  { root: 87.31, fifth: 130.81, arp: [261.63, 349.23, 523.25, 349.23] }, // F
+  { root: 73.42, fifth: 110.0, arp: [174.61, 220.0, 349.23, 220.0] }, // Dm
+  { root: 82.41, fifth: 123.47, arp: [246.94, 329.63, 493.88, 329.63] }, // E (no 3rd)
+  { root: 110.0, fifth: 164.81, arp: [261.63, 329.63, 523.25, 329.63] }, // Am
+  { root: 87.31, fifth: 130.81, arp: [261.63, 349.23, 523.25, 349.23] }, // F (♭VI)
+  { root: 98.0, fifth: 146.83, arp: [246.94, 293.66, 587.33, 293.66] }, // G (♭VII)
+  { root: 110.0, fifth: 164.81, arp: [261.63, 329.63, 523.25, 329.63] }, // Am
 ];
-const BASS: number[] = [
-  110, 0, 0, 0, 87.31, 0, 0, 0,
-  98, 0, 0, 0, 82.41, 0, 0, 0,
-  110, 0, 0, 0, 87.31, 0, 0, 0,
-  98, 0, 0, 98, 110, 0, 0, 0,
+
+// Arpeggio figures (indices into chord.arp), rotated every bar for variety.
+const ARP_SHAPES: number[][] = [
+  [0, 1, 2, 1],
+  [0, 2, 1, 1],
+  [2, 1, 0, 1],
+  [0, 1, 3, 2],
 ];
+
+// Sparse 4-bar lead phrase (64 steps), used in A2/B. 0 = rest.
+const LEAD_PHRASE: number[] = [
+  440, 0, 0, 0, 523.25, 0, 0, 0, 659.25, 0, 0, 0, 0, 0, 0, 0,
+  587.33, 0, 0, 0, 523.25, 0, 0, 0, 440, 0, 0, 0, 392.0, 0, 0, 0,
+  440, 0, 0, 0, 659.25, 0, 0, 0, 880, 0, 0, 0, 0, 0, 0, 0,
+  659.25, 0, 0, 0, 587.33, 0, 0, 0, 493.88, 0, 0, 0, 440, 0, 0, 0,
+];
+
+type Mode = "A" | "A2" | "B" | "Ap";
+function sectionOf(bar: number): Mode {
+  const b = bar % LOOP_BARS;
+  if (b < 8) return "A";
+  if (b < 16) return "A2";
+  if (b < 24) return "B";
+  return "Ap";
+}
+
+interface Dyn {
+  padFifth: boolean;
+  arp: boolean;
+  arpGhost: boolean;
+  lead: boolean;
+  hat: boolean;
+  kickMid: boolean;
+  bassOct: boolean;
+  arpVol: number;
+}
+const DYN: Record<Mode, Dyn> = {
+  A: { padFifth: false, arp: false, arpGhost: false, lead: false, hat: false, kickMid: false, bassOct: false, arpVol: 0 },
+  A2: { padFifth: true, arp: true, arpGhost: false, lead: true, hat: false, kickMid: false, bassOct: true, arpVol: 0.07 },
+  B: { padFifth: true, arp: true, arpGhost: true, lead: true, hat: true, kickMid: true, bassOct: true, arpVol: 0.1 },
+  Ap: { padFifth: true, arp: true, arpGhost: false, lead: false, hat: false, kickMid: false, bassOct: true, arpVol: 0.05 },
+};
 
 function bgmTick(): void {
   if (muted) return;
-  const i = bgmStep % LEAD.length;
-  if (LEAD[i]) tone(LEAD[i], 0.13, "square", 0.14);
-  if (BASS[i]) tone(BASS[i], 0.18, "triangle", 0.2);
-  bgmStep++;
+  const step = bgmStep;
+  const bar = Math.floor(step / BAR);
+  const inBar = step % BAR;
+  const mode = sectionOf(bar);
+  const dyn = DYN[mode];
+  const chord = PROG[bar % PROG.length];
+  const secBar = bar % 8;
+  const phraseStep = (secBar % 4) * BAR + inBar;
+  // Duck other voices on the bar head where pad + kick already stack.
+  const duck = inBar === 0 ? 0.6 : 1;
+
+  // Bass: root pedal + octave, with a small mid-bar pulse in section B.
+  if (inBar === 0) tone(chord.root, 0.45, "triangle", 0.2);
+  if (inBar === 8 && dyn.bassOct) tone(chord.root * 2, 0.45, "triangle", 0.13);
+  if (inBar === 12 && mode === "B") tone(chord.root, 0.3, "triangle", 0.11);
+
+  // Pad: detuned sine, root (+fifth in fuller sections) on each chord change.
+  if (inBar === 0) {
+    tone(chord.root, 1.6, "sine", 0.06);
+    tone(chord.root * DETUNE, 1.6, "sine", 0.06);
+    if (dyn.padFifth) {
+      tone(chord.fifth, 1.6, "sine", 0.05);
+      tone(chord.fifth * DETUNE, 1.6, "sine", 0.05);
+    }
+  }
+
+  // Arpeggio: square eighth-notes following the chord, figure rotates per bar.
+  if (dyn.arp && inBar % 2 === 0) {
+    const shape = ARP_SHAPES[secBar % ARP_SHAPES.length];
+    const note = chord.arp[shape[(step >> 1) & 3]];
+    const v = dyn.arpVol * duck;
+    if (note) {
+      tone(note, 0.12, "square", v);
+      if (dyn.arpGhost) tone(note, 0.1, "square", v * 0.4, 0.075);
+    }
+  }
+
+  // Lead: sparse square melody, with a faint vibrato tail in section B.
+  if (dyn.lead) {
+    const note = LEAD_PHRASE[phraseStep];
+    if (note) {
+      tone(note, 0.26, "square", 0.12);
+      if (mode === "B" && inBar === 12) tone(note * 1.01, 0.26, "square", 0.05, 0.1);
+    }
+  }
+
+  // Percussion: kick (+sub) on bar head; mid-bar kick & off-beat hats in B.
+  if (inBar === 0 || (dyn.kickMid && inBar === 8)) {
+    noise(0.05, 0.18);
+    tone(55, 0.08, "sine", 0.2);
+  }
+  if (dyn.hat && inBar % 2 === 1) noise(0.025, 0.06);
+
+  bgmStep = (bgmStep + 1) % (BAR * LOOP_BARS);
 }
 
 export function startBgm(): void {
