@@ -20,7 +20,8 @@ export type DiceKind =
   | "fireball"
   | "defend"
   | "selfDamage"
-  | "stun";
+  | "stun"
+  | "weaken";
 
 /** Continuous status the dice can inflict on the enemy. */
 export type StatusKind = "poison" | "burn";
@@ -67,6 +68,8 @@ export interface DiceFaceEffect {
   statusEffect?: StatusEffect;
   /** Number of enemy turns to stun (skip its attack). */
   stun?: number;
+  /** Amount to reduce the enemy's attack (weaken) for a few turns. */
+  weaken?: number;
 }
 
 /**
@@ -142,7 +145,14 @@ export interface ComputedStats {
 
 // ===== Character classes (転職) =====
 
-export type ClassId = "adventurer" | "warrior" | "rogue" | "mage" | "berserker";
+export type ClassId =
+  | "adventurer"
+  | "warrior"
+  | "rogue"
+  | "mage"
+  | "berserker"
+  | "paladin"
+  | "hexer";
 
 // ===== Artifacts (rebirth meta-progression) =====
 
@@ -202,6 +212,10 @@ export interface Enemy {
   bonusDefense: number;
   /** Remaining turns of the defense bonus. */
   bonusDefenseTurns: number;
+  /** Attack reduction from weaken. */
+  weakenAmount: number;
+  /** Remaining turns of weaken. */
+  weakenTurns: number;
 }
 
 // ===== Consumables =====

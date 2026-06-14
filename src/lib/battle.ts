@@ -93,7 +93,12 @@ export interface PlayerActionOutcome {
   status: ActiveStatus | null;
   /** Enemy turns to stun this turn (0 if none). */
   stun: number;
+  /** Attack reduction to apply to the enemy (0 if none). */
+  weaken: number;
 }
+
+/** How many enemy turns a weaken lasts. */
+export const WEAKEN_TURNS = 3;
 
 export const STATUS_LABEL: Record<StatusKind, string> = {
   poison: "毒",
@@ -131,6 +136,7 @@ export function resolvePlayerAction(
       logs: ["攻撃を外した！"],
       status: null,
       stun: 0,
+      weaken: 0,
     };
   }
 
@@ -173,7 +179,12 @@ export function resolvePlayerAction(
     logs.push(`スタン！ 敵は${stun}ターン動けない`);
   }
 
-  return { enemyDamage, selfDamage, heal, guard, hits, logs, status, stun };
+  const weaken = e.weaken && e.weaken > 0 ? e.weaken : 0;
+  if (weaken > 0) {
+    logs.push(`弱体化！ 敵の攻撃-${weaken} (${WEAKEN_TURNS}T)`);
+  }
+
+  return { enemyDamage, selfDamage, heal, guard, hits, logs, status, stun, weaken };
 }
 
 export interface StatusTickResult {
@@ -235,11 +246,15 @@ export function resolveEnemyTurn(
   stats: ComputedStats,
   guard: number,
 ): EnemyTurnResult {
-  const normal = () => Math.max(1, enemy.attack - stats.defense - guard);
+  const atk = Math.max(
+    1,
+    enemy.attack - (enemy.weakenTurns > 0 ? enemy.weakenAmount : 0),
+  );
+  const normal = () => Math.max(1, atk - stats.defense - guard);
 
   if (enemy.ability && Math.random() < ABILITY_CHANCE) {
     if (enemy.ability === "multiAttack") {
-      const per = Math.max(1, Math.round(enemy.attack * 0.7) - stats.defense - guard);
+      const per = Math.max(1, Math.round(atk * 0.7) - stats.defense - guard);
       const damage = per * 2;
       return {
         playerDamage: damage,

@@ -104,6 +104,8 @@ export function generateEnemy(floor: number): Enemy {
     ability: template.ability ?? null,
     bonusDefense: 0,
     bonusDefenseTurns: 0,
+    weakenAmount: 0,
+    weakenTurns: 0,
   };
 }
 

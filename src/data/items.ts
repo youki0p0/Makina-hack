@@ -163,6 +163,25 @@ export const ITEMS: readonly Equipment[] = [
       },
     ],
   },
+  {
+    id: "hex_rod",
+    name: "呪詛のロッド",
+    rarity: "rare",
+    slot: "weapon",
+    attack: 3,
+    defense: 0,
+    maxHp: 0,
+    rerollModifier: 0,
+    description: "攻撃力+3。2〜3で敵を弱体化(攻撃ダウン)。",
+    diceModifiers: [
+      {
+        faces: [2, 3],
+        effect: { kind: "weaken", weaken: 2 },
+        label: "弱体化",
+        description: "2〜3: 敵の攻撃-2",
+      },
+    ],
+  },
 
   // ===== armor =====
   {
