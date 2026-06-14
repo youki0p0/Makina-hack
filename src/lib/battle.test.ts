@@ -6,6 +6,7 @@ import {
   computeStats,
   expForLevel,
   luckFloor,
+  resolveEnemyTurn,
   resolvePlayerAction,
   tickEnemyStatuses,
 } from "@/lib/battle";
@@ -97,6 +98,26 @@ describe("applyExp", () => {
     const { player, leveledUp } = applyExp(p, p.expToNext + 1);
     expect(leveledUp).toBe(true);
     expect(player.level).toBe(2);
+  });
+});
+
+describe("resolveEnemyTurn player statuses", () => {
+  const stats = computeStats(basePlayer(), emptyEquip);
+
+  it("poison enemies can inflict player poison", () => {
+    const enemy = { ...generateEnemy(1), ability: "poison" as const };
+    let saw = false;
+    for (let i = 0; i < 300; i++) {
+      if (resolveEnemyTurn(enemy, stats, 0).playerPoison > 0) saw = true;
+    }
+    expect(saw).toBe(true);
+  });
+
+  it("a plain enemy inflicts no player status", () => {
+    const enemy = { ...generateEnemy(1), ability: null };
+    const t = resolveEnemyTurn(enemy, stats, 0);
+    expect(t.playerPoison).toBe(0);
+    expect(t.playerStun).toBe(0);
   });
 });
 

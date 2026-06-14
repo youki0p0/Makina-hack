@@ -234,8 +234,15 @@ export interface EnemyTurnResult {
   enemyHeal: number;
   /** If > 0, set the enemy's bonus defense to this value. */
   defendValue: number;
+  /** If > 0, inflict poison on the player (damage per turn, lasts a few turns). */
+  playerPoison: number;
+  /** If > 0, stun the player (loses rerolls) for this many turns. */
+  playerStun: number;
   logs: string[];
 }
+
+/** How many turns enemy-inflicted player poison lasts. */
+export const PLAYER_POISON_TURNS = 3;
 
 /**
  * Decide and resolve the enemy's turn: either a special ability or a normal
@@ -251,74 +258,70 @@ export function resolveEnemyTurn(
     enemy.attack - (enemy.weakenTurns > 0 ? enemy.weakenAmount : 0),
   );
   const normal = () => Math.max(1, atk - stats.defense - guard);
+  const base = (): EnemyTurnResult => ({
+    playerDamage: 0,
+    enemyHeal: 0,
+    defendValue: 0,
+    playerPoison: 0,
+    playerStun: 0,
+    logs: [],
+  });
 
   if (enemy.ability && Math.random() < ABILITY_CHANCE) {
     if (enemy.ability === "multiAttack") {
       const per = Math.max(1, Math.round(atk * 0.7) - stats.defense - guard);
       const damage = per * 2;
-      return {
-        playerDamage: damage,
-        enemyHeal: 0,
-        defendValue: 0,
-        logs: [`${enemy.name} の連続攻撃！ ${damage} ダメージ`],
-      };
+      return { ...base(), playerDamage: damage, logs: [`${enemy.name} の連続攻撃！ ${damage} ダメージ`] };
     }
     if (enemy.ability === "heal") {
       const heal = Math.max(1, Math.round(enemy.maxHp * 0.2));
-      return {
-        playerDamage: 0,
-        enemyHeal: heal,
-        defendValue: 0,
-        logs: [`${enemy.name} は回復した！ (+${heal})`],
-      };
+      return { ...base(), enemyHeal: heal, logs: [`${enemy.name} は回復した！ (+${heal})`] };
     }
     if (enemy.ability === "defend") {
       const defendValue = Math.max(3, Math.round(enemy.attack * 0.8));
-      return {
-        playerDamage: 0,
-        enemyHeal: 0,
-        defendValue,
-        logs: [`${enemy.name} は身を固めた！ (防御+${defendValue})`],
-      };
+      return { ...base(), defendValue, logs: [`${enemy.name} は身を固めた！ (防御+${defendValue})`] };
     }
     if (enemy.ability === "lifesteal") {
       const damage = normal();
       const heal = Math.max(1, Math.round(damage * 0.5));
       return {
+        ...base(),
         playerDamage: damage,
         enemyHeal: heal,
-        defendValue: 0,
         logs: [`${enemy.name} は吸血！ ${damage} ダメージ (自身 +${heal})`],
       };
     }
     if (enemy.ability === "fierce") {
       const damage = Math.max(1, Math.round(atk * 1.8) - stats.defense - guard);
-      return {
-        playerDamage: damage,
-        enemyHeal: 0,
-        defendValue: 0,
-        logs: [`${enemy.name} の渾身の一撃！ ${damage} ダメージ`],
-      };
+      return { ...base(), playerDamage: damage, logs: [`${enemy.name} の渾身の一撃！ ${damage} ダメージ`] };
     }
     if (enemy.ability === "guardBreak") {
-      // Ignores the player's guard for this turn.
       const damage = Math.max(1, atk - stats.defense);
+      return { ...base(), playerDamage: damage, logs: [`${enemy.name} の防御無視攻撃！ ${damage} ダメージ`] };
+    }
+    if (enemy.ability === "poison") {
+      const damage = normal();
+      const poison = Math.max(1, Math.round(atk * 0.3));
       return {
+        ...base(),
         playerDamage: damage,
-        enemyHeal: 0,
-        defendValue: 0,
-        logs: [`${enemy.name} の防御無視攻撃！ ${damage} ダメージ`],
+        playerPoison: poison,
+        logs: [`${enemy.name} の毒撃！ ${damage} ダメージ＋毒`],
+      };
+    }
+    if (enemy.ability === "shock") {
+      const damage = normal();
+      return {
+        ...base(),
+        playerDamage: damage,
+        playerStun: 1,
+        logs: [`${enemy.name} の麻痺攻撃！ ${damage} ダメージ＋スタン`],
       };
     }
   }
 
   const damage = normal();
-  return {
-    playerDamage: damage,
-    enemyHeal: 0,
-    defendValue: 0,
-    logs: [`${enemy.name} の攻撃！ ${damage} ダメージ`],
-  };
+  return { ...base(), playerDamage: damage, logs: [`${enemy.name} の攻撃！ ${damage} ダメージ`] };
 }
 
 export interface BossTurnResult {
