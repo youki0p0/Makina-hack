@@ -327,4 +327,6 @@ export interface SaveData {
   winStreak?: number;
   /** Cumulative progress for achievements/collection (optional for old saves). */
   progress?: Progress;
+  /** Favorited item keys (id:affix) pinned to the top of the inventory. */
+  favorites?: string[];
 }

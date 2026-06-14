@@ -32,6 +32,7 @@ export interface LoadedState {
   classId: ClassId;
   winStreak: number;
   progress: Progress;
+  favorites: string[];
 }
 
 export function saveGame(state: LoadedState): void {
@@ -51,6 +52,7 @@ export function saveGame(state: LoadedState): void {
     classId: state.classId,
     winStreak: state.winStreak,
     progress: state.progress,
+    favorites: state.favorites,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -95,6 +97,7 @@ export function loadGame(): LoadedState | null {
       classId: normalizeClassId(data.classId),
       winStreak: data.winStreak ?? 0,
       progress: normalizeProgress(data.progress),
+      favorites: Array.isArray(data.favorites) ? data.favorites : [],
     };
   } catch {
     return null;

@@ -1,4 +1,18 @@
-import type { DiceKind, Rarity } from "@/types/game";
+import type { DiceKind, Equipment, Rarity } from "@/types/game";
+
+/** Stable key for an item instance (base id + affix), used for favorites. */
+export function itemKey(item: Equipment): string {
+  return `${item.id}:${item.affixId ?? ""}`;
+}
+
+/** Sort rank for rarity (higher = rarer). */
+export const rarityRank: Record<Rarity, number> = {
+  legendary: 5,
+  epic: 4,
+  cursed: 3,
+  rare: 2,
+  common: 1,
+};
 
 export const rarityLabel: Record<Rarity, string> = {
   common: "コモン",
