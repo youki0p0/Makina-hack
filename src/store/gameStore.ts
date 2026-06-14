@@ -16,7 +16,7 @@ import {
   tickEnemyStatuses,
 } from "@/lib/battle";
 import { applyEquipmentModifiers, rollDice } from "@/lib/dice";
-import { rollConsumable, rollLoot } from "@/lib/loot";
+import { GACHA_COST, pullGachaItem, rollConsumable, rollLoot, SCRAP_VALUE } from "@/lib/loot";
 import { clearSave, loadGame, saveGame } from "@/lib/save";
 import type {
   ActiveBuff,
@@ -68,6 +68,10 @@ interface GameState {
   lastResult: BattleResult | null;
   /** Temporary consumable buffs in effect, counting down per battle. */
   activeBuffs: ActiveBuff[];
+  /** Gacha currency from scrapping equipment. */
+  gachaPoints: number;
+  /** The most recent gacha pull, for the result popup (not persisted). */
+  lastPull: Equipment | null;
 
   // selectors
   stats: () => ComputedStats;
@@ -85,6 +89,11 @@ interface GameState {
   // equipment
   equipItem: (itemIndex: number) => void;
   unequipItem: (slot: keyof EquippedItems) => void;
+
+  // gacha
+  scrapItem: (itemIndex: number) => void;
+  pullGacha: () => void;
+  clearLastPull: () => void;
 }
 
 let logCounter = 0;
@@ -97,6 +106,7 @@ export const useGameStore = create<GameState>((set, get) => {
       equipped: s.equipped,
       inventory: s.inventory,
       currentFloor: s.currentFloor,
+      gachaPoints: s.gachaPoints,
     });
   }
 
@@ -140,6 +150,8 @@ export const useGameStore = create<GameState>((set, get) => {
     battleLog: [],
     lastResult: null,
     activeBuffs: [],
+    gachaPoints: 0,
+    lastPull: null,
 
     stats: () => computeStats(get().player, get().equipped, get().activeBuffs),
     currentFace: () => faceByValue(get().diceFaces, get().diceValue),
@@ -153,6 +165,7 @@ export const useGameStore = create<GameState>((set, get) => {
           equipped: loaded.equipped,
           inventory: loaded.inventory,
           currentFloor: loaded.currentFloor,
+          gachaPoints: loaded.gachaPoints,
           hydrated: true,
         });
       } else {
@@ -183,6 +196,8 @@ export const useGameStore = create<GameState>((set, get) => {
         battleLog: [],
         lastResult: null,
         activeBuffs: [],
+        gachaPoints: 0,
+        lastPull: null,
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -347,6 +362,32 @@ export const useGameStore = create<GameState>((set, get) => {
       });
       persist();
     },
+
+    scrapItem: (itemIndex: number) => {
+      const state = get();
+      const item = state.inventory[itemIndex];
+      if (!item) return;
+      const gain = SCRAP_VALUE[item.rarity];
+      set({
+        inventory: state.inventory.filter((_, i) => i !== itemIndex),
+        gachaPoints: state.gachaPoints + gain,
+      });
+      persist();
+    },
+
+    pullGacha: () => {
+      const state = get();
+      if (state.gachaPoints < GACHA_COST) return;
+      const pulled = pullGachaItem();
+      set({
+        gachaPoints: state.gachaPoints - GACHA_COST,
+        inventory: [...state.inventory, pulled],
+        lastPull: pulled,
+      });
+      persist();
+    },
+
+    clearLastPull: () => set({ lastPull: null }),
   };
 
   // ===== victory / defeat helpers (closures over set/get not needed) =====
@@ -473,6 +514,7 @@ export const useGameStore = create<GameState>((set, get) => {
       equipped: snap.equipped ?? s.equipped,
       inventory: snap.inventory ?? s.inventory,
       currentFloor: snap.currentFloor ?? s.currentFloor,
+      gachaPoints: snap.gachaPoints ?? s.gachaPoints,
     });
   }
 });

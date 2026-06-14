@@ -104,6 +104,8 @@ export interface Equipment {
   rerollModifier: number;
   description: string;
   diceModifiers: DiceModifier[];
+  /** Gacha-exclusive: never drops from enemies, only from the equipment gacha. */
+  gachaOnly?: boolean;
 }
 
 export type EquippedItems = {
@@ -222,4 +224,6 @@ export interface SaveData {
   equippedIds: { [K in EquipmentSlot]: string | null };
   inventoryIds: string[];
   currentFloor: number;
+  /** Gacha currency from scrapping equipment (optional for old saves). */
+  gachaPoints?: number;
 }

@@ -14,6 +14,7 @@ export interface LoadedState {
   equipped: EquippedItems;
   inventory: Equipment[];
   currentFloor: number;
+  gachaPoints: number;
 }
 
 export function saveGame(state: LoadedState): void {
@@ -27,6 +28,7 @@ export function saveGame(state: LoadedState): void {
     },
     inventoryIds: state.inventory.map((i) => i.id),
     currentFloor: state.currentFloor,
+    gachaPoints: state.gachaPoints,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -57,6 +59,7 @@ export function loadGame(): LoadedState | null {
       equipped,
       inventory,
       currentFloor: data.currentFloor,
+      gachaPoints: data.gachaPoints ?? 0,
     };
   } catch {
     return null;

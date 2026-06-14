@@ -251,6 +251,46 @@ export const ITEMS: readonly Equipment[] = [
       },
     ],
   },
+
+  // ===== gacha-exclusive (never drops from enemies) =====
+  {
+    id: "dragon_slayer",
+    name: "竜殺しの大剣",
+    rarity: "legendary",
+    slot: "weapon",
+    attack: 8,
+    defense: 0,
+    maxHp: 0,
+    rerollModifier: 0,
+    gachaOnly: true,
+    description: "【限定】攻撃力+8。1のミスを通常攻撃に、4以上で2回攻撃。",
+    diceModifiers: [
+      {
+        faces: [1],
+        effect: { kind: "normal", damageMultiplier: 1, isMiss: false },
+        label: "通常攻撃",
+        description: "1: ミス → 通常攻撃",
+      },
+      {
+        faces: [4, 5, 6],
+        effect: { extraHits: 1 },
+        description: "4以上: 2回攻撃",
+      },
+    ],
+  },
+  {
+    id: "fortune_amulet",
+    name: "幸運の護符",
+    rarity: "epic",
+    slot: "accessory",
+    attack: 0,
+    defense: 0,
+    maxHp: 8,
+    rerollModifier: 2,
+    gachaOnly: true,
+    description: "【限定】HP+8、リロール+2。引き直しの鬼。",
+    diceModifiers: [],
+  },
 ];
 
 const ITEM_MAP: Map<string, Equipment> = new Map(ITEMS.map((i) => [i.id, i]));

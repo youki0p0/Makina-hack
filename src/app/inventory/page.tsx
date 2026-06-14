@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import EquipmentPanel from "@/components/EquipmentPanel";
+import GachaPanel from "@/components/GachaPanel";
 import InventoryList from "@/components/InventoryList";
 import PlayerStatus from "@/components/PlayerStatus";
 import { useGameStore } from "@/store/gameStore";
@@ -42,6 +43,7 @@ export default function InventoryPage() {
 
       <PlayerStatus />
       <EquipmentPanel />
+      <GachaPanel />
       <InventoryList />
     </main>
   );
