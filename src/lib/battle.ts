@@ -1,4 +1,5 @@
 import type {
+  ActiveBuff,
   ActiveStatus,
   ComputedStats,
   DiceFace,
@@ -18,8 +19,12 @@ export const EQUIP_SLOTS: ReadonlyArray<keyof EquippedItems> = [
   "accessory",
 ];
 
-/** Aggregate base player stats with equipment bonuses. */
-export function computeStats(player: Player, equipped: EquippedItems): ComputedStats {
+/** Aggregate base player stats with equipment bonuses and temporary buffs. */
+export function computeStats(
+  player: Player,
+  equipped: EquippedItems,
+  buffs: ReadonlyArray<ActiveBuff> = [],
+): ComputedStats {
   let attack = player.baseAttack;
   let defense = player.baseDefense;
   let maxHp = player.maxHp;
@@ -34,10 +39,43 @@ export function computeStats(player: Player, equipped: EquippedItems): ComputedS
     rerollMod += item.rerollModifier;
   }
 
-  // Spec: base 1 reroll, equipment shifts it; clamp to a sane range.
-  const rerolls = clamp(BASE_REROLLS + rerollMod, 0, MAX_REROLLS);
+  // Temporary consumable buffs stack on top of equipment.
+  let buffAttack = 0;
+  let buffDefense = 0;
+  let buffReroll = 0;
+  for (const b of buffs) {
+    if (b.kind === "attack") buffAttack += b.value;
+    else if (b.kind === "defense") buffDefense += b.value;
+    else if (b.kind === "reroll") buffReroll += b.value;
+  }
 
-  return { attack, defense, maxHp, rerolls };
+  // Spec: base 1 reroll, equipment shifts it; clamp. Buff rerolls add on top.
+  const rerolls = clamp(BASE_REROLLS + rerollMod, 0, MAX_REROLLS) + buffReroll;
+
+  return {
+    attack: attack + buffAttack,
+    defense: defense + buffDefense,
+    maxHp,
+    rerolls,
+  };
+}
+
+/** The minimum die value forced by active "luck" buffs (1 if none). */
+export function luckFloor(buffs: ReadonlyArray<ActiveBuff>): number {
+  let min = 1;
+  for (const b of buffs) {
+    if (b.kind === "luck") min = Math.max(min, b.value);
+  }
+  return Math.min(6, min);
+}
+
+/** Count down buffs by one battle, dropping any that expire. */
+export function tickBuffs(buffs: ReadonlyArray<ActiveBuff>): ActiveBuff[] {
+  const next: ActiveBuff[] = [];
+  for (const b of buffs) {
+    if (b.battlesLeft - 1 > 0) next.push({ ...b, battlesLeft: b.battlesLeft - 1 });
+  }
+  return next;
 }
 
 export interface PlayerActionOutcome {

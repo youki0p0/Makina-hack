@@ -1,10 +1,19 @@
 "use client";
 
+import { consumableIcon } from "@/data/consumables";
 import { useGameStore } from "@/store/gameStore";
+
+const BUFF_LABEL: Record<string, string> = {
+  attack: "攻",
+  defense: "防",
+  reroll: "振直",
+  luck: "幸運",
+};
 
 export default function PlayerStatus() {
   const player = useGameStore((s) => s.player);
   const stats = useGameStore((s) => s.stats());
+  const buffs = useGameStore((s) => s.activeBuffs);
 
   const hpPct = Math.max(0, Math.round((player.hp / stats.maxHp) * 100));
 
@@ -50,6 +59,20 @@ export default function PlayerStatus() {
           />
         </div>
       </div>
+
+      {buffs.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1 text-[10px]">
+          {buffs.map((b, i) => (
+            <span
+              key={`${b.kind}-${i}`}
+              className="rounded-full bg-emerald-500/20 px-2 py-0.5 font-bold text-emerald-300"
+            >
+              {consumableIcon[b.kind]} {BUFF_LABEL[b.kind]}
+              {b.kind === "luck" ? `≥${b.value}` : `+${b.value}`} ({b.battlesLeft}戦)
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
