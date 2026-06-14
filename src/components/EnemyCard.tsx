@@ -1,5 +1,6 @@
 "use client";
 
+import { useDamageFx } from "@/hooks/useDamageFx";
 import { useGameStore } from "@/store/gameStore";
 import type { ActiveStatus, EnemyAbility, StatusKind } from "@/types/game";
 
@@ -32,6 +33,7 @@ function summarize(statuses: ActiveStatus[]): { kind: StatusKind; dps: number; t
 export default function EnemyCard() {
   const enemy = useGameStore((s) => s.currentEnemy);
   const floor = useGameStore((s) => s.currentFloor);
+  const { floaters, shake } = useDamageFx(enemy?.hp ?? 0, enemy?.id ?? "", "hit");
 
   if (!enemy) return null;
 
@@ -40,12 +42,19 @@ export default function EnemyCard() {
 
   return (
     <div
-      className={`rounded-xl border p-4 text-center ${
+      className={`relative rounded-xl border p-4 text-center ${
         enemy.isBoss ? "border-red-600/70 bg-red-950/30" : "border-white/10 bg-black/30"
       }`}
     >
+      {floaters.map((f) => (
+        <span key={f.id} className={`dmg-float text-2xl ${f.cls}`}>
+          {f.text}
+        </span>
+      ))}
       <div className="text-xs text-gray-400">{floor}階</div>
-      <div className="my-1 text-5xl leading-none">{enemy.emoji}</div>
+      <div key={shake} className={`my-1 text-5xl leading-none ${shake ? "inline-block animate-shake" : "inline-block"}`}>
+        {enemy.emoji}
+      </div>
       <div className="font-bold">
         {enemy.isBoss && <span className="mr-1 text-red-400">BOSS</span>}
         {enemy.name}

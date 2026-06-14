@@ -8,6 +8,8 @@ import DiceDisplay from "@/components/DiceDisplay";
 import EnemyCard from "@/components/EnemyCard";
 import PlayerStatus from "@/components/PlayerStatus";
 import ShopScreen from "@/components/ShopScreen";
+import SoundToggle from "@/components/SoundToggle";
+import { sfx } from "@/lib/audio";
 import { rarityStyle } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 
@@ -38,6 +40,7 @@ export default function BattleScreen() {
           ← タイトル
         </Link>
         <div className="flex gap-2">
+          <SoundToggle />
           <Link
             href="/help"
             className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
@@ -78,8 +81,14 @@ function ResultOverlay() {
   const enterCurrentFloor = useGameStore((s) => s.enterCurrentFloor);
   const startBattle = useGameStore((s) => s.startBattle);
 
+  const won = battleState === "won";
+  useEffect(() => {
+    if (battleState === "won") sfx("win");
+    else if (battleState === "lost") sfx("lose");
+  }, [battleState]);
+
   if (!result) return null;
-  const victory = battleState === "won";
+  const victory = won;
 
   return (
     <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 p-6">

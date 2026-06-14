@@ -2,6 +2,7 @@
 
 import { getClass } from "@/data/classes";
 import { consumableIcon } from "@/data/consumables";
+import { useDamageFx } from "@/hooks/useDamageFx";
 import { useGameStore } from "@/store/gameStore";
 
 const BUFF_LABEL: Record<string, string> = {
@@ -19,9 +20,15 @@ export default function PlayerStatus() {
   const hpPct = Math.max(0, Math.round((player.hp / stats.maxHp) * 100));
   const cls = getClass(useGameStore((s) => s.classId));
   const streak = useGameStore((s) => s.winStreak);
+  const { floaters } = useDamageFx(player.hp, "player", "hurt");
 
   return (
-    <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+    <div className="relative rounded-xl border border-white/10 bg-black/30 p-3">
+      {floaters.map((f) => (
+        <span key={f.id} className={`dmg-float text-xl ${f.cls}`}>
+          {f.text}
+        </span>
+      ))}
       <div className="flex items-center justify-between text-sm">
         <span className="font-bold">
           {cls.icon} {cls.name} Lv{player.level}
