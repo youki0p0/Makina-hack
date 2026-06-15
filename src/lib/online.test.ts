@@ -8,7 +8,13 @@ import {
   sanitizeEntry,
   type RankingEntry,
 } from "@/lib/ranking";
-import { echoRewards, generateEcho } from "@/lib/echoBattle";
+import {
+  echoRewards,
+  generateEcho,
+  TRIAL_COUNT,
+  TRIAL_GHOSTS,
+  TRIAL_REWARD_BONUS,
+} from "@/lib/echoBattle";
 
 const sample: RankingEntry = {
   playerName: "Tester",
@@ -96,5 +102,20 @@ describe("echo battle generation", () => {
     const r = echoRewards(sample);
     expect(r.gold).toBeGreaterThan(0);
     expect(r.rankPoints).toBeGreaterThan(0);
+  });
+
+  it("the trial ladder has 20 escalating ghosts", () => {
+    expect(TRIAL_GHOSTS).toHaveLength(TRIAL_COUNT);
+    const first = generateEcho(TRIAL_GHOSTS[0]);
+    const last = generateEcho(TRIAL_GHOSTS[TRIAL_COUNT - 1]);
+    expect(last.maxHp).toBeGreaterThan(first.maxHp);
+    expect(last.attack).toBeGreaterThan(first.attack);
+    expect(TRIAL_GHOSTS[TRIAL_COUNT - 1].hasShinkiMakina).toBe(true);
+  });
+
+  it("trial rewards are a notch larger than the raw strength", () => {
+    const base = echoRewards(TRIAL_GHOSTS[9]);
+    const trial = echoRewards(TRIAL_GHOSTS[9], TRIAL_REWARD_BONUS);
+    expect(trial.gold).toBeGreaterThan(base.gold);
   });
 });
