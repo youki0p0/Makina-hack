@@ -483,14 +483,34 @@ const SLOT_NOUNS: Record<EquipmentSlot, string[]> = {
   accessory: ACC_NOUNS,
 };
 
-function rarityForTier(t: number): Rarity {
+export function rarityForTier(t: number): Rarity {
   if (t <= 15) return "common";
   if (t <= 30) return "rare";
   if (t <= 45) return "epic";
   return "legendary";
 }
 
-function generatedItem(slot: EquipmentSlot, t: number, noun: string): Equipment {
+/** The six equipment slots, in display order. */
+export const SLOT_LIST: EquipmentSlot[] = [
+  "weapon",
+  "helm",
+  "armor",
+  "gloves",
+  "boots",
+  "accessory",
+];
+
+/** Highest base tier. Beyond this, depth comes from ★ modifiers, not new bases. */
+export const GEN_MAX_TIER = 60;
+
+/**
+ * Procedurally build a "plain" stat item for a slot/tier. These are NEVER stored
+ * in a registry — the id (`gen_<slot>_<tier>`) is enough to reconstruct them, so
+ * the entity count stays flat no matter how many slots or floors exist.
+ */
+export function genItem(slot: EquipmentSlot, tier: number): Equipment {
+  const t = Math.max(1, Math.round(tier));
+  const noun = SLOT_NOUNS[slot][(t - 1) % SLOT_NOUNS[slot].length];
   const mat = MATERIALS[Math.min(MATERIALS.length - 1, Math.floor((t - 1) / 5))];
   const item: Equipment = {
     id: `gen_${slot}_${t}`,
@@ -541,16 +561,59 @@ function generatedItem(slot: EquipmentSlot, t: number, noun: string): Equipment 
   return item;
 }
 
-function buildGenerated(): Equipment[] {
-  const out: Equipment[] = [];
-  const slots: EquipmentSlot[] = ["weapon", "helm", "armor", "gloves", "boots", "accessory"];
-  for (let t = 1; t <= 61; t++) {
-    for (const slot of slots) {
-      const nouns = SLOT_NOUNS[slot];
-      out.push(generatedItem(slot, t, nouns[(t - 1) % nouns.length]));
-    }
-  }
-  return out;
+const randInt = (lo: number, hi: number) =>
+  lo + Math.floor(Math.random() * (hi - lo + 1));
+
+/** The base tier appropriate for a floor (capped; ★ handles deeper scaling). */
+export function genTierForFloor(floor: number): number {
+  return Math.max(1, Math.min(GEN_MAX_TIER, floor));
+}
+
+/** Parse a procedural id back into its slot + tier (null if not a gen id). */
+export function parseGenId(id: string): { slot: EquipmentSlot; tier: number } | null {
+  const m = /^gen_([a-z]+)_(\d+)$/.exec(id);
+  if (!m) return null;
+  const slot = m[1] as EquipmentSlot;
+  if (!SLOT_LIST.includes(slot)) return null;
+  return { slot, tier: Number(m[2]) };
+}
+
+/** Tier range (inclusive) for a rarity band, clamped to a max tier. */
+function bandRange(band: Rarity, maxTier: number): [number, number] {
+  const ranges: Partial<Record<Rarity, [number, number]>> = {
+    common: [1, 15],
+    rare: [16, 30],
+    epic: [31, 45],
+    legendary: [46, GEN_MAX_TIER],
+  };
+  const [lo, hi] = ranges[band] ?? [1, GEN_MAX_TIER];
+  return [Math.min(lo, maxTier), Math.min(hi, maxTier)];
+}
+
+/**
+ * Roll a floor-appropriate procedural drop. `rareBias` (0+) nudges the tier
+ * upward (= rarer). `slot` forces a slot (used for "smart drops").
+ */
+export function rollGenDrop(floor: number, rareBias = 0, slot?: EquipmentSlot): Equipment {
+  const top = genTierForFloor(floor);
+  const lo = Math.max(1, top - 15);
+  let tier = randInt(lo, top);
+  // Difficulty/boss rare bias: chance to pull the tier toward the top band.
+  if (Math.random() < Math.min(0.6, rareBias / 60)) tier = randInt(Math.max(lo, top - 4), top);
+  return genItem(slot ?? SLOT_LIST[randInt(0, SLOT_LIST.length - 1)], tier);
+}
+
+/** A plain Common procedural item (the 10/100 gacha). */
+export function genCommon(): Equipment {
+  const [lo, hi] = bandRange("common", GEN_MAX_TIER);
+  return genItem(SLOT_LIST[randInt(0, SLOT_LIST.length - 1)], randInt(lo, hi));
+}
+
+/** A Rare-or-above procedural item of a given slot (the 250 targeted gacha). */
+export function genRarePlus(slot: EquipmentSlot): Equipment {
+  // Tiers 16+ are Rare/Epic/Legendary; bias toward the middle for fairness.
+  const tier = randInt(16, GEN_MAX_TIER);
+  return genItem(slot, tier);
 }
 
 // ===== Set items (4 sets × 6 slots) =====
@@ -596,10 +659,8 @@ function buildSetItems(): Equipment[] {
 // route). Stats are 92% of the strongest droppable weapon; every face becomes a
 // plain normal attack ("Complete").
 function makinaAttackValue(): number {
-  const strongest = Math.max(
-    0,
-    ...buildGenerated().filter((i) => i.slot === "weapon").map((i) => i.attack),
-  );
+  // 92% of the strongest base weapon (top-tier procedural weapon).
+  const strongest = genItem("weapon", GEN_MAX_TIER).attack;
   return Math.round(strongest * 0.92);
 }
 
@@ -640,18 +701,21 @@ export function makeMakina(): Equipment {
   };
 }
 
-/** Full registry: signature + generated + set items. (神機マキナ is special.) */
-export const ITEMS: readonly Equipment[] = [
-  ...SIGNATURE_ITEMS,
-  ...buildGenerated(),
-  ...buildSetItems(),
-];
+/**
+ * Curated registry: hand-made signature items + set items. Procedural "gen_*"
+ * gear is NOT listed here — it's reconstructed on demand (see getItemById), so
+ * adding slots or going deeper never grows this array. This is also what the
+ * codex tracks as collectible.
+ */
+export const ITEMS: readonly Equipment[] = [...SIGNATURE_ITEMS, ...buildSetItems()];
 
 const ITEM_MAP: Map<string, Equipment> = new Map(ITEMS.map((i) => [i.id, i]));
 
 /** Get a fresh copy of an item by id, or null if unknown. */
 export function getItemById(id: string): Equipment | null {
   if (id === MAKINA_ID) return makeMakina();
+  const gen = parseGenId(id);
+  if (gen) return genItem(gen.slot, gen.tier);
   const item = ITEM_MAP.get(id);
   return item ? { ...item } : null;
 }

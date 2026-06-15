@@ -138,7 +138,8 @@ export default function CollectionPage() {
       {tab === "items" && (
         <div className="space-y-2">
           <p className="text-xs text-gray-400">
-            発見 {progress.discoveredItems.length} / {ITEMS.length}
+            発見 {ITEMS.filter((i) => progress.discoveredItems.includes(i.id)).length} / {ITEMS.length}
+            <span className="ml-1 text-[10px] text-gray-500">（署名・セット装備のみ。素材装備は対象外）</span>
           </p>
           {ITEMS.map((item) => {
             const found = progress.discoveredItems.includes(item.id);

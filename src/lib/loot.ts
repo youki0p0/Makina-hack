@@ -1,6 +1,6 @@
 import { AFFIXES, applyAffix, rollAffixedCopy } from "@/data/affixes";
 import { CONSUMABLES } from "@/data/consumables";
-import { ITEMS } from "@/data/items";
+import { ITEMS, genCommon, genRarePlus, rollGenDrop } from "@/data/items";
 import { applyModifier } from "@/data/modifiers";
 import { applyQuality, rollQuality } from "@/data/quality";
 import { rarityRank } from "@/lib/ui";
@@ -21,11 +21,16 @@ const RARITY_WEIGHT: Record<Rarity, number> = {
   legendary: 3,
 };
 
-/** Items that can drop from enemies (gacha/casino/unique items excluded). */
-const DROPPABLE = ITEMS.filter((i) => !i.gachaOnly && !i.casinoOnly && !i.unique);
-
-/** Items obtainable from the equipment gacha (casino prizes & uniques excluded). */
-const GACHA_POOL = ITEMS.filter((i) => !i.casinoOnly && !i.unique);
+/**
+ * CURATED droppables: hand-made signature gear + set pieces (the items with
+ * dice effects / set bonuses). Plain stat gear is generated procedurally, so it
+ * is NOT in this list — see rollLoot, which mixes curated drops with procedural.
+ */
+const CURATED_DROPPABLE = ITEMS.filter((i) => !i.gachaOnly && !i.casinoOnly && !i.unique);
+/** Curated Rare+ gear (incl. gacha-exclusives) for the targeted pull. */
+const CURATED_RAREPLUS = ITEMS.filter(
+  (i) => !i.casinoOnly && !i.unique && rarityRank[i.rarity] >= rarityRank.rare,
+);
 
 /** Gacha currency gained by scrapping equipment, by rarity. */
 export const SCRAP_VALUE: Record<Rarity, number> = {
@@ -42,11 +47,6 @@ export const GACHA_COST = 10;
 export const PREMIUM_COST = 100;
 /** Targeted pull (cost {@link TARGETED_COST}): chosen slot, Rare+ guaranteed. */
 export const TARGETED_COST = 250;
-
-/** Common-only gacha pool (the 10/100 pulls). */
-const COMMON_POOL = GACHA_POOL.filter((i) => i.rarity === "common");
-/** Rare-and-above gacha pool (the 250 targeted pull). */
-const RAREPLUS_POOL = GACHA_POOL.filter((i) => rarityRank[i.rarity] >= rarityRank.rare);
 
 /** Weighted random pick from a pool, returning an affixed copy. */
 function weightedPull(
@@ -74,12 +74,11 @@ function rarePlusWeight(item: Equipment): number {
 }
 
 /**
- * Basic pull (cost {@link GACHA_COST}): a plain Common. The cheap pull is the
- * material sink, never a shortcut to rare gear — this is what makes spamming
- * 10-pulls a poor strategy compared to saving for the targeted pull.
+ * Basic pull (cost {@link GACHA_COST}): a plain procedural Common. The cheap pull
+ * is the material sink, never a shortcut to rare gear.
  */
 export function pullGachaItem(): Equipment {
-  return weightedPull(COMMON_POOL, (i) => RARITY_WEIGHT[i.rarity] + (i.gachaOnly ? 10 : 0));
+  return genCommon();
 }
 
 /**
@@ -87,8 +86,7 @@ export function pullGachaItem(): Equipment {
  * affix plus a ★ modifier — a "high-roll Common", never Rare+.
  */
 export function pullPremiumItem(modCap = Infinity): Equipment {
-  const base = weightedPull(COMMON_POOL, (i) => RARITY_WEIGHT[i.rarity]);
-  const affixed = applyAffix(base, AFFIXES[Math.floor(Math.random() * AFFIXES.length)]);
+  const affixed = applyAffix(genCommon(), AFFIXES[Math.floor(Math.random() * AFFIXES.length)]);
   // Modifier ★ is capped by the player's deepest floor — no future-tier gear.
   const tier = Math.min(modCap, 1 + (Math.random() < 0.35 ? 1 : 0));
   return applyModifier(affixed, Math.max(0, tier));
@@ -96,56 +94,55 @@ export function pullPremiumItem(modCap = Infinity): Equipment {
 
 /**
  * Targeted pull (cost {@link TARGETED_COST}): pick a slot and get Rare-or-above
- * gear of that slot, guaranteed. The only reliable route to high-rarity items.
+ * gear of that slot, guaranteed. ~40% chance of a curated Rare+ (incl.
+ * exclusives) of that slot, otherwise a procedural Rare+ of that slot.
  */
 export function pullTargetedItem(slot: EquipmentSlot): Equipment {
-  const pool = RAREPLUS_POOL.filter((i) => i.slot === slot);
-  if (pool.length === 0) return weightedPull(RAREPLUS_POOL, rarePlusWeight);
-  return weightedPull(pool, rarePlusWeight);
+  const curated = CURATED_RAREPLUS.filter((i) => i.slot === slot);
+  if (curated.length > 0 && Math.random() < 0.4) {
+    return withQuality(weightedPull(curated, rarePlusWeight));
+  }
+  return withQuality(genRarePlus(slot));
 }
 
 /**
- * Roll for loot after defeating an enemy.
- * Bosses always drop; otherwise the enemy's dropRate decides.
+ * Roll for loot after defeating an enemy. Bosses always drop; otherwise the
+ * enemy's dropRate decides. Mixes curated (signature/set) gear with procedural
+ * stat gear. `slotHint` biases procedural drops toward a slot (smart drops).
  */
-export function rollLoot(enemy: Enemy, floor: number, rareBonus = 0): Equipment | null {
+export function rollLoot(
+  enemy: Enemy,
+  floor: number,
+  rareBonus = 0,
+  slotHint?: EquipmentSlot,
+): Equipment | null {
   if (Math.random() > enemy.dropRate) return null;
 
-  // Higher floors tilt the table toward better gear; difficulty adds rareBonus.
-  const floorBonus = Math.min(floor * 1.5, 40) + rareBonus;
-
-  // Floor-gated pool: items unlocked by this floor, within a recent window so
-  // low-tier gear phases out as you descend. Fall back to all unlocked items.
+  // Floor-gated curated pool (recent window), with fallbacks.
   const WINDOW = 20;
-  let pool = DROPPABLE.filter((i) => {
+  let curated = CURATED_DROPPABLE.filter((i) => {
     const mf = i.minFloor ?? 1;
     return mf <= floor && mf > floor - WINDOW;
   });
-  if (pool.length === 0) {
-    pool = DROPPABLE.filter((i) => (i.minFloor ?? 1) <= floor);
-  }
-  if (pool.length === 0) pool = DROPPABLE.filter((i) => (i.minFloor ?? 1) <= 1);
+  if (curated.length === 0) curated = CURATED_DROPPABLE.filter((i) => (i.minFloor ?? 1) <= floor);
 
-  const weighted = pool.map((item) => {
-    let weight = RARITY_WEIGHT[item.rarity];
-    if (item.rarity === "epic" || item.rarity === "legendary" || item.rarity === "cursed") {
-      weight += floorBonus;
-    }
-    if (enemy.isBoss && item.rarity !== "common") {
-      weight += 25;
-    }
-    return { item, weight };
-  });
-
-  const total = weighted.reduce((sum, w) => sum + w.weight, 0);
-  let roll = Math.random() * total;
-  for (const { item, weight } of weighted) {
-    roll -= weight;
-    if (roll <= 0) {
-      return withQuality(rollAffixedCopy({ ...item }));
-    }
+  // Bosses/late floors favor a curated (effect-bearing) drop; otherwise mostly
+  // procedural stat gear so the registry stays flat and gear scales with depth.
+  const curatedChance = enemy.isBoss ? 0.5 : 0.35;
+  if (curated.length > 0 && Math.random() < curatedChance) {
+    const floorBonus = Math.min(floor * 1.5, 40) + rareBonus;
+    const item = weightedPull(curated, (it) => {
+      let w = RARITY_WEIGHT[it.rarity];
+      if (it.rarity !== "common") w += floorBonus;
+      if (enemy.isBoss && it.rarity !== "common") w += 25;
+      return w;
+    });
+    return withQuality(item);
   }
-  return withQuality(rollAffixedCopy({ ...weighted[weighted.length - 1].item }));
+
+  // Procedural stat gear, floor-appropriate, optionally targeting a weak slot.
+  const bias = rareBonus + (enemy.isBoss ? 25 : 0);
+  return withQuality(rollAffixedCopy(rollGenDrop(floor, bias, slotHint)));
 }
 
 /** Roll an Ancient/Mythic upgrade onto a (legendary) drop. */

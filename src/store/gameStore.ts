@@ -114,6 +114,21 @@ function addUnique(list: string[], id: string): string[] {
   return list.includes(id) ? list : [...list, id];
 }
 
+/** The emptiest/weakest equipped slot (for biasing "smart drops"). */
+function weakestSlot(eq: EquippedItems): EquipmentSlot {
+  let worst: EquipmentSlot = EQUIP_SLOTS[0];
+  let worstScore = Infinity;
+  for (const slot of EQUIP_SLOTS) {
+    const it = eq[slot];
+    const score = it ? it.attack + it.defense + it.maxHp : -1;
+    if (score < worstScore) {
+      worstScore = score;
+      worst = slot;
+    }
+  }
+  return worst;
+}
+
 /** Sum status-resistance from equipped gear (clamped to 0.9). */
 function equippedResist(eq: EquippedItems): { poison: number; stun: number } {
   let poison = 0;
@@ -1210,9 +1225,13 @@ export const useGameStore = create<GameState>((set, get) => {
     // is anchored to the floor's ★ modifier tier (#8), with a chance to roll higher.
     const diff = getDifficulty(state.difficulty);
     const dropCount = diff.dropMin + Math.floor(Math.random() * (diff.dropMax - diff.dropMin + 1));
+    // Smart drops: with 6 slots, bias procedural drops toward the weakest/empty
+    // slot so gearing up doesn't take 2× as long as it did with 3 slots.
+    const weakSlot = weakestSlot(state.equipped);
     const drops: Equipment[] = [];
     for (let i = 0; i < dropCount; i++) {
-      const d = rollLoot(enemy, state.currentFloor, diff.rareBonus);
+      const hint = Math.random() < 0.6 ? weakSlot : undefined;
+      const d = rollLoot(enemy, state.currentFloor, diff.rareBonus, hint);
       if (d) drops.push(applyModifier(d, rollDropModTier(state.currentFloor, diff.upswing)));
     }
     const drop = drops[0] ?? null;

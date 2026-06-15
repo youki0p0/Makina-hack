@@ -47,7 +47,8 @@ Next.js (App Router) + TypeScript + Tailwind CSS + Zustand + localStorage。Verc
 
 - **ワールド進行** — 100階ごとに10章＋Endless Abyss。背景はCSSグラデのみ。→ [docs/worlds.md](docs/worlds.md)
 - **★モディファイア** — 50階ごとに装備・敵へ★が付き、**加算で**無限に強化（完成装備なし）。→ [docs/worlds.md](docs/worlds.md)
-- **装備とレアリティ・品質** — 6スロット、Common〜Legendary＋Ancient/Mythic/Unique。→ [docs/items.md](docs/items.md)
+- **装備とレアリティ・品質** — 6スロット、Common〜Legendary＋Ancient/Mythic/Unique。通常装備は
+  **手続き生成**（IDから再構築）でエンティティを増殖させない。→ [docs/items.md](docs/items.md)
 - **セット装備** — 賭博師 / 吸血鬼 / 処刑人 / 神託。2・4・6部位でビルドが変わる。→ [docs/set-items.md](docs/set-items.md)
 - **ガチャ** — 10=コモン量産 / 100=高補正コモン(レア以上なし) / 250=部位指定レア以上保証。★は最高到達階で上限。
 - **難易度** — 高難度ほどドロップ数・上振れ・レア率UP（Normal/Hard/Hell/Expert）。
@@ -81,7 +82,7 @@ src/
   app/            タイトル/戦闘/インベントリ/図鑑/アーティファクト/カジノ 各画面
   components/     BattleScreen(戦闘+各種オーバーレイ) / InventoryList / EquipmentPanel / GachaPanel ...
   data/
-    items.ts      全装備（署名/生成/セット/神機マキナ）
+    items.ts      装備（署名/セット=キュレーション＋手続き生成 genItem/神機マキナ）
     sets.ts       セット定義と効果計算 computeSetEffects
     quality.ts    Ancient/Mythic/Unique 品質
     modifiers.ts  ★モディファイア（加算・無限）
