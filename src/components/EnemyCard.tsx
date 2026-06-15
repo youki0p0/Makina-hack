@@ -2,6 +2,7 @@
 
 import { ENEMY_ABILITY_LABEL } from "@/data/enemies";
 import EnemyIcon from "@/components/EnemyIcon";
+import PixelGlyph from "@/components/PixelGlyph";
 import { useDamageFx } from "@/hooks/useDamageFx";
 import { useGameStore } from "@/store/gameStore";
 import type { ActiveStatus, StatusKind } from "@/types/game";
@@ -76,10 +77,11 @@ export default function EnemyCard() {
         <p className="text-xs text-gray-300">
           HP {Math.max(0, enemy.hp)}/{enemy.maxHp}
         </p>
-        <p className="text-[11px] text-gray-400">
-          ⚔️{eatk} 🛡️{edef}
+        <p className="flex items-center gap-x-2 text-[11px] text-gray-400">
+          <span className="flex items-center gap-0.5"><PixelGlyph kind="attack" size={13} />{eatk}</span>
+          <span className="flex items-center gap-0.5"><PixelGlyph kind="defense" size={13} />{edef}</span>
           {enemy.ability && (
-            <span className="ml-1 text-rose-300">{ENEMY_ABILITY_LABEL[enemy.ability]}</span>
+            <span className="text-rose-300">{ENEMY_ABILITY_LABEL[enemy.ability]}</span>
           )}
         </p>
 
@@ -101,26 +103,26 @@ export default function EnemyCard() {
             </span>
           )}
           {(enemy.stunTurns ?? 0) > 0 && (
-            <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 font-bold text-yellow-300">
-              ⚡ スタン ({enemy.stunTurns}T)
+            <span className="flex items-center gap-0.5 rounded-full bg-yellow-500/20 px-2 py-0.5 font-bold text-yellow-300">
+              <PixelGlyph kind="stun" size={12} /> スタン ({enemy.stunTurns}T)
             </span>
           )}
           {(enemy.weakenTurns ?? 0) > 0 && (
-            <span className="rounded-full bg-violet-500/20 px-2 py-0.5 font-bold text-violet-300">
-              🔻 攻-{enemy.weakenAmount} ({enemy.weakenTurns}T)
+            <span className="flex items-center gap-0.5 rounded-full bg-violet-500/20 px-2 py-0.5 font-bold text-violet-300">
+              <PixelGlyph kind="weaken" size={12} /> 攻-{enemy.weakenAmount} ({enemy.weakenTurns}T)
             </span>
           )}
           {(enemy.bonusDefenseTurns ?? 0) > 0 && (
-            <span className="rounded-full bg-blue-500/20 px-2 py-0.5 font-bold text-blue-300">
-              🛡️↑ 防御+{enemy.bonusDefense} ({enemy.bonusDefenseTurns}T)
+            <span className="flex items-center gap-0.5 rounded-full bg-blue-500/20 px-2 py-0.5 font-bold text-blue-300">
+              <PixelGlyph kind="defense" size={12} /> 防御+{enemy.bonusDefense} ({enemy.bonusDefenseTurns}T)
             </span>
           )}
           {statuses.map((s) => (
             <span
               key={s.kind}
-              className={`rounded-full px-2 py-0.5 font-bold ${STATUS_UI[s.kind].cls}`}
+              className={`flex items-center gap-0.5 rounded-full px-2 py-0.5 font-bold ${STATUS_UI[s.kind].cls}`}
             >
-              {STATUS_UI[s.kind].icon} {s.dps}/T ({s.turns}T)
+              <PixelGlyph kind={s.kind === "poison" ? "poison" : "fire"} size={12} /> {s.dps}/T ({s.turns}T)
             </span>
           ))}
         </div>

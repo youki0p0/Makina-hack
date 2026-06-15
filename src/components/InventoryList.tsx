@@ -7,6 +7,7 @@ import { itemKey, rarityLabel, rarityPipString, rarityRank, rarityStyle, slotLab
 import { QUALITIES } from "@/data/quality";
 import { getSetDef } from "@/data/sets";
 import ItemIcon from "@/components/ItemIcon";
+import PixelGlyph from "@/components/PixelGlyph";
 import { useGameStore } from "@/store/gameStore";
 import type { Equipment, EquipmentSlot, Rarity } from "@/types/game";
 
@@ -162,12 +163,12 @@ export default function InventoryList() {
             sellLegendaries();
           }
         }}
-        className="h-8 w-full rounded-lg bg-amber-600/80 text-[11px] font-bold text-white active:scale-95"
+        className="flex h-8 w-full items-center justify-center gap-1 rounded-lg bg-amber-600/80 text-[11px] font-bold text-white active:scale-95"
       >
-        🌈 未装備レジェンドを一括売却（ロック除外）
+        <PixelGlyph kind="rainbow" size={14} /> 未装備レジェンドを一括売却（ロック除外）
       </button>
-      <p className="text-[10px] text-gray-500">
-        🔒 ロック（★）した装備は分解・一括売却の対象外です。
+      <p className="flex items-center gap-1 text-[10px] text-gray-500">
+        <PixelGlyph kind="lock" size={12} /> ロックした装備は分解・一括売却の対象外です。
       </p>
 
       {rows.length === 0 ? (
@@ -185,10 +186,10 @@ export default function InventoryList() {
               >
                 <button
                   onClick={() => toggleFavorite(itemKey(item))}
-                  className={`shrink-0 text-lg active:scale-90 ${fav ? "text-amber-300" : "text-gray-600"}`}
+                  className="shrink-0 active:scale-90"
                   aria-label="ロック"
                 >
-                  {fav ? "🔒" : "🔓"}
+                  <PixelGlyph kind={fav ? "lock" : "unlock"} size={18} />
                 </button>
                 <button onClick={() => setSelected(index)} className="flex min-w-0 flex-1 items-center gap-2 text-left active:scale-[0.98]">
                   <ItemIcon item={item} size={32} />
@@ -290,12 +291,8 @@ function EquipmentDetailModal({
           <h3 className={`min-w-0 flex-1 text-lg font-extrabold ${item.rarity === "legendary" ? "legendary-glow" : style.text}`}>
             {item.name}
           </h3>
-          <button
-            onClick={onToggleFavorite}
-            className={`text-xl ${favorite ? "text-amber-300" : "text-gray-600"}`}
-            aria-label="ロック"
-          >
-            {favorite ? "🔒" : "🔓"}
+          <button onClick={onToggleFavorite} className="active:scale-90" aria-label="ロック">
+            <PixelGlyph kind={favorite ? "lock" : "unlock"} size={22} />
           </button>
         </div>
         <span className="text-[10px] text-gray-400">
@@ -372,9 +369,13 @@ function EquipmentDetailModal({
           <button
             onClick={onScrap}
             disabled={favorite}
-            className="h-12 flex-1 rounded-xl bg-amber-700/80 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
+            className="flex h-12 flex-1 items-center justify-center gap-1 rounded-xl bg-amber-700/80 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
           >
-            {favorite ? "🔒 ロック中" : `分解 +${SCRAP_VALUE[item.rarity]}`}
+            {favorite ? (
+              <><PixelGlyph kind="lock" size={14} /> ロック中</>
+            ) : (
+              <><PixelGlyph kind="material" size={14} /> 分解 +{SCRAP_VALUE[item.rarity]}</>
+            )}
           </button>
           <button
             onClick={onEquip}

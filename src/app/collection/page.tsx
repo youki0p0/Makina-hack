@@ -13,6 +13,7 @@ import {
 import { TITLES, isTitleUnlocked } from "@/data/titles";
 import { SETS } from "@/data/sets";
 import EnemyIcon from "@/components/EnemyIcon";
+import PixelGlyph from "@/components/PixelGlyph";
 import { rarityLabel, rarityStyle } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 
@@ -47,7 +48,7 @@ export default function CollectionPage() {
       </div>
 
       <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-center">
-        <h1 className="font-bold">📚 実績 / 図鑑</h1>
+        <h1 className="flex items-center justify-center gap-1 font-bold"><PixelGlyph kind="codex" size={18} /> 実績 / 図鑑</h1>
         <div className="mt-1 grid grid-cols-3 gap-1 text-[10px] text-gray-300">
           <span>最深 {progress.maxFloor}階</span>
           <span>最高到達 {progress.highestFloorReached}階</span>
@@ -100,7 +101,7 @@ export default function CollectionPage() {
                   }`}
                 >
                   <p className="font-bold">
-                    {done ? "🏅" : "🔒"} {fa.name}
+                    <PixelGlyph kind={done ? "star" : "lock"} size={12} /> {fa.name}
                   </p>
                   <p>
                     素材+{fa.gachaPoints}
@@ -123,7 +124,7 @@ export default function CollectionPage() {
                   done ? "border-amber-500/50 bg-amber-500/10" : "border-white/10 bg-black/20 opacity-60"
                 }`}
               >
-                <span className="text-2xl">{done ? a.icon : "🔒"}</span>
+                <span className="text-2xl">{done ? a.icon : <PixelGlyph kind="lock" size={20} />}</span>
                 <div className="min-w-0">
                   <p className={`font-bold ${done ? "text-amber-200" : "text-gray-400"}`}>{a.name}</p>
                   <p className="text-[10px] text-gray-400">{a.desc}</p>
@@ -241,7 +242,7 @@ export default function CollectionPage() {
               >
                 <div className="min-w-0">
                   <p className={`font-bold ${current ? "text-amber-200" : unlocked ? "text-gray-100" : "text-gray-500"}`}>
-                    {unlocked ? `《${t.name}》` : "🔒 ???"}
+                    {unlocked ? `《${t.name}》` : <><PixelGlyph kind="lock" size={12} /> ???</>}
                   </p>
                   <p className="text-[10px] text-gray-400">{t.desc}</p>
                 </div>

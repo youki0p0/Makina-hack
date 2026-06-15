@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import ArtifactPanel from "@/components/ArtifactPanel";
 import PlayerStatus from "@/components/PlayerStatus";
 import { milestoneSouls, nextMilestoneFloor } from "@/data/milestones";
+import PixelGlyph from "@/components/PixelGlyph";
 import { useGameStore } from "@/store/gameStore";
 
 export default function ArtifactsPage() {
@@ -43,8 +44,8 @@ export default function ArtifactsPage() {
 
       <PlayerStatus />
 
-      <div className="rounded-xl border border-violet-500/40 bg-violet-500/10 p-3 text-[11px] text-violet-200">
-        🔮 魂は<strong>最高到達階の更新</strong>でのみ獲得（死亡・周回では増えない）。
+      <div className="flex items-center gap-1 rounded-xl border border-violet-500/40 bg-violet-500/10 p-3 text-[11px] text-violet-200">
+        <PixelGlyph kind="soul" size={14} /> 魂は<strong>最高到達階の更新</strong>でのみ獲得（死亡・周回では増えない）。
         次の獲得は <strong>{nextFloor}階</strong> 到達で +{milestoneSouls(nextFloor)}。
       </div>
 

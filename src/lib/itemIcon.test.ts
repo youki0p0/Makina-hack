@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getEnemyIconDataUrl, getItemIconDataUrl, hashSeed } from "@/lib/itemIcon";
+import { getEnemyIconDataUrl, getGlyphIconDataUrl, getItemIconDataUrl, hashSeed } from "@/lib/itemIcon";
 
 describe("procedural icons", () => {
   it("hashSeed is deterministic and varies by input", () => {
@@ -14,5 +14,7 @@ describe("procedural icons", () => {
     expect(
       getEnemyIconDataUrl({ templateId: "slime", isBoss: false, modTier: 0, seed: 1 }),
     ).toBe("");
+    expect(getGlyphIconDataUrl("attack")).toBe("");
+    expect(getGlyphIconDataUrl("gold")).toBe("");
   });
 });

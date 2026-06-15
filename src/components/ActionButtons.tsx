@@ -1,6 +1,7 @@
 "use client";
 
 import { sfx } from "@/lib/audio";
+import PixelGlyph from "@/components/PixelGlyph";
 import { useGameStore } from "@/store/gameStore";
 
 export default function ActionButtons() {
@@ -22,7 +23,7 @@ export default function ActionButtons() {
       disabled={disabled || rerollsLeft <= 0}
       className="flex h-20 flex-col items-center justify-center rounded-2xl bg-sky-600 text-lg font-bold text-white shadow-lg active:scale-95 disabled:opacity-40"
     >
-      <span>🎲 リロール</span>
+      <span className="flex items-center gap-1.5"><PixelGlyph kind="dice" size={20} /> リロール</span>
       <span className="text-xs font-normal opacity-90">残り {rerollsLeft}</span>
     </button>
   );
@@ -35,9 +36,9 @@ export default function ActionButtons() {
         confirm();
       }}
       disabled={disabled}
-      className="flex h-20 items-center justify-center rounded-2xl bg-emerald-600 text-2xl font-extrabold text-white shadow-lg active:scale-95 disabled:opacity-40"
+      className="flex h-20 items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 text-2xl font-extrabold text-white shadow-lg active:scale-95 disabled:opacity-40"
     >
-      ⚔️ 決定
+      <PixelGlyph kind="attack" size={24} /> 決定
     </button>
   );
 

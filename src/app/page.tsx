@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import SoundToggle from "@/components/SoundToggle";
+import PixelGlyph from "@/components/PixelGlyph";
 import { DIFFICULTY_LIST } from "@/data/difficulty";
 import { isFeatureUnlocked, FEATURE_UNLOCKS } from "@/data/unlocks";
 import { getDailyBonus } from "@/lib/daily";
@@ -91,75 +92,75 @@ export default function TitlePage() {
 
           <Link
             href="/inventory"
-            className="h-12 rounded-2xl bg-white/10 pt-3 font-bold active:scale-95"
+            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/10 font-bold active:scale-95"
           >
-            🎒 装備を見る
+            <PixelGlyph kind="bag" size={18} /> 装備を見る
           </Link>
 
           <Link
             href="/class"
-            className="h-12 rounded-2xl bg-white/10 pt-3 font-bold active:scale-95"
+            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/10 font-bold active:scale-95"
           >
-            ⚔️ 転職
+            <PixelGlyph kind="attack" size={18} /> 転職
           </Link>
 
           {artifactsUnlocked ? (
             <Link
               href="/artifacts"
-              className="h-12 rounded-2xl bg-indigo-600/80 pt-3 font-bold active:scale-95"
+              className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-indigo-600/80 font-bold active:scale-95"
             >
-              🔮 アーティファクト / 転生
+              <PixelGlyph kind="soul" size={18} /> アーティファクト / 転生
             </Link>
           ) : (
-            <div className="h-12 rounded-2xl bg-white/5 pt-3 text-center text-sm text-gray-500">
-              🔒 アーティファクト（{FEATURE_UNLOCKS.artifacts.hint}）
+            <div className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/5 text-sm text-gray-500">
+              <PixelGlyph kind="lock" size={16} /> アーティファクト（{FEATURE_UNLOCKS.artifacts.hint}）
             </div>
           )}
 
           {casinoUnlocked ? (
             <Link
               href="/casino"
-              className="h-12 rounded-2xl bg-fuchsia-600/80 pt-3 font-bold active:scale-95"
+              className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-fuchsia-600/80 font-bold active:scale-95"
             >
-              🎰 カジノ
+              <PixelGlyph kind="casino" size={18} /> カジノ
             </Link>
           ) : (
-            <div className="h-12 rounded-2xl bg-white/5 pt-3 text-center text-sm text-gray-500">
-              🔒 カジノ（{FEATURE_UNLOCKS.casino.hint}）
+            <div className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/5 text-sm text-gray-500">
+              <PixelGlyph kind="lock" size={16} /> カジノ（{FEATURE_UNLOCKS.casino.hint}）
             </div>
           )}
 
           <div className="flex gap-2">
             <Link
               href="/ranking"
-              className="h-12 flex-1 rounded-2xl bg-emerald-700/70 pt-3 text-center font-bold active:scale-95"
+              className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-emerald-700/70 font-bold active:scale-95"
             >
-              📡 ランキング
+              <PixelGlyph kind="ranking" size={18} /> ランキング
             </Link>
             <Link
               href="/echo"
-              className="h-12 flex-1 rounded-2xl bg-fuchsia-700/70 pt-3 text-center font-bold active:scale-95"
+              className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-fuchsia-700/70 font-bold active:scale-95"
             >
-              👤 残響戦
+              <PixelGlyph kind="ghost" size={18} /> 残響戦
             </Link>
           </div>
 
           <Link
             href="/collection"
-            className="h-12 rounded-2xl bg-white/10 pt-3 font-bold active:scale-95"
+            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/10 font-bold active:scale-95"
           >
-            📚 実績 / 図鑑
+            <PixelGlyph kind="codex" size={18} /> 実績 / 図鑑
           </Link>
 
           <Link
             href="/help"
-            className="h-12 rounded-2xl bg-white/10 pt-3 font-bold active:scale-95"
+            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/10 font-bold active:scale-95"
           >
-            ❓ 遊び方
+            <PixelGlyph kind="help" size={18} /> 遊び方
           </Link>
 
-          <div className="mt-1 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
-            🗓️ 本日のボーナス: <span className="font-bold">{daily.label}</span>
+          <div className="mt-1 flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
+            <PixelGlyph kind="star" size={14} /> 本日のボーナス: <span className="font-bold">{daily.label}</span>
           </div>
 
           <div>
