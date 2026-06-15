@@ -1,3 +1,4 @@
+import { applyEnemyModifier, enemyModTierForFloor } from "@/data/modifiers";
 import type { Enemy, EnemyAbility, EnemyTemplate } from "@/types/game";
 
 /**
@@ -138,31 +139,44 @@ export const BOSS_TEMPLATE: EnemyTemplate = BOSS_TEMPLATES[0];
 
 /** Pick a boss for the given floor; cycles through the roster by tier. */
 function pickBoss(floor: number): EnemyTemplate {
-  const tier = Math.floor(floor / 5); // 1-based boss number
+  const tier = Math.floor(floor / 10); // 1-based boss number (bosses every 10F)
   return BOSS_TEMPLATES[(tier - 1 + BOSS_TEMPLATES.length) % BOSS_TEMPLATES.length];
 }
 
 /**
+ * Boss rank for a floor: 3 = 章ボス(100F), 2 = 大ボス(50F), 1 = 小ボス(10F), 0 = none.
+ */
+export function bossRank(floor: number): number {
+  if (floor % 100 === 0) return 3;
+  if (floor % 50 === 0) return 2;
+  if (floor % 10 === 0) return 1;
+  return 0;
+}
+
+/**
  * Build an enemy scaled to the given floor.
- * Every 5th floor spawns a boss (chosen from the boss roster).
+ * Bosses appear every 10 floors: small(10) / great(50) / chapter(100).
  */
 export function generateEnemy(floor: number, enemyMult = 1): Enemy {
-  const isBossFloor = floor % 5 === 0;
+  const rank = bossRank(floor);
+  const isBossFloor = rank > 0;
   const template = isBossFloor ? pickBoss(floor) : pickNormalTemplate(floor);
 
-  // Linear-ish scaling with floor. Bosses also scale with how many they've cleared.
-  const tier = Math.floor(floor / 5);
+  // Linear-ish scaling with floor; bosses get extra by depth and boss rank.
+  const tier = Math.floor(floor / 10);
   const hpScale = 1 + floor * 0.18;
   const atkScale = 1 + floor * 0.12;
   const defScale = 1 + floor * 0.08;
+  // Great/chapter bosses are tougher than small bosses.
+  const rankMult = rank >= 3 ? 1.6 : rank === 2 ? 1.3 : 1;
 
-  const maxHp = Math.round((template.baseHp * hpScale + (isBossFloor ? tier * 30 : 0)) * enemyMult);
-  const attack = Math.round((template.baseAttack * atkScale + (isBossFloor ? tier * 3 : 0)) * enemyMult);
+  const maxHp = Math.round((template.baseHp * hpScale + (isBossFloor ? tier * 30 : 0)) * rankMult * enemyMult);
+  const attack = Math.round((template.baseAttack * atkScale + (isBossFloor ? tier * 3 : 0)) * rankMult * enemyMult);
   const defense = Math.round(template.baseDefense * defScale);
-  const exp = Math.round(template.baseExp * (1 + floor * 0.15));
-  const gold = Math.round(template.baseGold * (1 + floor * 0.15));
+  const exp = Math.round(template.baseExp * (1 + floor * 0.15) * rankMult);
+  const gold = Math.round(template.baseGold * (1 + floor * 0.15) * rankMult);
 
-  return {
+  const enemy: Enemy = {
     id: `${template.id}_${floor}`,
     templateId: template.id,
     name: isBossFloor ? `${template.name} Lv${tier}` : template.name,
@@ -185,7 +199,11 @@ export function generateEnemy(floor: number, enemyMult = 1): Enemy {
     enraged: false,
     charging: false,
     chargeCounter: 0,
+    modTier: 0,
   };
+
+  // Apply the floor's ★ modifier (no-op below floor 50).
+  return applyEnemyModifier(enemy, enemyModTierForFloor(floor));
 }
 
 function pickNormalTemplate(floor: number): EnemyTemplate {

@@ -16,7 +16,10 @@ const MAX_REROLLS = 3;
 
 export const EQUIP_SLOTS: ReadonlyArray<keyof EquippedItems> = [
   "weapon",
+  "helm",
   "armor",
+  "gloves",
+  "boots",
   "accessory",
 ];
 

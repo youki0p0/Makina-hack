@@ -11,15 +11,22 @@ import ShopScreen from "@/components/ShopScreen";
 import SoundToggle from "@/components/SoundToggle";
 import { sfx } from "@/lib/audio";
 import { rarityStyle } from "@/lib/ui";
+import { getWorld, FINAL_FLOOR } from "@/data/worlds";
+import { ENDING_STAFF_ROLL, ENDING_PROMPT, NG_PLUS_SEQUENCE } from "@/data/lore";
 import { useGameStore } from "@/store/gameStore";
 
 export default function BattleScreen() {
   const battleState = useGameStore((s) => s.battleState);
   const currentEnemy = useGameStore((s) => s.currentEnemy);
   const diceValue = useGameStore((s) => s.diceValue);
+  const currentFloor = useGameStore((s) => s.currentFloor);
+  const worldCleared = useGameStore((s) => s.worldCleared);
+  const pendingEnding = useGameStore((s) => s.pendingEnding);
+  const endlessMessage = useGameStore((s) => s.endlessMessage);
   const enterCurrentFloor = useGameStore((s) => s.enterCurrentFloor);
   const confirm = useGameStore((s) => s.confirm);
   const [auto, setAuto] = useState(false);
+  const world = getWorld(currentFloor);
 
   // On entering with nothing in progress, resolve the floor (battle or shop).
   useEffect(() => {
@@ -38,6 +45,8 @@ export default function BattleScreen() {
       return () => clearTimeout(t);
     }
     if (battleState === "won") {
+      // Pause auto-advance while a narrative/world overlay is up.
+      if (pendingEnding || endlessMessage || worldCleared !== null) return;
       const t = setTimeout(() => enterCurrentFloor(), 750);
       return () => clearTimeout(t);
     }
@@ -52,7 +61,11 @@ export default function BattleScreen() {
   return (
     <div
       className="flex h-[100dvh] flex-col gap-2 overflow-hidden px-3 pt-2"
-      style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
+      style={{
+        paddingTop: "max(0.5rem, env(safe-area-inset-top))",
+        background: world.background,
+        backgroundAttachment: "fixed",
+      }}
     >
       <div className="flex items-center justify-between">
         <Link
@@ -86,6 +99,14 @@ export default function BattleScreen() {
         </div>
       </div>
 
+      {/* Chapter banner: which world / floor you're descending through. */}
+      <div className="flex items-center justify-between rounded-lg bg-black/30 px-3 py-1">
+        <span className="text-xs font-bold" style={{ color: world.accent }}>
+          第{world.chapter}章 {world.name}
+        </span>
+        <span className="text-[10px] text-gray-400">{world.subtitle}</span>
+      </div>
+
       {/* Scrollable middle so the action bar stays pinned and visible. */}
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         <EnemyCard />
@@ -104,7 +125,151 @@ export default function BattleScreen() {
         <ActionButtons />
       </div>
 
-      {(battleState === "won" || battleState === "lost") && <ResultOverlay />}
+      {pendingEnding ? (
+        <EndingOverlay />
+      ) : endlessMessage ? (
+        <EndlessMessageOverlay text={endlessMessage} />
+      ) : worldCleared !== null ? (
+        <WorldClearOverlay floor={worldCleared} />
+      ) : battleState === "won" || battleState === "lost" ? (
+        <ResultOverlay />
+      ) : null}
+    </div>
+  );
+}
+
+/** The unskippable 1000F ending: staff roll → YES/NO → (YES) 強くてニューゲーム. */
+function EndingOverlay() {
+  const newGamePlus = useGameStore((s) => s.newGamePlus);
+  const declineEnding = useGameStore((s) => s.declineEnding);
+  const [step, setStep] = useState<"roll" | "ngplus">("roll");
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black p-6 text-center">
+      <div className="w-full max-w-sm">
+        {step === "roll" ? (
+          <>
+            <div className="space-y-1 text-sm leading-relaxed text-white">
+              {ENDING_STAFF_ROLL.map((line, i) => (
+                <p key={i} className={line === "" ? "h-3" : ""}>
+                  {line}
+                </p>
+              ))}
+            </div>
+            <div className="mt-6 flex flex-col gap-2">
+              <button
+                onClick={() => setStep("ngplus")}
+                className="h-14 rounded-2xl border border-white/40 bg-white/5 text-lg font-bold text-white active:scale-95"
+              >
+                ▶ {ENDING_PROMPT.yes}
+              </button>
+              <button
+                onClick={declineEnding}
+                className="h-12 rounded-2xl border border-white/15 text-sm font-bold text-gray-300 active:scale-95"
+              >
+                {ENDING_PROMPT.no}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-1 text-sm leading-relaxed text-white">
+              {NG_PLUS_SEQUENCE.map((line, i) => (
+                <p key={i} className={line === "" ? "h-3" : ""}>
+                  {line}
+                </p>
+              ))}
+            </div>
+            <button
+              onClick={newGamePlus}
+              className="mt-6 h-14 w-full rounded-2xl border border-white/40 bg-white/5 text-lg font-bold text-white active:scale-95"
+            >
+              再起動する
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A single Endless-Abyss story line (NO route), shown once. */
+function EndlessMessageOverlay({ text }: { text: string }) {
+  const clearEndlessMessage = useGameStore((s) => s.clearEndlessMessage);
+  const enterCurrentFloor = useGameStore((s) => s.enterCurrentFloor);
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/95 p-6 text-center">
+      <div className="w-full max-w-sm">
+        <div className="space-y-1 whitespace-pre-line text-sm leading-relaxed text-gray-100">
+          {text}
+        </div>
+        <button
+          onClick={() => {
+            clearEndlessMessage();
+            enterCurrentFloor();
+          }}
+          className="mt-8 h-12 w-full rounded-2xl border border-white/20 text-sm font-bold text-gray-200 active:scale-95"
+        >
+          ……続ける
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Quiet, premium "World Complete" screen shown when a 100th-floor boss falls. */
+function WorldClearOverlay({ floor }: { floor: number }) {
+  const clearWorldClear = useGameStore((s) => s.clearWorldClear);
+  const enterCurrentFloor = useGameStore((s) => s.enterCurrentFloor);
+  const cleared = getWorld(floor);
+  const next = getWorld(floor + 1);
+  const isFinal = floor >= FINAL_FLOOR;
+
+  useEffect(() => {
+    sfx("win");
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/85 p-6">
+      <div
+        className="w-full max-w-sm rounded-2xl border p-6 text-center"
+        style={{ borderColor: `${cleared.accent}66`, background: "#0c0a14" }}
+      >
+        <p className="text-xs tracking-[0.3em] text-gray-400">第{cleared.chapter}章</p>
+        <h2 className="mt-1 text-2xl font-black" style={{ color: cleared.accent }}>
+          {cleared.name}
+        </h2>
+        <p className="mt-1 text-sm tracking-[0.2em] text-gray-300">COMPLETE</p>
+
+        <div className="my-5 h-px w-full" style={{ background: `${cleared.accent}40` }} />
+
+        {isFinal ? (
+          <div className="space-y-1">
+            <p className="text-lg font-extrabold" style={{ color: next.accent }}>
+              Endless Abyss
+            </p>
+            <p className="text-xs tracking-[0.2em] text-gray-400">UNLOCKED</p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <p className="text-xs text-gray-400">次のワールド</p>
+            <p className="text-lg font-extrabold" style={{ color: next.accent }}>
+              第{next.chapter}章 {next.name}
+            </p>
+            <p className="text-[10px] tracking-[0.2em] text-gray-500">UNLOCKED</p>
+          </div>
+        )}
+
+        <button
+          onClick={() => {
+            clearWorldClear();
+            enterCurrentFloor();
+          }}
+          className="mt-6 h-14 w-full rounded-2xl bg-white/10 text-lg font-bold text-white active:scale-95"
+        >
+          次へ →
+        </button>
+      </div>
     </div>
   );
 }
@@ -193,6 +358,22 @@ function ResultOverlay() {
           >
             🎒 装備を整える
           </Link>
+          {!victory && (
+            <>
+              <Link
+                href="/class"
+                className="h-12 rounded-2xl bg-white/10 pt-3 text-center font-bold active:scale-95"
+              >
+                🔁 転職する
+              </Link>
+              <Link
+                href="/"
+                className="h-12 rounded-2xl bg-white/10 pt-3 text-center font-bold active:scale-95"
+              >
+                🏠 ホームに戻る
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -18,6 +18,13 @@ export function defaultProgress(): Progress {
     maxStreak: 0,
     discoveredItems: [],
     defeatedEnemies: [],
+    highestFloorReached: 1,
+    claimedMilestones: [],
+    claimedFloorAchievements: [],
+    endingSeen: false,
+    ngPlus: 0,
+    makinaGranted: false,
+    claimedEndlessMessages: [],
   };
 }
 
@@ -34,6 +41,18 @@ export function normalizeProgress(p?: Partial<Progress>): Progress {
     maxStreak: typeof p.maxStreak === "number" ? p.maxStreak : 0,
     discoveredItems: Array.isArray(p.discoveredItems) ? [...p.discoveredItems] : [],
     defeatedEnemies: Array.isArray(p.defeatedEnemies) ? [...p.defeatedEnemies] : [],
+    highestFloorReached:
+      typeof p.highestFloorReached === "number" ? p.highestFloorReached : base.highestFloorReached,
+    claimedMilestones: Array.isArray(p.claimedMilestones) ? [...p.claimedMilestones] : [],
+    claimedFloorAchievements: Array.isArray(p.claimedFloorAchievements)
+      ? [...p.claimedFloorAchievements]
+      : [],
+    endingSeen: p.endingSeen === true,
+    ngPlus: typeof p.ngPlus === "number" ? p.ngPlus : 0,
+    makinaGranted: p.makinaGranted === true,
+    claimedEndlessMessages: Array.isArray(p.claimedEndlessMessages)
+      ? [...p.claimedEndlessMessages]
+      : [],
   };
 }
 

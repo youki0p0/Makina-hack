@@ -4,12 +4,12 @@ import PWARegister from "@/components/PWARegister";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ダイスダンジョン",
+  title: "Dice Ex Machina",
   description: "装備で出目が書き換わる、スマホ向けコマンド式ハクスラRPG",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "ダイスダンジョン",
+    title: "Dice Ex Machina",
     statusBarStyle: "black-translucent",
   },
   icons: {

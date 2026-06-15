@@ -5,11 +5,19 @@ import { useEffect, useState } from "react";
 import { ACHIEVEMENTS, achievedCount } from "@/data/achievements";
 import { BOSS_TEMPLATES, ENEMY_ABILITY_LABEL, ENEMY_TEMPLATES } from "@/data/enemies";
 import { ITEMS } from "@/data/items";
+import {
+  FLOOR_ACHIEVEMENTS,
+  milestoneSouls,
+  nextMilestoneFloor,
+} from "@/data/milestones";
 import { TITLES, isTitleUnlocked } from "@/data/titles";
+import { SETS } from "@/data/sets";
+import { setPieceId } from "@/data/sets";
+import { EQUIP_SLOTS } from "@/lib/battle";
 import { rarityLabel, rarityStyle } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 
-type Tab = "achievements" | "items" | "enemies" | "titles";
+type Tab = "achievements" | "items" | "sets" | "enemies" | "titles";
 
 export default function CollectionPage() {
   const hydrate = useGameStore((s) => s.hydrate);
@@ -43,16 +51,20 @@ export default function CollectionPage() {
         <h1 className="font-bold">📚 実績 / 図鑑</h1>
         <div className="mt-1 grid grid-cols-3 gap-1 text-[10px] text-gray-300">
           <span>最深 {progress.maxFloor}階</span>
+          <span>最高到達 {progress.highestFloorReached}階</span>
           <span>撃破 {progress.kills}</span>
           <span>ボス {progress.bossKills}</span>
           <span>転生 {progress.rebirths}</span>
-          <span>JP {progress.jackpots}</span>
           <span>最大連勝 {progress.maxStreak}</span>
         </div>
+        <p className="mt-2 text-[10px] text-violet-300">
+          次の転生ポイント: {nextMilestoneFloor(progress.highestFloorReached)}階 で +
+          {milestoneSouls(nextMilestoneFloor(progress.highestFloorReached))}
+        </p>
       </div>
 
-      <div className="grid grid-cols-4 gap-1">
-        {(["achievements", "items", "enemies", "titles"] as Tab[]).map((t) => (
+      <div className="grid grid-cols-5 gap-1">
+        {(["achievements", "items", "sets", "enemies", "titles"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -60,14 +72,47 @@ export default function CollectionPage() {
               tab === t ? "bg-emerald-600 text-white" : "bg-white/10 text-gray-300"
             }`}
           >
-            {t === "achievements" ? "実績" : t === "items" ? "装備" : t === "enemies" ? "敵" : "称号"}
+            {t === "achievements"
+              ? "実績"
+              : t === "items"
+                ? "装備"
+                : t === "sets"
+                  ? "セット"
+                  : t === "enemies"
+                    ? "敵"
+                    : "称号"}
           </button>
         ))}
       </div>
 
       {tab === "achievements" && (
         <div className="space-y-2">
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400">階層実績（到達で素材・転生ポイント獲得）</p>
+          <div className="grid grid-cols-2 gap-1">
+            {FLOOR_ACHIEVEMENTS.map((fa) => {
+              const done = progress.claimedFloorAchievements.includes(fa.id);
+              return (
+                <div
+                  key={fa.id}
+                  className={`rounded-lg border p-2 text-[10px] ${
+                    done
+                      ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200"
+                      : "border-white/10 bg-black/20 text-gray-400"
+                  }`}
+                >
+                  <p className="font-bold">
+                    {done ? "🏅" : "🔒"} {fa.name}
+                  </p>
+                  <p>
+                    素材+{fa.gachaPoints}
+                    {fa.souls ? ` / 転生+${fa.souls}` : ""}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="pt-1 text-xs text-gray-400">
             達成 {achievedCount(progress)} / {ACHIEVEMENTS.length}
           </p>
           {ACHIEVEMENTS.map((a) => {
@@ -113,6 +158,31 @@ export default function CollectionPage() {
                 ) : (
                   <p className="text-gray-500">??? （未発見）</p>
                 )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab === "sets" && (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-400">
+            セット装備は2/4/6部位でビルドが変わる。装飾以外は職業制限あり。
+          </p>
+          {SETS.map((set) => {
+            const pieceIds = EQUIP_SLOTS.map((slot) => setPieceId(set.id, slot));
+            const found = pieceIds.filter((id) => progress.discoveredItems.includes(id)).length;
+            return (
+              <div key={set.id} className="rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/10 p-2">
+                <p className="font-bold text-fuchsia-200">
+                  {set.icon} {set.name}セット{" "}
+                  <span className="text-[10px] text-gray-400">収集 {found}/{pieceIds.length}</span>
+                </p>
+                <ul className="mt-1 space-y-0.5 text-[10px] text-fuchsia-100">
+                  {set.bonuses.map((b) => (
+                    <li key={b.pieces}>・{b.pieces}部位: {b.desc}</li>
+                  ))}
+                </ul>
               </div>
             );
           })}

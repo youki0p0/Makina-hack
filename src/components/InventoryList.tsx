@@ -3,9 +3,28 @@
 import { useState } from "react";
 import { canEquip } from "@/data/classes";
 import { SCRAP_VALUE } from "@/lib/loot";
-import { itemKey, rarityLabel, rarityRank, rarityStyle, slotLabel } from "@/lib/ui";
+import { itemKey, rarityLabel, rarityPipString, rarityRank, rarityStyle, slotLabel } from "@/lib/ui";
+import { QUALITIES } from "@/data/quality";
+import { SET_BY_ID } from "@/data/sets";
 import { useGameStore } from "@/store/gameStore";
 import type { Equipment, EquipmentSlot, Rarity } from "@/types/game";
+
+/**
+ * Rarity pips (✦) shown separately from the name. Legendary gets a rainbow glow
+ * (#13). The ★ modifier tier already rides on the item name, so it isn't
+ * duplicated here.
+ */
+function RarityPips({ item }: { item: Equipment }) {
+  const legendary = item.rarity === "legendary";
+  return (
+    <span
+      className={`align-middle ${legendary ? "legendary-glow" : rarityStyle[item.rarity].text}`}
+    >
+      {legendary ? "🌈" : ""}
+      {rarityPipString(item.rarity)}
+    </span>
+  );
+}
 
 const TAG_LABEL: Record<string, string> = { light: "軽", heavy: "重", magic: "魔" };
 
@@ -52,6 +71,7 @@ export default function InventoryList() {
   const equipItem = useGameStore((s) => s.equipItem);
   const scrapItem = useGameStore((s) => s.scrapItem);
   const scrapBulk = useGameStore((s) => s.scrapBulk);
+  const sellLegendaries = useGameStore((s) => s.sellLegendaries);
   const toggleFavorite = useGameStore((s) => s.toggleFavorite);
   const classId = useGameStore((s) => s.classId);
   const [selected, setSelected] = useState<number | null>(null);
@@ -125,7 +145,29 @@ export default function InventoryList() {
           </button>
         ))}
       </div>
-      <p className="text-[10px] text-gray-500">★ を付けた装備は分解されません（ロック）。</p>
+      <button
+        onClick={() => {
+          const SELL_GOLD = 500;
+          const targets = inventory.filter(
+            (it) =>
+              it.rarity === "legendary" && !favorites.includes(itemKey(it)),
+          );
+          if (targets.length === 0) return;
+          if (
+            confirm(
+              `未装備・未ロックのレジェンド ${targets.length}個 を売却して 💰+${targets.length * SELL_GOLD}`,
+            )
+          ) {
+            sellLegendaries();
+          }
+        }}
+        className="h-8 w-full rounded-lg bg-amber-600/80 text-[11px] font-bold text-white active:scale-95"
+      >
+        🌈 未装備レジェンドを一括売却（ロック除外）
+      </button>
+      <p className="text-[10px] text-gray-500">
+        🔒 ロック（★）した装備は分解・一括売却の対象外です。
+      </p>
 
       {rows.length === 0 ? (
         <p className="rounded-xl border border-white/10 bg-black/20 p-4 text-center text-sm text-gray-500">
@@ -143,13 +185,18 @@ export default function InventoryList() {
                 <button
                   onClick={() => toggleFavorite(itemKey(item))}
                   className={`shrink-0 text-lg active:scale-90 ${fav ? "text-amber-300" : "text-gray-600"}`}
-                  aria-label="お気に入り"
+                  aria-label="ロック"
                 >
-                  {fav ? "★" : "☆"}
+                  {fav ? "🔒" : "🔓"}
                 </button>
                 <button onClick={() => setSelected(index)} className="flex min-w-0 flex-1 items-center justify-between text-left active:scale-[0.98]">
                   <div className="min-w-0">
-                    <p className={`truncate font-bold ${rarityStyle[item.rarity].text}`}>
+                    <p
+                      className={`truncate font-bold ${
+                        item.rarity === "legendary" ? "legendary-glow" : rarityStyle[item.rarity].text
+                      }`}
+                    >
+                      <RarityPips item={item} />{" "}
                       {item.name}
                       {item.equipTag && (
                         <span className="ml-1 text-[9px] text-gray-400">[{TAG_LABEL[item.equipTag]}]</span>
@@ -157,6 +204,12 @@ export default function InventoryList() {
                     </p>
                     <p className="text-[10px] text-gray-400">
                       {slotLabel[item.slot]} ・ {rarityLabel[item.rarity]}
+                      {item.quality && (
+                        <span className="ml-1 text-cyan-300">{QUALITIES[item.quality].label}</span>
+                      )}
+                      {item.setId && (
+                        <span className="ml-1 text-fuchsia-300">[{SET_BY_ID[item.setId].name}]</span>
+                      )}
                       {!canEquip(item, classId) && <span className="ml-1 text-red-400">装備不可</span>}
                     </p>
                   </div>
@@ -231,18 +284,37 @@ function EquipmentDetailModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h3 className={`text-lg font-extrabold ${style.text}`}>
+          <h3 className={`text-lg font-extrabold ${item.rarity === "legendary" ? "legendary-glow" : style.text}`}>
             {item.name}
           </h3>
-          <button onClick={onToggleFavorite} className={`text-xl ${favorite ? "text-amber-300" : "text-gray-600"}`}>
-            {favorite ? "★" : "☆"}
+          <button
+            onClick={onToggleFavorite}
+            className={`text-xl ${favorite ? "text-amber-300" : "text-gray-600"}`}
+            aria-label="ロック"
+          >
+            {favorite ? "🔒" : "🔓"}
           </button>
         </div>
         <span className="text-[10px] text-gray-400">
-          {slotLabel[item.slot]} ・ {rarityLabel[item.rarity]}
+          <RarityPips item={item} /> {slotLabel[item.slot]} ・ {rarityLabel[item.rarity]}
+          {item.quality ? ` ・ ${QUALITIES[item.quality].label}` : ""}
+          {item.modTier ? ` ・ ★${item.modTier}` : ""}
         </span>
 
         <p className="mt-2 text-sm text-gray-200">{item.description}</p>
+
+        {item.setId && (
+          <div className="mt-3 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 p-2">
+            <p className="text-[10px] font-bold text-fuchsia-300">
+              {SET_BY_ID[item.setId].icon} {SET_BY_ID[item.setId].name}セット
+            </p>
+            <ul className="mt-1 space-y-0.5 text-[10px] text-fuchsia-100">
+              {SET_BY_ID[item.setId].bonuses.map((b) => (
+                <li key={b.pieces}>・{b.pieces}部位: {b.desc}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           {item.attack !== 0 && <Stat label={`攻撃 +${item.attack}`} />}

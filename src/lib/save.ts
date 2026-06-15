@@ -7,6 +7,7 @@ import type {
   ArtifactLevels,
   ClassId,
   Equipment,
+  EquipmentSlot,
   EquippedItems,
   Player,
   Progress,
@@ -14,12 +15,22 @@ import type {
   SaveData,
 } from "@/types/game";
 
+/**
+ * Bump this whenever the save shape changes incompatibly. During the debug era
+ * we simply DISCARD older saves (no migration) so the data model can evolve.
+ */
+export const SAVE_VERSION = 3;
+
+const STORAGE_KEY = "dice-hackslash-save-v3";
+
 function toSavedItem(item: Equipment | null): SavedItem | null {
   if (!item) return null;
-  return item.affixId ? { id: item.id, affixId: item.affixId } : { id: item.id };
+  const out: SavedItem = { id: item.id };
+  if (item.affixId) out.affixId = item.affixId;
+  if (item.modTier && item.modTier > 0) out.modTier = item.modTier;
+  if (item.quality) out.quality = item.quality;
+  return out;
 }
-
-const STORAGE_KEY = "dice-hackslash-save-v1";
 
 export interface LoadedState {
   player: Player;
@@ -39,17 +50,22 @@ export interface LoadedState {
   handedness: "right" | "left";
   checkpoint: number;
   tapToBuy: boolean;
+  startFloorPref: number;
 }
 
 export function saveGame(state: LoadedState): void {
   if (typeof window === "undefined") return;
-  const data: SaveData = {
-    player: state.player,
-    equippedItems: {
-      weapon: toSavedItem(state.equipped.weapon),
-      armor: toSavedItem(state.equipped.armor),
-      accessory: toSavedItem(state.equipped.accessory),
+  const equippedItems = EQUIP_SLOTS.reduce(
+    (acc, slot) => {
+      acc[slot] = toSavedItem(state.equipped[slot]);
+      return acc;
     },
+    {} as { [K in EquipmentSlot]: SavedItem | null },
+  );
+  const data: SaveData = {
+    saveVersion: SAVE_VERSION,
+    player: state.player,
+    equippedItems,
     inventoryItems: state.inventory.map((i) => toSavedItem(i)).filter((i): i is SavedItem => i !== null),
     currentFloor: state.currentFloor,
     gachaPoints: state.gachaPoints,
@@ -65,6 +81,7 @@ export function saveGame(state: LoadedState): void {
     handedness: state.handedness,
     checkpoint: state.checkpoint,
     tapToBuy: state.tapToBuy,
+    startFloorPref: state.startFloorPref,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -80,22 +97,17 @@ export function loadGame(): LoadedState | null {
     if (!raw) return null;
     const data = JSON.parse(raw) as SaveData;
 
-    const equipped: EquippedItems = { weapon: null, armor: null, accessory: null };
-    for (const slot of EQUIP_SLOTS) {
-      const saved = data.equippedItems?.[slot];
-      if (saved) {
-        equipped[slot] = getItemInstance(saved.id, saved.affixId);
-      } else {
-        // Legacy fallback.
-        const id = data.equippedIds?.[slot];
-        equipped[slot] = id ? getItemInstance(id) : null;
-      }
-    }
+    // Debug-era policy: discard saves from an older schema version.
+    if (data.saveVersion !== SAVE_VERSION || !data.player) return null;
 
-    const savedInventory: SavedItem[] =
-      data.inventoryItems ?? (data.inventoryIds ?? []).map((id) => ({ id }));
-    const inventory = savedInventory
-      .map((s) => getItemInstance(s.id, s.affixId))
+    const equipped = EQUIP_SLOTS.reduce((acc, slot) => {
+      const saved = data.equippedItems?.[slot];
+      acc[slot] = saved ? getItemInstance(saved.id, saved.affixId, saved.modTier, saved.quality) : null;
+      return acc;
+    }, {} as EquippedItems);
+
+    const inventory = (data.inventoryItems ?? [])
+      .map((s) => getItemInstance(s.id, s.affixId, s.modTier, s.quality))
       .filter((i): i is Equipment => i !== null);
 
     return {
@@ -116,6 +128,8 @@ export function loadGame(): LoadedState | null {
       handedness: data.handedness === "left" ? "left" : "right",
       checkpoint: typeof data.checkpoint === "number" && data.checkpoint >= 1 ? data.checkpoint : 1,
       tapToBuy: data.tapToBuy === true,
+      startFloorPref:
+        typeof data.startFloorPref === "number" && data.startFloorPref >= 1 ? data.startFloorPref : 1,
     };
   } catch {
     return null;
@@ -150,6 +164,7 @@ export function importSave(code: string): boolean {
     const json = decodeURIComponent(escape(atob(code.trim())));
     const data = JSON.parse(json) as Partial<SaveData>;
     if (!data || typeof data !== "object" || !data.player) return false;
+    if (data.saveVersion !== SAVE_VERSION) return false;
     window.localStorage.setItem(STORAGE_KEY, json);
     return true;
   } catch {

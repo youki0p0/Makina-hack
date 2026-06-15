@@ -1,24 +1,32 @@
-# 🎲 ダイスダンジョン
+# 🎲 Dice Ex Machina
 
-装備で**ダイスの出目効果が書き換わる**、スマホ向けのコマンド式ハクスラRPG。
-戦闘中の操作は「リロール」と「決定」だけ。テンポよく1周遊べる軽量設計です。
+**ダイス版 Diablo。** 装備で **ダイスの出目そのものが書き換わる**、スマホ縦画面向けの
+コマンド式ハクスラRPG。戦闘の操作は「リロール」と「決定」の2つだけ。
 
-Next.js (App Router) + TypeScript + Tailwind CSS + Zustand + localStorage で実装、
-Vercel にそのままデプロイできます。
+> **Vision** — Dice Ex Machina は放置ゲームではない。プレイヤー自身はほとんど成長しない。
+> 強くなるのは **装備・ビルド・プレイヤーの知識**。1000階に明確な終わりがあり、その先は
+> プレイヤー自身の物語（Endless Abyss）になる。
+
+Next.js (App Router) + TypeScript + Tailwind CSS + Zustand + localStorage。Vercel にそのまま
+デプロイできます。
+
+---
+
+## ゲームループ
+
+敵を倒す → 装備を拾う → ダイス面が変わる → ビルドが変わる → 深く潜る → 新しい世界を見る → さらに潜る
 
 ---
 
 ## 遊び方
 
-1. タイトルで **はじめる** を押すと戦闘が始まります。
-2. ターンごとに6面ダイスが自動で振られます。
-3. 出目を見て選ぶのは2つだけ：
-   - **🎲 リロール** … もう一度振り直す（回数は装備で増減）
-   - **⚔️ 決定** … 今の出目の効果を発動する
-4. 行動後に敵が反撃。敵のHPを0にすれば勝利、自分のHPが0になれば敗北。
-5. 勝つと EXP・ゴールド・**装備**を獲得し、次の階へ。
-6. 負けるとダンジョンは1階に戻り、ゴールドを一部失います。
-7. **5階ごとにボス**が出現します。
+1. タイトルで難易度・出発階を選び **はじめる**。
+2. ターンごとに6面ダイスが振られる。操作は **🎲 リロール** と **⚔️ 決定** のみ。
+3. 敵HPを0にすれば勝利、自分のHPが0なら敗北。
+4. 勝つと EXP・ゴールド・**装備**を獲得して次の階へ。
+5. 敗北すると **到達階×100G** を失い（全財産没収はされない）、セーブポイントの直後から再開。
+6. **10階ごとに小ボス / 50階で大ボス / 100階で章ボス。** 100階ごとに世界が変わる。
+7. **1000階の DEUS EX MACHINA** を倒すと物語が終わる。その先は **Endless Abyss**。
 
 ### 初期ダイス表
 
@@ -31,20 +39,23 @@ Vercel にそのままデプロイできます。
 | 5 | クリティカル |
 | 6 | スキル攻撃 |
 
-### 装備で出目が変わる（コアの面白さ）
+装備・職業・**セット効果**が各出目の意味を書き換えます。変化した出目には `✦` 印が付きます。
 
-装備を変えると、各出目の意味そのものが書き換わります。例：
+---
 
-- **鉄の剣** … `1` のミスを小攻撃に変更
-- **盗賊の短剣** … `5以上`で2回攻撃／リロール+1
-- **吸血の剣** … `4以上`で与ダメージの25%を回復
-- **呪いの斧** … `1〜2`で自傷、`5〜6`で大ダメージ
-- **重装鎧** … `1〜3`でガード、リロール-1
-- **賭博師の指輪** … `1`で自傷、`6`で超火力
-- **魔導書** … `6`を火球スキルに変更
+## 主要システム（詳細は docs/ を参照）
 
-戦闘画面では、変化した出目に `✦` 印が付き、現在の出目の効果が大きく表示されます。
-装備画面で装備を入れ替えると、ダイス表がその場で書き換わります。
+- **ワールド進行** — 100階ごとに10章＋Endless Abyss。背景はCSSグラデのみ。→ [docs/worlds.md](docs/worlds.md)
+- **★モディファイア** — 50階ごとに装備・敵へ★が付き、**加算で**無限に強化（完成装備なし）。→ [docs/worlds.md](docs/worlds.md)
+- **装備とレアリティ・品質** — 6スロット、Common〜Legendary＋Ancient/Mythic/Unique。→ [docs/items.md](docs/items.md)
+- **セット装備** — 賭博師 / 吸血鬼 / 処刑人 / 神託。2・4・6部位でビルドが変わる。→ [docs/set-items.md](docs/set-items.md)
+- **ガチャ** — 10=コモン量産 / 100=高補正コモン(レア以上なし) / 250=部位指定レア以上保証。★は最高到達階で上限。
+- **難易度** — 高難度ほどドロップ数・上振れ・レア率UP（Normal/Hard/Hell/Expert）。
+- **職業** — 聖騎士(耐久)/戦士(火力)/盗賊(連撃)/魔法使い(爆発)/狂戦士(超火力)。倍率は `data/jobBalance.ts`。
+- **転生ポイント** — 最高到達階の100階区切り初到達でのみ獲得（死亡・周回では増えない）。
+- **エンディングと物語** — 1000階撃破→スタッフロール→強くてニューゲーム or Endless。→ [docs/lore.md](docs/lore.md)
+- **神機マキナ** — 世界に一本だけの唯一武器。全出目を通常攻撃にする。→ [docs/lore.md](docs/lore.md)
+- **図鑑 / 装備比較 / ロック / レジェンド一括売却** — 収集率表示、装備中との差分、ロック保護。
 
 ---
 
@@ -58,12 +69,8 @@ npm run start    # ビルド済みアプリを起動
 npm run test     # ユニットテスト（Vitest）
 ```
 
-スマホ縦画面想定のため、ブラウザのデバイスツールバーで縦長表示にすると確認しやすいです。
-
-### Vercel へのデプロイ
-
-このリポジトリをそのまま Vercel にインポートするだけでデプロイできます。
-ビルドコマンド・出力ディレクトリは Next.js のデフォルト設定でOKです。
+スマホ縦画面想定。ブラウザのデバイスツールバーで縦長表示にすると確認しやすいです。
+Vercel はこのリポジトリをそのままインポートするだけでデプロイできます。
 
 ---
 
@@ -71,92 +78,49 @@ npm run test     # ユニットテスト（Vitest）
 
 ```
 src/
-  app/
-    page.tsx              タイトル画面
-    battle/page.tsx       戦闘画面
-    inventory/page.tsx    インベントリ画面
-    layout.tsx            共通レイアウト（スマホ幅に固定）
-    globals.css
-  components/
-    BattleScreen.tsx      戦闘画面の構成 + リザルトオーバーレイ
-    DiceDisplay.tsx       現在の出目と全6面の表示
-    ActionButtons.tsx     リロール / 決定
-    EnemyCard.tsx         敵カード
-    PlayerStatus.tsx      プレイヤーのHP/攻防/EXP
-    InventoryList.tsx     所持品 + 装備詳細モーダル
-    EquipmentPanel.tsx    装備中スロット
-    BattleLog.tsx         戦闘ログ
+  app/            タイトル/戦闘/インベントリ/図鑑/アーティファクト/カジノ 各画面
+  components/     BattleScreen(戦闘+各種オーバーレイ) / InventoryList / EquipmentPanel / GachaPanel ...
   data/
-    items.ts              全装備データ（出目変化の定義）
-    enemies.ts            敵テンプレートと階層スケーリング
-    diceFaces.ts          基本ダイス表
+    items.ts      全装備（署名/生成/セット/神機マキナ）
+    sets.ts       セット定義と効果計算 computeSetEffects
+    quality.ts    Ancient/Mythic/Unique 品質
+    modifiers.ts  ★モディファイア（加算・無限）
+    worlds.ts     ワールド10章＋Endless、背景グラデ
+    milestones.ts 転生ポイント／階層実績
+    jobBalance.ts 職業バランス（攻撃倍率）
+    lore.ts       エンディング/Endless/神機マキナの文言
+    enemies.ts    敵テンプレ＋ボス階層（10/50/100）
+    difficulty.ts 難易度（ドロップ数/レア率/上振れ）
   lib/
-    dice.ts               applyEquipmentModifiers（出目書き換えの中核）
-    battle.ts             ダメージ計算・レベルアップ・ステータス集計
-    loot.ts               ドロップ抽選
-    save.ts               localStorage 保存/読み込み
-    ui.ts                 レアリティ等の表示用ヘルパー
-  store/
-    gameStore.ts          Zustand ストア（全状態の管理）
-  types/
-    game.ts               型定義
+    dice.ts       applyEquipmentModifiers（出目書き換えの中核）
+    battle.ts     ダメージ計算・EQUIP_SLOTS(6スロット)
+    loot.ts       ドロップ/ガチャ抽選
+    save.ts       localStorage 保存（saveVersion=3）
+    ui.ts         レアリティ表示・✦ピップ
+  store/gameStore.ts   Zustand ストア（全状態・全アクション）
+  types/game.ts        型定義
+docs/             worlds / items / set-items / lore のドキュメント
 ```
 
 ---
 
 ## 状態管理と保存
 
-Zustand で `player` / `equipped` / `inventory` / `currentEnemy` / `currentFloor` /
-`battleState` / `diceValue` / `diceFaces` / `rerollsLeft` / `battleLog` を管理します。
+Zustand で全状態を管理し、localStorage に保存します（キー `dice-hackslash-save-v3`、
+`saveVersion = 3`）。**デバッグ段階のため旧バージョンのセーブは読み込み時に破棄**されます。
 
-localStorage には `player` / 装備ID / 所持品ID / `currentFloor` を保存します。
-装備は **ID のみ**を保存し、読み込み時に `data/items.ts` から復元するため、
+装備は **ID・接尾辞・★・品質のみ**を保存し、読み込み時に `data/items.ts` から復元するため、
 出目変化のロジック（関数的データ）も安全にシリアライズできます。
 
 ---
 
 ## Claude Code Skill
 
-このリポジトリには、Claude Code でこのゲームを開発する際の作業指針をまとめた
-Skill を同梱しています。
+`.claude/skills/mobile-dice-hackslash/SKILL.md`（Skill 名 `mobile-dice-hackslash`）に
+開発指針を同梱。`/mobile-dice-hackslash` で呼び出せます。スマホ縦UI・2ボタン戦闘・
+**装備でダイス面を書き換える**コアを壊さないこと、1 Issue = 1 PR、`npm run build` /
+`npm run test` が通るまで直すことを徹底します。
 
-- 場所: `.claude/skills/mobile-dice-hackslash/SKILL.md`
-- Skill 名: `mobile-dice-hackslash`
-
-### 使い方
-
-Claude Code をこのリポジトリで起動すると、Skill は自動的に読み込まれます。
-明示的に呼び出したい場合は、チャットで次のように入力します。
-
-```
-/mobile-dice-hackslash
-```
-
-この Skill は、機能追加・バグ修正・UI/バランス調整を行う際に、以下を守らせます。
-
-- Next.js App Router / TypeScript / Tailwind / Zustand 前提で実装する
-- スマホ縦画面UIを最優先する
-- 戦闘中の操作は「リロール」「決定」の2ボタン中心を維持する
-- **装備でダイス面を書き換える**ゲーム設計を壊さない
-- 1 Issue = 1 PR、`main` へ直接 push しない
-- `npm run build` が通るまで修正する（型エラー0が完了条件）
-- PR 作成後、CI 通過で自動マージする前提
-- 既存仕様を壊さず、小さく実装する
-
-ファイル早見表やPR前チェックリストも Skill 内に含まれているため、
-「どこを触ればよいか」をすぐ把握できます。
-
-### 同梱: Fusion スキル（マルチモデル・パネル）
-
-`.claude/skills/fusion/` には外部 OSS の **Fusion** スキルも同梱しています。
-1つの質問を複数モデル（Opus 4.8 ×2 / GPT-5.5 / Gemini 3.1 Pro）に並列で投げ、
-Opus 4.8 が統合して高信頼の回答を作るパネル型スキルです。
-
-- 呼び出し: `/fusion`（自動でパネル選択）、`/fusion-opus4.8`、`/fusion-gpt5.5`
-- `opus4.8-4.8`（Opus 2回）は追加CLI不要。`gpt5.5`/`gemini` パネルには
-  それぞれ `codex` / `gemini` CLI のインストールとログインが必要です。
-- ⚠️ **注意**: GPT-5.5/Gemini パネルを使うと、プロンプト（場合によりコード）が
-  OpenAI / Google など外部プロバイダに送信されます。外部送信を避けたい場合は
-  `opus4.8-4.8` を使ってください。
-- 出典: https://github.com/duolahypercho/fusion-fable （MIT License、
-  `.claude/skills/fusion/LICENSE` に原ライセンスを同梱）
+`.claude/skills/fusion/` にはマルチモデル・パネルの **Fusion** スキルも同梱しています
+（`/fusion` ほか。外部CLI/送信に関する注意は Skill 内記載。出典:
+https://github.com/duolahypercho/fusion-fable 、MIT License）。

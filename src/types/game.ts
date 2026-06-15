@@ -2,7 +2,19 @@
 
 export type Rarity = "common" | "rare" | "epic" | "legendary" | "cursed";
 
-export type EquipmentSlot = "weapon" | "armor" | "accessory";
+/** Optional item quality layered on top of rarity (rarer = stronger). */
+export type Quality = "ancient" | "mythic" | "unique";
+
+export type EquipmentSlot =
+  | "weapon"
+  | "helm"
+  | "armor"
+  | "gloves"
+  | "boots"
+  | "accessory";
+
+/** Set identifiers for set-bonus gear. */
+export type SetId = "gambler" | "vampire" | "executioner" | "oracle";
 
 /** Equipment category used for class-based equip restrictions. */
 export type EquipTag = "light" | "heavy" | "magic";
@@ -129,6 +141,18 @@ export interface Equipment {
   stunResist?: number;
   /** Higher affix chance + wider affix range (bigger stat swings). */
   volatile?: boolean;
+  /** Infinite ★ modifier tier (0 = none). Scales stats additively. */
+  modTier?: number;
+  /** Set membership (drives 2/4/6-piece set bonuses). */
+  setId?: SetId;
+  /** Quality tier (ancient/mythic/unique) layered on rarity. */
+  quality?: Quality;
+  /** Never drops/gacha/shop — granted only by special events (e.g. 神機マキナ). */
+  unique?: boolean;
+  /** Cannot be sold or scrapped (the one-and-only 神機マキナ). */
+  noSell?: boolean;
+  /** ★ modifiers never apply to this item. */
+  noModifier?: boolean;
 }
 
 export type EquippedItems = {
@@ -247,6 +271,8 @@ export interface Enemy {
   charging: boolean;
   /** Boss gimmick: turns counted toward the next charge. */
   chargeCounter: number;
+  /** Infinite ★ modifier tier (0 = none). Boosts HP/attack/drops. */
+  modTier: number;
 }
 
 // ===== Consumables =====
@@ -319,6 +345,20 @@ export interface Progress {
   discoveredItems: string[];
   /** Template ids of enemies ever defeated. */
   defeatedEnemies: string[];
+  /** Highest floor ever reached (drives rebirth-point milestones & gacha cap). */
+  highestFloorReached: number;
+  /** Milestone floors whose rebirth points have already been granted. */
+  claimedMilestones: number[];
+  /** Ids of floor achievements already claimed. */
+  claimedFloorAchievements: string[];
+  /** The 1000F DEUS EX MACHINA ending has been witnessed (one-time, unskippable). */
+  endingSeen: boolean;
+  /** New Game+ count (強くてニューゲーム). */
+  ngPlus: number;
+  /** 神機マキナ has been granted (so it is never duplicated). */
+  makinaGranted: boolean;
+  /** Endless-Abyss story floors already shown (1050/1100/…/1250). */
+  claimedEndlessMessages: number[];
 }
 
 // ===== Persistence =====
@@ -327,9 +367,15 @@ export interface Progress {
 export interface SavedItem {
   id: string;
   affixId?: string;
+  /** Infinite ★ modifier tier (0/undefined = none). */
+  modTier?: number;
+  /** Quality tier (ancient/mythic/unique). */
+  quality?: Quality;
 }
 
 export interface SaveData {
+  /** Schema version. Mismatched versions are discarded (debug-era reset). */
+  saveVersion?: number;
   player: Player;
   /** Legacy: plain id arrays (read for old saves). */
   equippedIds?: { [K in EquipmentSlot]: string | null };
@@ -364,4 +410,6 @@ export interface SaveData {
   checkpoint?: number;
   /** Shop: buy by tapping the whole item row (one-tap purchase). */
   tapToBuy?: boolean;
+  /** Last start-floor chosen in the title pulldown (restored on next visit). */
+  startFloorPref?: number;
 }

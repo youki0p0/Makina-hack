@@ -1,8 +1,8 @@
 import type { DiceKind, Equipment, Rarity } from "@/types/game";
 
-/** Stable key for an item instance (base id + affix), used for favorites. */
+/** Stable key for an item instance (base id + affix + ★ tier), used for locks. */
 export function itemKey(item: Equipment): string {
-  return `${item.id}:${item.affixId ?? ""}`;
+  return `${item.id}:${item.affixId ?? ""}:${item.modTier ?? 0}`;
 }
 
 /** Sort rank for rarity (higher = rarer). */
@@ -13,6 +13,20 @@ export const rarityRank: Record<Rarity, number> = {
   rare: 2,
   common: 1,
 };
+
+/** ✦-pip count per rarity for at-a-glance readability (#13). */
+export const rarityPips: Record<Rarity, number> = {
+  common: 1,
+  rare: 2,
+  epic: 3,
+  legendary: 4,
+  cursed: 2,
+};
+
+/** "✦✦✦" pip string for a rarity. */
+export function rarityPipString(rarity: Rarity): string {
+  return "✦".repeat(rarityPips[rarity]);
+}
 
 export const rarityLabel: Record<Rarity, string> = {
   common: "コモン",
@@ -33,7 +47,10 @@ export const rarityStyle: Record<Rarity, { text: string; border: string; bg: str
 
 export const slotLabel: Record<string, string> = {
   weapon: "武器",
-  armor: "防具",
+  helm: "兜",
+  armor: "鎧",
+  gloves: "篭手",
+  boots: "靴",
   accessory: "装飾",
 };
 

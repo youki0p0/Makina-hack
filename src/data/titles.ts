@@ -19,6 +19,7 @@ export const TITLES: readonly Title[] = [
   { id: "reborn", name: "輪廻の者", desc: "3回転生", check: (p) => p.rebirths >= 3 },
   { id: "gambler", name: "賭博師", desc: "カジノでジャックポット", check: (p) => p.jackpots >= 1 },
   { id: "collector", name: "蒐集家", desc: "装備を12種発見", check: (p) => p.discoveredItems.length >= 12 },
+  { id: "makina_0001", name: "Makina-0001", desc: "1000階の終端を見届けた者", check: (p) => p.endingSeen },
 ];
 
 const TITLE_MAP: Map<string, Title> = new Map(TITLES.map((t) => [t.id, t]));
