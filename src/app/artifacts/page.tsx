@@ -4,14 +4,16 @@ import Link from "next/link";
 import { useEffect } from "react";
 import ArtifactPanel from "@/components/ArtifactPanel";
 import PlayerStatus from "@/components/PlayerStatus";
+import { milestoneSouls, nextMilestoneFloor } from "@/data/milestones";
 import { useGameStore } from "@/store/gameStore";
 
 export default function ArtifactsPage() {
   const hydrate = useGameStore((s) => s.hydrate);
   const hydrated = useGameStore((s) => s.hydrated);
   const floor = useGameStore((s) => s.currentFloor);
-  const gain = useGameStore((s) => s.rebirthGain());
+  const highest = useGameStore((s) => s.progress.highestFloorReached);
   const rebirth = useGameStore((s) => s.rebirth);
+  const nextFloor = nextMilestoneFloor(highest);
 
   useEffect(() => {
     hydrate();
@@ -40,27 +42,29 @@ export default function ArtifactsPage() {
       </div>
 
       <PlayerStatus />
+
+      <div className="rounded-xl border border-violet-500/40 bg-violet-500/10 p-3 text-[11px] text-violet-200">
+        🔮 魂は<strong>最高到達階の更新</strong>でのみ獲得（死亡・周回では増えない）。
+        次の獲得は <strong>{nextFloor}階</strong> 到達で +{milestoneSouls(nextFloor)}。
+      </div>
+
       <ArtifactPanel />
 
       <div className="mt-auto rounded-xl border border-rose-500/40 bg-rose-500/10 p-3">
-        <h2 className="text-sm font-bold text-rose-200">転生</h2>
+        <h2 className="text-sm font-bold text-rose-200">転生（リセット）</h2>
         <p className="mt-1 text-[10px] text-gray-400">
           進行をリセットして最初からやり直す。レベル・装備・ゴールドは失うが、
-          魂を獲得しアーティファクトは引き継がれる。周回するほど強くなる。
+          アーティファクトと最高到達記録は引き継がれる。（魂は転生では増えない）
         </p>
         <button
           onClick={() => {
-            if (
-              confirm(
-                `転生しますか？\n現在の進行(${floor}階)を失う代わりに 魂 +${gain} を獲得します。`,
-              )
-            ) {
+            if (confirm(`転生しますか？\n現在の進行(${floor}階)を失います。`)) {
               rebirth();
             }
           }}
           className="mt-2 h-12 w-full rounded-xl bg-rose-600 font-bold text-white active:scale-95"
         >
-          転生する（魂 +{gain}）
+          転生する
         </button>
       </div>
     </main>

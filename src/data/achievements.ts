@@ -18,6 +18,9 @@ export function defaultProgress(): Progress {
     maxStreak: 0,
     discoveredItems: [],
     defeatedEnemies: [],
+    highestFloorReached: 1,
+    claimedMilestones: [],
+    claimedFloorAchievements: [],
   };
 }
 
@@ -34,6 +37,12 @@ export function normalizeProgress(p?: Partial<Progress>): Progress {
     maxStreak: typeof p.maxStreak === "number" ? p.maxStreak : 0,
     discoveredItems: Array.isArray(p.discoveredItems) ? [...p.discoveredItems] : [],
     defeatedEnemies: Array.isArray(p.defeatedEnemies) ? [...p.defeatedEnemies] : [],
+    highestFloorReached:
+      typeof p.highestFloorReached === "number" ? p.highestFloorReached : base.highestFloorReached,
+    claimedMilestones: Array.isArray(p.claimedMilestones) ? [...p.claimedMilestones] : [],
+    claimedFloorAchievements: Array.isArray(p.claimedFloorAchievements)
+      ? [...p.claimedFloorAchievements]
+      : [],
   };
 }
 

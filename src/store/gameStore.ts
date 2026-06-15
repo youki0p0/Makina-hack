@@ -19,6 +19,14 @@ import {
 } from "@/data/classes";
 import { generateEnemy } from "@/data/enemies";
 import { getItemById } from "@/data/items";
+import { applyModifier, rollDropModTier } from "@/data/modifiers";
+import { jobAttackMult } from "@/data/jobBalance";
+import {
+  crossedMilestones,
+  milestoneSouls,
+  newlyEarnedFloorAchievements,
+} from "@/data/milestones";
+import { isWorldBossFloor, FINAL_FLOOR } from "@/data/worlds";
 import {
   addStatus,
   applyExp,
@@ -157,6 +165,10 @@ interface GameState {
   checkpoint: number;
   /** Shop one-tap purchase (buy by tapping the item row). */
   tapToBuy: boolean;
+  /** Last start-floor chosen in the title pulldown (persisted, #4). */
+  startFloorPref: number;
+  /** Floor of a just-cleared world boss (drives the world-clear overlay). */
+  worldCleared: number | null;
   /** Items for sale at the current shop floor (not persisted). */
   shopStock: ShopEntry[];
 
@@ -196,6 +208,8 @@ interface GameState {
   setTapToBuy: (v: boolean) => void;
   /** Choose which floor to (re)start a run from: 1 or a reached checkpoint. */
   setStartFloor: (floor: number) => void;
+  /** Dismiss the world-clear overlay. */
+  clearWorldClear: () => void;
   exportSaveData: () => string;
   importSaveData: (code: string) => boolean;
 
@@ -203,6 +217,8 @@ interface GameState {
   scrapItem: (itemIndex: number) => void;
   /** Scrap all non-favorited items at or below the given rarity. */
   scrapBulk: (maxRarity: Rarity) => void;
+  /** Sell all unequipped, unlocked Legendary items for gold. */
+  sellLegendaries: () => void;
   pullGacha: () => void;
   pullPremium: () => void;
   pullTargeted: (slot: EquipmentSlot) => void;
@@ -242,6 +258,7 @@ export const useGameStore = create<GameState>((set, get) => {
       handedness: s.handedness,
       checkpoint: s.checkpoint,
       tapToBuy: s.tapToBuy,
+      startFloorPref: s.startFloorPref,
     });
   }
 
@@ -293,13 +310,15 @@ export const useGameStore = create<GameState>((set, get) => {
     };
   }
 
-  /** Compute stats including artifact bonuses and the active class. */
+  /** Compute stats including artifact bonuses, active class, and job balance. */
   function currentStats(
     player: Player,
     equipped: EquippedItems,
     buffs: ActiveBuff[] = [],
   ): ComputedStats {
-    return computeStats(player, equipped, buffs, passiveBonus());
+    const base = computeStats(player, equipped, buffs, passiveBonus());
+    // Job balance: per-class attack multiplier (centralized in jobBalance.ts).
+    return { ...base, attack: Math.round(base.attack * jobAttackMult(get().classId)) };
   }
 
   /** Apply a loaded save into state (used by hydrate and import). */
@@ -322,12 +341,14 @@ export const useGameStore = create<GameState>((set, get) => {
       handedness: loaded.handedness,
       checkpoint: loaded.checkpoint,
       tapToBuy: loaded.tapToBuy,
+      startFloorPref: loaded.startFloorPref,
       hydrated: true,
       currentEnemy: null,
       battleState: "idle",
       battleLog: [],
       lastResult: null,
       activeBuffs: [],
+      worldCleared: null,
       shopStock: [],
     });
     set({ diceFaces: refreshFaces() });
@@ -363,14 +384,16 @@ export const useGameStore = create<GameState>((set, get) => {
     handedness: "right",
     checkpoint: 1,
     tapToBuy: false,
+    startFloorPref: 1,
+    worldCleared: null,
     shopStock: [],
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
     currentFace: () => faceByValue(get().diceFaces, get().diceValue),
     rebirthGain: () => computeRebirthGain(get().currentFloor, get().player.level),
-    // 転職は3階ごと、または初期クラスのときに可能。
+    // 転職できるのは倒れた後だけ（初期クラスのうちは常に可）。
     canChangeClass: () =>
-      get().classId === DEFAULT_CLASS_ID || get().currentFloor % 3 === 0,
+      get().classId === DEFAULT_CLASS_ID || get().battleState === "lost",
 
     hydrate: () => {
       if (get().hydrated) return;
@@ -419,6 +442,8 @@ export const useGameStore = create<GameState>((set, get) => {
         handedness: get().handedness,
         checkpoint: 1,
         tapToBuy: get().tapToBuy,
+        startFloorPref: 1,
+        worldCleared: null,
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -666,6 +691,8 @@ export const useGameStore = create<GameState>((set, get) => {
 
     enterCurrentFloor: () => {
       const floor = get().currentFloor;
+      // Leaving the result/world-clear screen always dismisses the overlay flag.
+      if (get().worldCleared !== null) set({ worldCleared: null });
       if (isShopFloor(floor)) {
         set({
           battleState: "shop",
@@ -806,12 +833,15 @@ export const useGameStore = create<GameState>((set, get) => {
       if (!allowed) return;
       set({
         currentFloor: floor,
+        startFloorPref: floor,
         battleState: "idle",
         currentEnemy: null,
         lastResult: null,
       });
       persist();
     },
+
+    clearWorldClear: () => set({ worldCleared: null }),
 
     exportSaveData: () => exportSave(),
 
@@ -852,6 +882,25 @@ export const useGameStore = create<GameState>((set, get) => {
       }
       if (gain === 0) return;
       set({ inventory: kept, gachaPoints: state.gachaPoints + gain });
+      persist();
+    },
+
+    sellLegendaries: () => {
+      const state = get();
+      // Equipped items are not in the inventory list, so they're naturally safe.
+      const SELL_GOLD = 500; // per legendary
+      let gold = 0;
+      const kept: Equipment[] = [];
+      for (const item of state.inventory) {
+        const locked = state.favorites.includes(itemKey(item));
+        if (item.rarity === "legendary" && !locked) {
+          gold += SELL_GOLD;
+        } else {
+          kept.push(item);
+        }
+      }
+      if (gold === 0) return;
+      set({ inventory: kept, player: { ...state.player, gold: state.player.gold + gold } });
       persist();
     },
 
@@ -927,7 +976,6 @@ export const useGameStore = create<GameState>((set, get) => {
 
     rebirth: () => {
       const state = get();
-      const gain = computeRebirthGain(state.currentFloor, state.player.level);
       const starter = getItemById("rusty_sword");
       const equipped: EquippedItems = { ...emptyEquipped(), weapon: starter };
       // Reset the run; keep only souls (+gain) and permanent artifacts.
@@ -943,11 +991,16 @@ export const useGameStore = create<GameState>((set, get) => {
         activeBuffs: [],
         gachaPoints: 0,
         lastPull: null,
-        souls: state.souls + gain,
+        // Souls are no longer earned by rebirthing — only by reaching NEW depth
+        // milestones (#17). Rebirth is purely a run reset now.
+        souls: state.souls,
         // Rebirth returns you to the base class.
         classId: DEFAULT_CLASS_ID,
         winStreak: 0,
         checkpoint: 1,
+        startFloorPref: 1,
+        worldCleared: null,
+        // Lifetime fields (highestFloorReached / claimed milestones) survive rebirth.
         progress: {
           ...state.progress,
           rebirths: state.progress.rebirths + 1,
@@ -960,7 +1013,8 @@ export const useGameStore = create<GameState>((set, get) => {
 
     changeClass: (id: ClassId) => {
       const state = get();
-      if (!(state.classId === DEFAULT_CLASS_ID || state.currentFloor % 3 === 0)) return;
+      // 転職は倒れた後だけ（初期クラスのうちは自由）。
+      if (!(state.classId === DEFAULT_CLASS_ID || state.battleState === "lost")) return;
       if (id === state.classId) return;
       if (!isClassUnlocked(id, state.progress)) return;
       const cls = getClass(id);
@@ -1020,7 +1074,17 @@ export const useGameStore = create<GameState>((set, get) => {
     const goldMult = streakMult * rewardMult * (daily.stat === "gold" ? 1 + daily.value / 100 : 1);
     const expGained = Math.round(enemy.exp * streakMult * rewardMult);
     const goldGained = Math.round(enemy.gold * goldMult);
-    const drop = rollLoot(enemy, state.currentFloor);
+
+    // Difficulty governs how many drops and how big the upswing (#6). Each drop
+    // is anchored to the floor's ★ modifier tier (#8), with a chance to roll higher.
+    const diff = getDifficulty(state.difficulty);
+    const dropCount = diff.dropMin + Math.floor(Math.random() * (diff.dropMax - diff.dropMin + 1));
+    const drops: Equipment[] = [];
+    for (let i = 0; i < dropCount; i++) {
+      const d = rollLoot(enemy, state.currentFloor, diff.rareBonus);
+      if (d) drops.push(applyModifier(d, rollDropModTier(state.currentFloor, diff.upswing)));
+    }
+    const drop = drops[0] ?? null;
 
     let leveledPlayer: Player = { ...state.player, hp: playerHp, gold: state.player.gold + goldGained };
     const { player: leveled, leveledUp } = applyExp(leveledPlayer, expGained);
@@ -1039,9 +1103,9 @@ export const useGameStore = create<GameState>((set, get) => {
         { text: `レベルアップ！ Lv${leveledPlayer.level} (全回復)`, tone: "good" },
       ]);
     }
-    const inventory = drop ? [...state.inventory, drop] : state.inventory;
-    if (drop) {
-      finalLog = pushLogs(finalLog, [{ text: `${drop.name} を手に入れた！`, tone: "good" }]);
+    const inventory = drops.length ? [...state.inventory, ...drops] : state.inventory;
+    for (const d of drops) {
+      finalLog = pushLogs(finalLog, [{ text: `${d.name} を手に入れた！`, tone: "good" }]);
     }
 
     // Consumables are auto-used the instant they drop.
@@ -1088,6 +1152,40 @@ export const useGameStore = create<GameState>((set, get) => {
         { text: `💾 セーブポイント到達！(${newFloor}階クリア) 以降の敗北は${newFloor + 1}階から再開`, tone: "good" },
       ]);
     }
+    let discoveredItems = state.progress.discoveredItems;
+    for (const d of drops) discoveredItems = addUnique(discoveredItems, d.id);
+
+    // ===== Rebirth-point milestones & floor achievements (#15, #17) =====
+    // Souls/material are awarded ONLY for reaching a NEW highest floor — never
+    // from death, checkpoint farming, or re-clearing old floors.
+    const prevHighest = state.progress.highestFloorReached;
+    const newHighest = Math.max(prevHighest, newFloor);
+    let souls = state.souls;
+    let bonusGacha = 0;
+    let claimedMilestones = state.progress.claimedMilestones;
+    let claimedFloorAchievements = state.progress.claimedFloorAchievements;
+    if (newHighest > prevHighest) {
+      for (const mf of crossedMilestones(prevHighest, newHighest)) {
+        if (claimedMilestones.includes(mf)) continue;
+        const pts = milestoneSouls(mf);
+        if (pts > 0) {
+          souls += pts;
+          claimedMilestones = [...claimedMilestones, mf];
+          finalLog = pushLogs(finalLog, [
+            { text: `🔮 ${mf}階 初到達！ 転生ポイント +${pts}`, tone: "good" },
+          ]);
+        }
+      }
+      for (const fa of newlyEarnedFloorAchievements(newHighest, claimedFloorAchievements)) {
+        bonusGacha += fa.gachaPoints;
+        if (fa.souls) souls += fa.souls;
+        claimedFloorAchievements = [...claimedFloorAchievements, fa.id];
+        finalLog = pushLogs(finalLog, [
+          { text: `🏅 実績「${fa.name}」 素材+${fa.gachaPoints}${fa.souls ? ` / 転生+${fa.souls}` : ""}`, tone: "good" },
+        ]);
+      }
+    }
+
     const progress: Progress = {
       ...state.progress,
       kills: state.progress.kills + 1,
@@ -1095,10 +1193,14 @@ export const useGameStore = create<GameState>((set, get) => {
       maxFloor: Math.max(state.progress.maxFloor, newFloor),
       maxStreak: Math.max(state.progress.maxStreak, winStreak),
       defeatedEnemies: addUnique(state.progress.defeatedEnemies, enemy.templateId),
-      discoveredItems: drop
-        ? addUnique(state.progress.discoveredItems, drop.id)
-        : state.progress.discoveredItems,
+      discoveredItems,
+      highestFloorReached: newHighest,
+      claimedMilestones,
+      claimedFloorAchievements,
     };
+
+    // World-clear overlay when a 100th-floor world boss falls (#3).
+    const worldCleared = isWorldBossFloor(state.currentFloor) ? state.currentFloor : null;
 
     return {
       player: leveledPlayer,
@@ -1112,6 +1214,9 @@ export const useGameStore = create<GameState>((set, get) => {
       winStreak,
       progress,
       checkpoint,
+      souls,
+      gachaPoints: state.gachaPoints + bonusGacha,
+      worldCleared,
     };
   }
 
@@ -1121,7 +1226,11 @@ export const useGameStore = create<GameState>((set, get) => {
     enemy: Enemy,
     enemyHp: number,
   ): Snapshot {
-    const goldLost = Math.round(state.player.gold * 0.3);
+    // Softer, predictable penalty: reached-floor × 100 gold, but never the whole
+    // purse (cap at 90% of current gold) and never below zero (#5).
+    const penalty = state.currentFloor * 100;
+    const maxLoss = Math.floor(state.player.gold * 0.9);
+    const goldLost = Math.max(0, Math.min(penalty, maxLoss));
     const player: Player = {
       ...state.player,
       hp: 0,
@@ -1184,6 +1293,7 @@ export const useGameStore = create<GameState>((set, get) => {
       handedness: snap.handedness ?? s.handedness,
       checkpoint: snap.checkpoint ?? s.checkpoint,
       tapToBuy: snap.tapToBuy ?? s.tapToBuy,
+      startFloorPref: snap.startFloorPref ?? s.startFloorPref,
     });
   }
 });

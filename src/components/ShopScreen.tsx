@@ -3,6 +3,7 @@
 import Link from "next/link";
 import PlayerStatus from "@/components/PlayerStatus";
 import { rarityLabel, rarityStyle, slotLabel } from "@/lib/ui";
+import { getWorld } from "@/data/worlds";
 import { useGameStore } from "@/store/gameStore";
 
 export default function ShopScreen() {
@@ -12,12 +13,15 @@ export default function ShopScreen() {
   const buy = useGameStore((s) => s.buyShopItem);
   const leave = useGameStore((s) => s.leaveShop);
   const tapToBuy = useGameStore((s) => s.tapToBuy);
+  const world = getWorld(floor);
 
   return (
     <div
       className="flex h-[100dvh] flex-col gap-2 overflow-hidden px-3"
       style={{
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",
+        background: world.background,
+        backgroundAttachment: "fixed",
       }}
     >
       <div className="flex items-center justify-between">

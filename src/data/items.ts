@@ -1,4 +1,5 @@
 import { applyAffix, getAffixById } from "@/data/affixes";
+import { applyModifier } from "@/data/modifiers";
 import type { EquipTag, Equipment, EquipmentSlot, Rarity } from "@/types/game";
 
 /**
@@ -523,13 +524,21 @@ export function getItemById(id: string): Equipment | null {
   return item ? { ...item } : null;
 }
 
-/** Rehydrate an item instance from a base id plus an optional affix id. */
-export function getItemInstance(id: string, affixId?: string): Equipment | null {
+/** Rehydrate an item instance from a base id plus optional affix + ★ tier. */
+export function getItemInstance(
+  id: string,
+  affixId?: string,
+  modTier?: number,
+): Equipment | null {
   const base = getItemById(id);
   if (!base) return null;
-  if (!affixId) return base;
-  const affix = getAffixById(affixId);
-  return affix ? applyAffix(base, affix) : base;
+  let item = base;
+  if (affixId) {
+    const affix = getAffixById(affixId);
+    if (affix) item = applyAffix(base, affix);
+  }
+  if (modTier && modTier > 0) item = applyModifier(item, modTier);
+  return item;
 }
 
 export const STARTER_WEAPON_ID = "rusty_sword";

@@ -14,12 +14,21 @@ import type {
   SaveData,
 } from "@/types/game";
 
+/**
+ * Bump this whenever the save shape changes incompatibly. During the debug era
+ * we simply DISCARD older saves (no migration) so the data model can evolve.
+ */
+export const SAVE_VERSION = 2;
+
+const STORAGE_KEY = "dice-hackslash-save-v2";
+
 function toSavedItem(item: Equipment | null): SavedItem | null {
   if (!item) return null;
-  return item.affixId ? { id: item.id, affixId: item.affixId } : { id: item.id };
+  const out: SavedItem = { id: item.id };
+  if (item.affixId) out.affixId = item.affixId;
+  if (item.modTier && item.modTier > 0) out.modTier = item.modTier;
+  return out;
 }
-
-const STORAGE_KEY = "dice-hackslash-save-v1";
 
 export interface LoadedState {
   player: Player;
@@ -39,11 +48,13 @@ export interface LoadedState {
   handedness: "right" | "left";
   checkpoint: number;
   tapToBuy: boolean;
+  startFloorPref: number;
 }
 
 export function saveGame(state: LoadedState): void {
   if (typeof window === "undefined") return;
   const data: SaveData = {
+    saveVersion: SAVE_VERSION,
     player: state.player,
     equippedItems: {
       weapon: toSavedItem(state.equipped.weapon),
@@ -65,6 +76,7 @@ export function saveGame(state: LoadedState): void {
     handedness: state.handedness,
     checkpoint: state.checkpoint,
     tapToBuy: state.tapToBuy,
+    startFloorPref: state.startFloorPref,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -80,22 +92,17 @@ export function loadGame(): LoadedState | null {
     if (!raw) return null;
     const data = JSON.parse(raw) as SaveData;
 
+    // Debug-era policy: discard saves from an older schema version.
+    if (data.saveVersion !== SAVE_VERSION || !data.player) return null;
+
     const equipped: EquippedItems = { weapon: null, armor: null, accessory: null };
     for (const slot of EQUIP_SLOTS) {
       const saved = data.equippedItems?.[slot];
-      if (saved) {
-        equipped[slot] = getItemInstance(saved.id, saved.affixId);
-      } else {
-        // Legacy fallback.
-        const id = data.equippedIds?.[slot];
-        equipped[slot] = id ? getItemInstance(id) : null;
-      }
+      equipped[slot] = saved ? getItemInstance(saved.id, saved.affixId, saved.modTier) : null;
     }
 
-    const savedInventory: SavedItem[] =
-      data.inventoryItems ?? (data.inventoryIds ?? []).map((id) => ({ id }));
-    const inventory = savedInventory
-      .map((s) => getItemInstance(s.id, s.affixId))
+    const inventory = (data.inventoryItems ?? [])
+      .map((s) => getItemInstance(s.id, s.affixId, s.modTier))
       .filter((i): i is Equipment => i !== null);
 
     return {
@@ -116,6 +123,8 @@ export function loadGame(): LoadedState | null {
       handedness: data.handedness === "left" ? "left" : "right",
       checkpoint: typeof data.checkpoint === "number" && data.checkpoint >= 1 ? data.checkpoint : 1,
       tapToBuy: data.tapToBuy === true,
+      startFloorPref:
+        typeof data.startFloorPref === "number" && data.startFloorPref >= 1 ? data.startFloorPref : 1,
     };
   } catch {
     return null;
@@ -150,6 +159,7 @@ export function importSave(code: string): boolean {
     const json = decodeURIComponent(escape(atob(code.trim())));
     const data = JSON.parse(json) as Partial<SaveData>;
     if (!data || typeof data !== "object" || !data.player) return false;
+    if (data.saveVersion !== SAVE_VERSION) return false;
     window.localStorage.setItem(STORAGE_KEY, json);
     return true;
   } catch {

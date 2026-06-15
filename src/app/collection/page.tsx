@@ -5,6 +5,11 @@ import { useEffect, useState } from "react";
 import { ACHIEVEMENTS, achievedCount } from "@/data/achievements";
 import { BOSS_TEMPLATES, ENEMY_ABILITY_LABEL, ENEMY_TEMPLATES } from "@/data/enemies";
 import { ITEMS } from "@/data/items";
+import {
+  FLOOR_ACHIEVEMENTS,
+  milestoneSouls,
+  nextMilestoneFloor,
+} from "@/data/milestones";
 import { TITLES, isTitleUnlocked } from "@/data/titles";
 import { rarityLabel, rarityStyle } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
@@ -43,12 +48,16 @@ export default function CollectionPage() {
         <h1 className="font-bold">📚 実績 / 図鑑</h1>
         <div className="mt-1 grid grid-cols-3 gap-1 text-[10px] text-gray-300">
           <span>最深 {progress.maxFloor}階</span>
+          <span>最高到達 {progress.highestFloorReached}階</span>
           <span>撃破 {progress.kills}</span>
           <span>ボス {progress.bossKills}</span>
           <span>転生 {progress.rebirths}</span>
-          <span>JP {progress.jackpots}</span>
           <span>最大連勝 {progress.maxStreak}</span>
         </div>
+        <p className="mt-2 text-[10px] text-violet-300">
+          次の転生ポイント: {nextMilestoneFloor(progress.highestFloorReached)}階 で +
+          {milestoneSouls(nextMilestoneFloor(progress.highestFloorReached))}
+        </p>
       </div>
 
       <div className="grid grid-cols-4 gap-1">
@@ -67,7 +76,32 @@ export default function CollectionPage() {
 
       {tab === "achievements" && (
         <div className="space-y-2">
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400">階層実績（到達で素材・転生ポイント獲得）</p>
+          <div className="grid grid-cols-2 gap-1">
+            {FLOOR_ACHIEVEMENTS.map((fa) => {
+              const done = progress.claimedFloorAchievements.includes(fa.id);
+              return (
+                <div
+                  key={fa.id}
+                  className={`rounded-lg border p-2 text-[10px] ${
+                    done
+                      ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200"
+                      : "border-white/10 bg-black/20 text-gray-400"
+                  }`}
+                >
+                  <p className="font-bold">
+                    {done ? "🏅" : "🔒"} {fa.name}
+                  </p>
+                  <p>
+                    素材+{fa.gachaPoints}
+                    {fa.souls ? ` / 転生+${fa.souls}` : ""}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="pt-1 text-xs text-gray-400">
             達成 {achievedCount(progress)} / {ACHIEVEMENTS.length}
           </p>
           {ACHIEVEMENTS.map((a) => {

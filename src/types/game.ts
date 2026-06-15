@@ -129,6 +129,8 @@ export interface Equipment {
   stunResist?: number;
   /** Higher affix chance + wider affix range (bigger stat swings). */
   volatile?: boolean;
+  /** Infinite ★ modifier tier (0 = none). Scales stats additively. */
+  modTier?: number;
 }
 
 export type EquippedItems = {
@@ -247,6 +249,8 @@ export interface Enemy {
   charging: boolean;
   /** Boss gimmick: turns counted toward the next charge. */
   chargeCounter: number;
+  /** Infinite ★ modifier tier (0 = none). Boosts HP/attack/drops. */
+  modTier: number;
 }
 
 // ===== Consumables =====
@@ -319,6 +323,12 @@ export interface Progress {
   discoveredItems: string[];
   /** Template ids of enemies ever defeated. */
   defeatedEnemies: string[];
+  /** Highest floor ever reached (drives rebirth-point milestones). */
+  highestFloorReached: number;
+  /** Milestone floors whose rebirth points have already been granted. */
+  claimedMilestones: number[];
+  /** Ids of floor achievements already claimed. */
+  claimedFloorAchievements: string[];
 }
 
 // ===== Persistence =====
@@ -327,9 +337,13 @@ export interface Progress {
 export interface SavedItem {
   id: string;
   affixId?: string;
+  /** Infinite ★ modifier tier (0/undefined = none). */
+  modTier?: number;
 }
 
 export interface SaveData {
+  /** Schema version. Mismatched versions are discarded (debug-era reset). */
+  saveVersion?: number;
   player: Player;
   /** Legacy: plain id arrays (read for old saves). */
   equippedIds?: { [K in EquipmentSlot]: string | null };
@@ -364,4 +378,6 @@ export interface SaveData {
   checkpoint?: number;
   /** Shop: buy by tapping the whole item row (one-tap purchase). */
   tapToBuy?: boolean;
+  /** Last start-floor chosen in the title pulldown (restored on next visit). */
+  startFloorPref?: number;
 }

@@ -30,6 +30,7 @@ export default function TitlePage() {
   const setTapToBuy = useGameStore((s) => s.setTapToBuy);
   const checkpoint = useGameStore((s) => s.checkpoint);
   const setStartFloor = useGameStore((s) => s.setStartFloor);
+  const startFloorPref = useGameStore((s) => s.startFloorPref);
   const daily = getDailyBonus();
 
   // Start-floor options: 1, and the floor just past each reached 50-mark
@@ -75,7 +76,7 @@ export default function TitlePage() {
             <div>
               <p className="text-[10px] text-gray-500">出発階を選ぶ（詰まったら1階から鍛え直し）</p>
               <select
-                value={startFloors.includes(floor) ? floor : 1}
+                value={startFloors.includes(startFloorPref) ? startFloorPref : 1}
                 onChange={(e) => setStartFloor(Number(e.target.value))}
                 className="mt-1 h-9 w-full rounded-lg border border-white/15 bg-black/40 px-2 text-sm font-bold text-gray-100"
               >
@@ -147,13 +148,13 @@ export default function TitlePage() {
           </div>
 
           <div>
-            <p className="text-[10px] text-gray-500">難易度</p>
-            <div className="mt-1 flex gap-1">
+            <p className="text-[10px] text-gray-500">難易度（高いほどドロップ数・高レア率UP）</p>
+            <div className="mt-1 grid grid-cols-2 gap-1">
               {DIFFICULTY_LIST.map((d) => (
                 <button
                   key={d.id}
                   onClick={() => setDifficulty(d.id)}
-                  className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 ${
+                  className={`h-8 rounded-lg text-[11px] font-bold active:scale-95 ${
                     difficulty === d.id ? "bg-rose-600 text-white" : "bg-white/10 text-gray-300"
                   }`}
                 >

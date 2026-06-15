@@ -1,3 +1,4 @@
+import { applyEnemyModifier, enemyModTierForFloor } from "@/data/modifiers";
 import type { Enemy, EnemyAbility, EnemyTemplate } from "@/types/game";
 
 /**
@@ -162,7 +163,7 @@ export function generateEnemy(floor: number, enemyMult = 1): Enemy {
   const exp = Math.round(template.baseExp * (1 + floor * 0.15));
   const gold = Math.round(template.baseGold * (1 + floor * 0.15));
 
-  return {
+  const enemy: Enemy = {
     id: `${template.id}_${floor}`,
     templateId: template.id,
     name: isBossFloor ? `${template.name} Lv${tier}` : template.name,
@@ -185,7 +186,11 @@ export function generateEnemy(floor: number, enemyMult = 1): Enemy {
     enraged: false,
     charging: false,
     chargeCounter: 0,
+    modTier: 0,
   };
+
+  // Apply the floor's ★ modifier (no-op below floor 50).
+  return applyEnemyModifier(enemy, enemyModTierForFloor(floor));
 }
 
 function pickNormalTemplate(floor: number): EnemyTemplate {

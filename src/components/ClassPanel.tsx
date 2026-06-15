@@ -24,7 +24,7 @@ export default function ClassPanel() {
       <h2 className="text-sm font-bold text-gray-300">転職</h2>
       {!canChange && (
         <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[10px] text-amber-200">
-          転職できるのは「3階ごと」だけ。次の転職可能階まで進もう。
+          転職できるのは「倒れた後」だけ。力尽きてから職業を選び直そう。
         </p>
       )}
 
