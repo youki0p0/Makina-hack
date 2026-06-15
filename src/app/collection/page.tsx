@@ -12,6 +12,7 @@ import {
 } from "@/data/milestones";
 import { TITLES, isTitleUnlocked } from "@/data/titles";
 import { SETS } from "@/data/sets";
+import EnemyIcon from "@/components/EnemyIcon";
 import { rarityLabel, rarityStyle } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 
@@ -198,7 +199,13 @@ export default function CollectionPage() {
                   found ? "border-white/15 bg-black/30" : "border-white/10 bg-black/20 opacity-70"
                 }`}
               >
-                <div className="text-3xl">{found ? e.emoji : "❓"}</div>
+                <div className="text-3xl">
+                  {found ? (
+                    <EnemyIcon enemy={{ templateId: e.id, isBoss: e.isBoss, modTier: 0 }} size={40} />
+                  ) : (
+                    "❓"
+                  )}
+                </div>
                 <div className="min-w-0">
                   <p className="text-sm font-bold">
                     {found ? e.name : "???"}

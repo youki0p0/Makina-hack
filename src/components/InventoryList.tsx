@@ -6,6 +6,7 @@ import { SCRAP_VALUE } from "@/lib/loot";
 import { itemKey, rarityLabel, rarityPipString, rarityRank, rarityStyle, slotLabel } from "@/lib/ui";
 import { QUALITIES } from "@/data/quality";
 import { getSetDef } from "@/data/sets";
+import ItemIcon from "@/components/ItemIcon";
 import { useGameStore } from "@/store/gameStore";
 import type { Equipment, EquipmentSlot, Rarity } from "@/types/game";
 
@@ -189,8 +190,9 @@ export default function InventoryList() {
                 >
                   {fav ? "🔒" : "🔓"}
                 </button>
-                <button onClick={() => setSelected(index)} className="flex min-w-0 flex-1 items-center justify-between text-left active:scale-[0.98]">
-                  <div className="min-w-0">
+                <button onClick={() => setSelected(index)} className="flex min-w-0 flex-1 items-center gap-2 text-left active:scale-[0.98]">
+                  <ItemIcon item={item} size={32} />
+                  <div className="min-w-0 flex-1">
                     <p
                       className={`truncate font-bold ${
                         item.rarity === "legendary" ? "legendary-glow" : rarityStyle[item.rarity].text
@@ -283,8 +285,9 @@ function EquipmentDetailModal({
         className={`w-full max-w-sm animate-pop rounded-2xl border bg-[#15131f] p-4 ${style.border}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
-          <h3 className={`text-lg font-extrabold ${item.rarity === "legendary" ? "legendary-glow" : style.text}`}>
+        <div className="flex items-center gap-2">
+          <ItemIcon item={item} size={64} />
+          <h3 className={`min-w-0 flex-1 text-lg font-extrabold ${item.rarity === "legendary" ? "legendary-glow" : style.text}`}>
             {item.name}
           </h3>
           <button

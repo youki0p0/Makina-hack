@@ -2,6 +2,7 @@
 
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { computeSetEffects, getSetDef } from "@/data/sets";
+import ItemIcon from "@/components/ItemIcon";
 import { rarityStyle, slotLabel } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 import type { EquippedItems } from "@/types/game";
@@ -47,15 +48,18 @@ export default function EquipmentPanel() {
                 item ? rarityStyle[item.rarity].border : "border-white/10"
               } ${item ? rarityStyle[item.rarity].bg : "bg-black/20"}`}
             >
-              <div className="min-w-0">
-                <span className="text-[10px] text-gray-400">{slotLabel[slot]}</span>
-                {item ? (
-                  <p className={`truncate font-bold ${rarityStyle[item.rarity].text}`}>
-                    {item.name}
-                  </p>
-                ) : (
-                  <p className="text-gray-500">なし</p>
-                )}
+              <div className="flex min-w-0 items-center gap-2">
+                {item && <ItemIcon item={item} size={48} />}
+                <div className="min-w-0">
+                  <span className="text-[10px] text-gray-400">{slotLabel[slot]}</span>
+                  {item ? (
+                    <p className={`truncate font-bold ${rarityStyle[item.rarity].text}`}>
+                      {item.name}
+                    </p>
+                  ) : (
+                    <p className="text-gray-500">なし</p>
+                  )}
+                </div>
               </div>
               {item && (
                 <button

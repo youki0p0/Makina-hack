@@ -4,6 +4,7 @@ import { useState } from "react";
 import { GACHA_COST, PREMIUM_COST, TARGETED_COST } from "@/lib/loot";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { rarityLabel, rarityStyle, slotLabel } from "@/lib/ui";
+import ItemIcon from "@/components/ItemIcon";
 import { useGameStore } from "@/store/gameStore";
 import type { EquipmentSlot } from "@/types/game";
 
@@ -78,6 +79,9 @@ export default function GachaPanel() {
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-xs text-gray-400">ガチャ結果</p>
+            <div className="mt-2 flex justify-center">
+              <ItemIcon item={lastPull} size={64} />
+            </div>
             <p className={`mt-1 text-xl font-extrabold ${rarityStyle[lastPull.rarity].text}`}>
               {lastPull.name}
             </p>

@@ -2,6 +2,16 @@
 
 All notable changes to Dice Ex Machina.
 
+## [Unreleased] — 手続き生成ピクセルアイコン（画像アセット不使用）
+
+- 装備・敵・ボスのアイコンを **16×16ドット絵のプログラム生成** に（`lib/itemIcon.ts`）。
+  png/jpg/webp 等の画像アセットは持たない。Nearest-Neighbor 拡大・base64キャッシュ・SSR安全。
+- `ItemIcon`（武器/防具/装飾の形状、レアリティ色、★装飾、Set紋章）と `EnemyIcon`
+  （クリーチャー形状、ボス王冠、★オーラ）コンポーネントを追加。
+- 神機マキナは専用ジェネレータ（歯車＋ダイス融合・黒金・虹色）。
+- インベントリ/装備/詳細/ドロップ/ガチャ結果/戦闘の敵/図鑑に組み込み。
+- `docs/icons.md` を追加。test 73件グリーン／build 成功。
+
 ## [Unreleased] — アイテム/装備/セットの無限化
 
 - **装備ステの無限スケール**: 基底ティア上限(60)を撤廃。`genTierForFloor=floor` で深さに応じ

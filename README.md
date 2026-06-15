@@ -57,6 +57,7 @@ Next.js (App Router) + TypeScript + Tailwind CSS + Zustand + localStorage。Verc
 - **エンディングと物語** — 1000階撃破→スタッフロール→強くてニューゲーム or Endless。→ [docs/lore.md](docs/lore.md)
 - **神機マキナ** — 世界に一本だけの唯一武器。全出目を通常攻撃にする。→ [docs/lore.md](docs/lore.md)
 - **図鑑 / 装備比較 / ロック / レジェンド一括売却** — 収集率表示、装備中との差分、ロック保護。
+- **手続き生成ピクセルアイコン** — 装備・敵・ボスのアイコンを画像なしでコード生成。→ [docs/icons.md](docs/icons.md)
 
 ---
 
