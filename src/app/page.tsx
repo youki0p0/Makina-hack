@@ -28,7 +28,13 @@ export default function TitlePage() {
   const setHandedness = useGameStore((s) => s.setHandedness);
   const tapToBuy = useGameStore((s) => s.tapToBuy);
   const setTapToBuy = useGameStore((s) => s.setTapToBuy);
+  const checkpoint = useGameStore((s) => s.checkpoint);
+  const setStartFloor = useGameStore((s) => s.setStartFloor);
   const daily = getDailyBonus();
+
+  // Start-floor options: 1 and every reached 50-mark checkpoint.
+  const startFloors: number[] = [1];
+  for (let f = 50; f <= checkpoint; f += 50) startFloors.push(f);
 
   const hasProgress = hydrated && (floor > 1 || player.level > 1);
   const artifactsUnlocked = isFeatureUnlocked("artifacts", progress);
@@ -63,6 +69,23 @@ export default function TitlePage() {
           >
             {hasProgress ? `▶ つづきから (${floor}階)` : "▶ はじめる"}
           </Link>
+
+          {startFloors.length > 1 && (
+            <div>
+              <p className="text-[10px] text-gray-500">出発階を選ぶ（詰まったら1階から鍛え直し）</p>
+              <select
+                value={startFloors.includes(floor) ? floor : 1}
+                onChange={(e) => setStartFloor(Number(e.target.value))}
+                className="mt-1 h-9 w-full rounded-lg border border-white/15 bg-black/40 px-2 text-sm font-bold text-gray-100"
+              >
+                {startFloors.map((f) => (
+                  <option key={f} value={f}>
+                    {f === 1 ? "1階から（最初）" : `${f}階から（セーブポイント）`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <Link
             href="/inventory"
