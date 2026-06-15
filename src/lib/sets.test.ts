@@ -86,6 +86,27 @@ describe("set bonuses", () => {
   });
 });
 
+describe("set × job synergies", () => {
+  it("rogue + gambler(4pc) unlocks the chained-bet synergy", () => {
+    const eq = equipSet("gambler", 4);
+    const withoutJob = computeSetEffects(eq);
+    const withRogue = computeSetEffects(eq, "rogue");
+    expect(withoutJob.synergies).toHaveLength(0);
+    expect(withRogue.synergies.length).toBeGreaterThan(0);
+    expect(withRogue.extraHit).toBe(true);
+  });
+
+  it("a non-matching job gets no synergy", () => {
+    expect(computeSetEffects(equipSet("gambler", 4), "mage").synergies).toHaveLength(0);
+  });
+
+  it("mage + oracle(4pc) boosts the six-damage bonus", () => {
+    const base = computeSetEffects(equipSet("oracle", 4)).sixDmgBonus;
+    const synced = computeSetEffects(equipSet("oracle", 4), "mage").sixDmgBonus;
+    expect(synced).toBeGreaterThan(base);
+  });
+});
+
 describe("quality", () => {
   it("ancient/mythic scale stats and prefix the name", () => {
     const base = getItemById("gen_weapon_50")!; // legendary tier

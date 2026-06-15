@@ -5,8 +5,8 @@
 // pieces scale infinitely with depth (see genSetItem in data/items.ts).
 
 import type {
+  ClassId,
   DiceModifier,
-  Equipment,
   EquipmentSlot,
   EquippedItems,
   StatBonus,
@@ -179,7 +179,76 @@ export interface SetEffects {
   sixDouble: boolean;
   rollTwoDice: boolean;
   activeTiers: { key: string; name: string; pieces: number; icon: string }[];
+  /** Active set×job synergies (label + description) for the UI. */
+  synergies: { name: string; desc: string }[];
 }
+
+// ===== Set × Job synergies =====
+// Equipping a set (≥ N pieces) while playing a matching job unlocks an extra,
+// build-defining bonus. This is what makes "this set + this job" feel special.
+
+export interface Synergy {
+  classId: ClassId;
+  setKey: string;
+  minPieces: number;
+  name: string;
+  desc: string;
+  apply: (eff: SetEffects) => void;
+}
+
+export const SYNERGIES: readonly Synergy[] = [
+  {
+    classId: "rogue",
+    setKey: "gambler",
+    minPieces: 4,
+    name: "連鎖の賭け",
+    desc: "盗賊×賭博師4: リロール+1＆追撃",
+    apply: (e) => {
+      e.statBonus.reroll += 1;
+      e.extraHit = true;
+    },
+  },
+  {
+    classId: "paladin",
+    setKey: "vampire",
+    minPieces: 4,
+    name: "聖血の誓い",
+    desc: "聖騎士×吸血鬼4: 全攻撃に+15%吸血",
+    apply: (e) => {
+      e.lifestealAllPct = Math.max(e.lifestealAllPct, 0.15);
+    },
+  },
+  {
+    classId: "mage",
+    setKey: "oracle",
+    minPieces: 4,
+    name: "預言の業火",
+    desc: "魔法使い×神託4: 出目6の威力+40%",
+    apply: (e) => {
+      e.sixDmgBonus += 0.4;
+    },
+  },
+  {
+    classId: "berserker",
+    setKey: "executioner",
+    minPieces: 4,
+    name: "処刑の狂宴",
+    desc: "狂戦士×処刑人4: 即死しきい値を20%に",
+    apply: (e) => {
+      e.executePct = Math.max(e.executePct, 0.2);
+    },
+  },
+  {
+    classId: "warrior",
+    setKey: "gambler",
+    minPieces: 4,
+    name: "豪運の一撃",
+    desc: "戦士×賭博師4: 出目5・6の威力+30%",
+    apply: (e) => {
+      e.highFaceDmgBonus = Math.max(e.highFaceDmgBonus, 0.3);
+    },
+  },
+];
 
 const EMPTY_BONUS: StatBonus = { attack: 0, defense: 0, maxHp: 0, reroll: 0 };
 
@@ -192,8 +261,11 @@ function gamblerFaceOneToTwo(): DiceModifier {
   };
 }
 
-/** Count equipped pieces per set and resolve the combined bonus effects. */
-export function computeSetEffects(equipped: EquippedItems): SetEffects {
+/**
+ * Count equipped pieces per set and resolve the combined bonus effects.
+ * Passing `classId` also applies any matching set×job synergies.
+ */
+export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): SetEffects {
   const counts: Record<string, number> = {};
   for (const slot of EQUIP_SLOTS) {
     const it = equipped[slot];
@@ -213,6 +285,7 @@ export function computeSetEffects(equipped: EquippedItems): SetEffects {
     sixDouble: false,
     rollTwoDice: false,
     activeTiers: [],
+    synergies: [],
   };
 
   for (const [key, n] of Object.entries(counts)) {
@@ -236,6 +309,16 @@ export function computeSetEffects(equipped: EquippedItems): SetEffects {
       if (b.sixDouble) eff.sixDouble = true;
       if (b.rollTwoDice) eff.rollTwoDice = true;
       if (b.faceOneToTwo) eff.diceModifiers.push(gamblerFaceOneToTwo());
+    }
+  }
+
+  // Set × job synergies.
+  if (classId) {
+    for (const syn of SYNERGIES) {
+      if (syn.classId === classId && (counts[syn.setKey] ?? 0) >= syn.minPieces) {
+        syn.apply(eff);
+        eff.synergies.push({ name: syn.name, desc: syn.desc });
+      }
     }
   }
 
