@@ -2,7 +2,19 @@
 
 export type Rarity = "common" | "rare" | "epic" | "legendary" | "cursed";
 
-export type EquipmentSlot = "weapon" | "armor" | "accessory";
+/** Optional item quality layered on top of rarity (rarer = stronger). */
+export type Quality = "ancient" | "mythic" | "unique";
+
+export type EquipmentSlot =
+  | "weapon"
+  | "helm"
+  | "armor"
+  | "gloves"
+  | "boots"
+  | "accessory";
+
+/** Set identifiers for set-bonus gear. */
+export type SetId = "gambler" | "vampire" | "executioner" | "oracle";
 
 /** Equipment category used for class-based equip restrictions. */
 export type EquipTag = "light" | "heavy" | "magic";
@@ -131,6 +143,16 @@ export interface Equipment {
   volatile?: boolean;
   /** Infinite ★ modifier tier (0 = none). Scales stats additively. */
   modTier?: number;
+  /** Set membership (drives 2/4/6-piece set bonuses). */
+  setId?: SetId;
+  /** Quality tier (ancient/mythic/unique) layered on rarity. */
+  quality?: Quality;
+  /** Never drops/gacha/shop — granted only by special events (e.g. 神機マキナ). */
+  unique?: boolean;
+  /** Cannot be sold or scrapped (the one-and-only 神機マキナ). */
+  noSell?: boolean;
+  /** ★ modifiers never apply to this item. */
+  noModifier?: boolean;
 }
 
 export type EquippedItems = {
@@ -323,12 +345,20 @@ export interface Progress {
   discoveredItems: string[];
   /** Template ids of enemies ever defeated. */
   defeatedEnemies: string[];
-  /** Highest floor ever reached (drives rebirth-point milestones). */
+  /** Highest floor ever reached (drives rebirth-point milestones & gacha cap). */
   highestFloorReached: number;
   /** Milestone floors whose rebirth points have already been granted. */
   claimedMilestones: number[];
   /** Ids of floor achievements already claimed. */
   claimedFloorAchievements: string[];
+  /** The 1000F DEUS EX MACHINA ending has been witnessed (one-time, unskippable). */
+  endingSeen: boolean;
+  /** New Game+ count (強くてニューゲーム). */
+  ngPlus: number;
+  /** 神機マキナ has been granted (so it is never duplicated). */
+  makinaGranted: boolean;
+  /** Endless-Abyss story floors already shown (1050/1100/…/1250). */
+  claimedEndlessMessages: number[];
 }
 
 // ===== Persistence =====
@@ -339,6 +369,8 @@ export interface SavedItem {
   affixId?: string;
   /** Infinite ★ modifier tier (0/undefined = none). */
   modTier?: number;
+  /** Quality tier (ancient/mythic/unique). */
+  quality?: Quality;
 }
 
 export interface SaveData {

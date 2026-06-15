@@ -21,6 +21,10 @@ export function defaultProgress(): Progress {
     highestFloorReached: 1,
     claimedMilestones: [],
     claimedFloorAchievements: [],
+    endingSeen: false,
+    ngPlus: 0,
+    makinaGranted: false,
+    claimedEndlessMessages: [],
   };
 }
 
@@ -42,6 +46,12 @@ export function normalizeProgress(p?: Partial<Progress>): Progress {
     claimedMilestones: Array.isArray(p.claimedMilestones) ? [...p.claimedMilestones] : [],
     claimedFloorAchievements: Array.isArray(p.claimedFloorAchievements)
       ? [...p.claimedFloorAchievements]
+      : [],
+    endingSeen: p.endingSeen === true,
+    ngPlus: typeof p.ngPlus === "number" ? p.ngPlus : 0,
+    makinaGranted: p.makinaGranted === true,
+    claimedEndlessMessages: Array.isArray(p.claimedEndlessMessages)
+      ? [...p.claimedEndlessMessages]
       : [],
   };
 }

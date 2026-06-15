@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { GACHA_COST, PREMIUM_COST, TARGETED_COST } from "@/lib/loot";
+import { EQUIP_SLOTS } from "@/lib/battle";
 import { rarityLabel, rarityStyle, slotLabel } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 import type { EquipmentSlot } from "@/types/game";
 
-const SLOTS: EquipmentSlot[] = ["weapon", "armor", "accessory"];
+const SLOTS = EQUIP_SLOTS as readonly EquipmentSlot[];
 
 export default function GachaPanel() {
   const points = useGameStore((s) => s.gachaPoints);
@@ -32,7 +33,7 @@ export default function GachaPanel() {
         disabled={points < GACHA_COST}
         className="mt-2 h-11 w-full rounded-xl bg-purple-600 font-bold text-white active:scale-95 disabled:opacity-40"
       >
-        通常ガチャ（素材 {GACHA_COST}）
+        通常ガチャ（素材 {GACHA_COST}・コモン量産）
       </button>
 
       <button
@@ -40,17 +41,17 @@ export default function GachaPanel() {
         disabled={points < PREMIUM_COST}
         className="mt-2 h-11 w-full rounded-xl bg-amber-600 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
       >
-        ✨ プレミアム（素材 {PREMIUM_COST}・高レア率UP）
+        ✨ プレミアム（素材 {PREMIUM_COST}・高補正コモン/レア以上なし）
       </button>
 
       <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2">
-        <p className="text-[10px] text-gray-400">スロット指定ガチャ（高レア率UP）</p>
-        <div className="mt-1 flex gap-1">
+        <p className="text-[10px] text-gray-400">部位指定ガチャ（レア以上 保証）</p>
+        <div className="mt-1 grid grid-cols-3 gap-1">
           {SLOTS.map((s) => (
             <button
               key={s}
               onClick={() => setSlot(s)}
-              className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 ${
+              className={`h-8 rounded-lg text-[11px] font-bold active:scale-95 ${
                 slot === s ? "bg-amber-600 text-white" : "bg-white/10 text-gray-300"
               }`}
             >
@@ -63,7 +64,7 @@ export default function GachaPanel() {
           disabled={points < TARGETED_COST}
           className="mt-2 h-11 w-full rounded-xl bg-rose-600 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
         >
-          🎯 {slotLabel[slot]}指定ガチャ（素材 {TARGETED_COST}）
+          🎯 {slotLabel[slot]}指定ガチャ（素材 {TARGETED_COST}・レア以上保証）
         </button>
       </div>
 

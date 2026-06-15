@@ -2,6 +2,7 @@ import { AFFIXES, applyAffix, rollAffixedCopy } from "@/data/affixes";
 import { CONSUMABLES } from "@/data/consumables";
 import { ITEMS } from "@/data/items";
 import { applyModifier } from "@/data/modifiers";
+import { applyQuality, rollQuality } from "@/data/quality";
 import { rarityRank } from "@/lib/ui";
 import type {
   Consumable,
@@ -20,11 +21,11 @@ const RARITY_WEIGHT: Record<Rarity, number> = {
   legendary: 3,
 };
 
-/** Items that can drop from enemies (gacha/casino-exclusive items excluded). */
-const DROPPABLE = ITEMS.filter((i) => !i.gachaOnly && !i.casinoOnly);
+/** Items that can drop from enemies (gacha/casino/unique items excluded). */
+const DROPPABLE = ITEMS.filter((i) => !i.gachaOnly && !i.casinoOnly && !i.unique);
 
-/** Items obtainable from the equipment gacha (casino prizes excluded). */
-const GACHA_POOL = ITEMS.filter((i) => !i.casinoOnly);
+/** Items obtainable from the equipment gacha (casino prizes & uniques excluded). */
+const GACHA_POOL = ITEMS.filter((i) => !i.casinoOnly && !i.unique);
 
 /** Gacha currency gained by scrapping equipment, by rarity. */
 export const SCRAP_VALUE: Record<Rarity, number> = {
@@ -85,10 +86,12 @@ export function pullGachaItem(): Equipment {
  * Boosted pull (cost {@link PREMIUM_COST}): still Common-only, but guaranteed an
  * affix plus a ★ modifier — a "high-roll Common", never Rare+.
  */
-export function pullPremiumItem(): Equipment {
+export function pullPremiumItem(modCap = Infinity): Equipment {
   const base = weightedPull(COMMON_POOL, (i) => RARITY_WEIGHT[i.rarity]);
   const affixed = applyAffix(base, AFFIXES[Math.floor(Math.random() * AFFIXES.length)]);
-  return applyModifier(affixed, 1 + (Math.random() < 0.35 ? 1 : 0));
+  // Modifier ★ is capped by the player's deepest floor — no future-tier gear.
+  const tier = Math.min(modCap, 1 + (Math.random() < 0.35 ? 1 : 0));
+  return applyModifier(affixed, Math.max(0, tier));
 }
 
 /**
@@ -139,10 +142,15 @@ export function rollLoot(enemy: Enemy, floor: number, rareBonus = 0): Equipment 
   for (const { item, weight } of weighted) {
     roll -= weight;
     if (roll <= 0) {
-      return rollAffixedCopy({ ...item });
+      return withQuality(rollAffixedCopy({ ...item }));
     }
   }
-  return rollAffixedCopy({ ...weighted[weighted.length - 1].item });
+  return withQuality(rollAffixedCopy({ ...weighted[weighted.length - 1].item }));
+}
+
+/** Roll an Ancient/Mythic upgrade onto a (legendary) drop. */
+function withQuality(item: Equipment): Equipment {
+  return applyQuality(item, rollQuality(item));
 }
 
 /**

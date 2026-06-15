@@ -12,7 +12,14 @@ import {
 } from "@/lib/battle";
 import type { ActiveBuff, DiceFace, EquippedItems, Player } from "@/types/game";
 
-const emptyEquip: EquippedItems = { weapon: null, armor: null, accessory: null };
+const emptyEquip: EquippedItems = {
+  weapon: null,
+  helm: null,
+  armor: null,
+  gloves: null,
+  boots: null,
+  accessory: null,
+};
 
 function basePlayer(): Player {
   return {

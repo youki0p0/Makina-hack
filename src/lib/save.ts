@@ -7,6 +7,7 @@ import type {
   ArtifactLevels,
   ClassId,
   Equipment,
+  EquipmentSlot,
   EquippedItems,
   Player,
   Progress,
@@ -18,15 +19,16 @@ import type {
  * Bump this whenever the save shape changes incompatibly. During the debug era
  * we simply DISCARD older saves (no migration) so the data model can evolve.
  */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
-const STORAGE_KEY = "dice-hackslash-save-v2";
+const STORAGE_KEY = "dice-hackslash-save-v3";
 
 function toSavedItem(item: Equipment | null): SavedItem | null {
   if (!item) return null;
   const out: SavedItem = { id: item.id };
   if (item.affixId) out.affixId = item.affixId;
   if (item.modTier && item.modTier > 0) out.modTier = item.modTier;
+  if (item.quality) out.quality = item.quality;
   return out;
 }
 
@@ -53,14 +55,17 @@ export interface LoadedState {
 
 export function saveGame(state: LoadedState): void {
   if (typeof window === "undefined") return;
+  const equippedItems = EQUIP_SLOTS.reduce(
+    (acc, slot) => {
+      acc[slot] = toSavedItem(state.equipped[slot]);
+      return acc;
+    },
+    {} as { [K in EquipmentSlot]: SavedItem | null },
+  );
   const data: SaveData = {
     saveVersion: SAVE_VERSION,
     player: state.player,
-    equippedItems: {
-      weapon: toSavedItem(state.equipped.weapon),
-      armor: toSavedItem(state.equipped.armor),
-      accessory: toSavedItem(state.equipped.accessory),
-    },
+    equippedItems,
     inventoryItems: state.inventory.map((i) => toSavedItem(i)).filter((i): i is SavedItem => i !== null),
     currentFloor: state.currentFloor,
     gachaPoints: state.gachaPoints,
@@ -95,14 +100,14 @@ export function loadGame(): LoadedState | null {
     // Debug-era policy: discard saves from an older schema version.
     if (data.saveVersion !== SAVE_VERSION || !data.player) return null;
 
-    const equipped: EquippedItems = { weapon: null, armor: null, accessory: null };
-    for (const slot of EQUIP_SLOTS) {
+    const equipped = EQUIP_SLOTS.reduce((acc, slot) => {
       const saved = data.equippedItems?.[slot];
-      equipped[slot] = saved ? getItemInstance(saved.id, saved.affixId, saved.modTier) : null;
-    }
+      acc[slot] = saved ? getItemInstance(saved.id, saved.affixId, saved.modTier, saved.quality) : null;
+      return acc;
+    }, {} as EquippedItems);
 
     const inventory = (data.inventoryItems ?? [])
-      .map((s) => getItemInstance(s.id, s.affixId, s.modTier))
+      .map((s) => getItemInstance(s.id, s.affixId, s.modTier, s.quality))
       .filter((i): i is Equipment => i !== null);
 
     return {

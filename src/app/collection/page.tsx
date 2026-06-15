@@ -11,10 +11,13 @@ import {
   nextMilestoneFloor,
 } from "@/data/milestones";
 import { TITLES, isTitleUnlocked } from "@/data/titles";
+import { SETS } from "@/data/sets";
+import { setPieceId } from "@/data/sets";
+import { EQUIP_SLOTS } from "@/lib/battle";
 import { rarityLabel, rarityStyle } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 
-type Tab = "achievements" | "items" | "enemies" | "titles";
+type Tab = "achievements" | "items" | "sets" | "enemies" | "titles";
 
 export default function CollectionPage() {
   const hydrate = useGameStore((s) => s.hydrate);
@@ -60,8 +63,8 @@ export default function CollectionPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-4 gap-1">
-        {(["achievements", "items", "enemies", "titles"] as Tab[]).map((t) => (
+      <div className="grid grid-cols-5 gap-1">
+        {(["achievements", "items", "sets", "enemies", "titles"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -69,7 +72,15 @@ export default function CollectionPage() {
               tab === t ? "bg-emerald-600 text-white" : "bg-white/10 text-gray-300"
             }`}
           >
-            {t === "achievements" ? "実績" : t === "items" ? "装備" : t === "enemies" ? "敵" : "称号"}
+            {t === "achievements"
+              ? "実績"
+              : t === "items"
+                ? "装備"
+                : t === "sets"
+                  ? "セット"
+                  : t === "enemies"
+                    ? "敵"
+                    : "称号"}
           </button>
         ))}
       </div>
@@ -147,6 +158,31 @@ export default function CollectionPage() {
                 ) : (
                   <p className="text-gray-500">??? （未発見）</p>
                 )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab === "sets" && (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-400">
+            セット装備は2/4/6部位でビルドが変わる。装飾以外は職業制限あり。
+          </p>
+          {SETS.map((set) => {
+            const pieceIds = EQUIP_SLOTS.map((slot) => setPieceId(set.id, slot));
+            const found = pieceIds.filter((id) => progress.discoveredItems.includes(id)).length;
+            return (
+              <div key={set.id} className="rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/10 p-2">
+                <p className="font-bold text-fuchsia-200">
+                  {set.icon} {set.name}セット{" "}
+                  <span className="text-[10px] text-gray-400">収集 {found}/{pieceIds.length}</span>
+                </p>
+                <ul className="mt-1 space-y-0.5 text-[10px] text-fuchsia-100">
+                  {set.bonuses.map((b) => (
+                    <li key={b.pieces}>・{b.pieces}部位: {b.desc}</li>
+                  ))}
+                </ul>
               </div>
             );
           })}

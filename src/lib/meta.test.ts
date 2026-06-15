@@ -73,15 +73,17 @@ describe("enemies", () => {
     expect(ids.size).toBe(50);
   });
 
-  it("generates a boss on every 5th floor with gimmick fields", () => {
-    const boss = generateEnemy(5);
+  it("generates a boss every 10th floor with gimmick fields", () => {
+    const boss = generateEnemy(10);
     expect(boss.isBoss).toBe(true);
     expect(boss.enraged).toBe(false);
     expect(boss.weakenTurns).toBe(0);
+    // Floor 5 is no longer a boss floor (bosses moved to every 10F).
+    expect(generateEnemy(5).isBoss).toBe(false);
   });
 
   it("has multiple boss types that rotate by tier", () => {
     expect(BOSS_TEMPLATES.length).toBeGreaterThanOrEqual(5);
-    expect(generateEnemy(5).templateId).not.toBe(generateEnemy(10).templateId);
+    expect(generateEnemy(10).templateId).not.toBe(generateEnemy(20).templateId);
   });
 });

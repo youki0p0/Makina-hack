@@ -29,9 +29,9 @@ const CONS_PRICE: Record<Rarity, number> = {
   legendary: 80,
 };
 
-/** Shops appear on every 4th floor, except boss floors (every 5th). */
+/** Shops appear on every 4th floor, except boss floors (every 10th). */
 export function isShopFloor(floor: number): boolean {
-  return floor % 4 === 0 && floor % 5 !== 0;
+  return floor % 4 === 0 && floor % 10 !== 0;
 }
 
 // Shop never sells gacha- or casino-exclusive gear.

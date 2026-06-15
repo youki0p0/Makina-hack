@@ -1,6 +1,7 @@
 "use client";
 
 import { EQUIP_SLOTS } from "@/lib/battle";
+import { computeSetEffects, SET_BY_ID } from "@/data/sets";
 import { rarityStyle, slotLabel } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 import type { EquippedItems } from "@/types/game";
@@ -8,10 +9,34 @@ import type { EquippedItems } from "@/types/game";
 export default function EquipmentPanel() {
   const equipped = useGameStore((s) => s.equipped);
   const unequip = useGameStore((s) => s.unequipItem);
+  const setEff = computeSetEffects(equipped);
 
   return (
     <div className="space-y-2">
       <h2 className="text-sm font-bold text-gray-300">装備中</h2>
+
+      {setEff.activeTiers.length > 0 && (
+        <div className="rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 p-2">
+          <p className="text-[10px] font-bold text-fuchsia-200">発動中のセット効果</p>
+          <ul className="mt-1 space-y-1 text-[10px] text-fuchsia-100">
+            {setEff.activeTiers.map((t) => {
+              const def = SET_BY_ID[t.id];
+              return (
+                <li key={t.id}>
+                  {t.icon} {t.name} ({t.pieces}部位)
+                  <ul className="ml-3 text-gray-300">
+                    {def.bonuses
+                      .filter((b) => t.pieces >= b.pieces)
+                      .map((b) => (
+                        <li key={b.pieces}>・{b.pieces}部位: {b.desc}</li>
+                      ))}
+                  </ul>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       <div className="space-y-2">
         {EQUIP_SLOTS.map((slot) => {
           const item = equipped[slot as keyof EquippedItems];

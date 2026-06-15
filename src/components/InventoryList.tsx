@@ -4,6 +4,8 @@ import { useState } from "react";
 import { canEquip } from "@/data/classes";
 import { SCRAP_VALUE } from "@/lib/loot";
 import { itemKey, rarityLabel, rarityPipString, rarityRank, rarityStyle, slotLabel } from "@/lib/ui";
+import { QUALITIES } from "@/data/quality";
+import { SET_BY_ID } from "@/data/sets";
 import { useGameStore } from "@/store/gameStore";
 import type { Equipment, EquipmentSlot, Rarity } from "@/types/game";
 
@@ -202,6 +204,12 @@ export default function InventoryList() {
                     </p>
                     <p className="text-[10px] text-gray-400">
                       {slotLabel[item.slot]} ・ {rarityLabel[item.rarity]}
+                      {item.quality && (
+                        <span className="ml-1 text-cyan-300">{QUALITIES[item.quality].label}</span>
+                      )}
+                      {item.setId && (
+                        <span className="ml-1 text-fuchsia-300">[{SET_BY_ID[item.setId].name}]</span>
+                      )}
                       {!canEquip(item, classId) && <span className="ml-1 text-red-400">装備不可</span>}
                     </p>
                   </div>
@@ -289,10 +297,24 @@ function EquipmentDetailModal({
         </div>
         <span className="text-[10px] text-gray-400">
           <RarityPips item={item} /> {slotLabel[item.slot]} ・ {rarityLabel[item.rarity]}
+          {item.quality ? ` ・ ${QUALITIES[item.quality].label}` : ""}
           {item.modTier ? ` ・ ★${item.modTier}` : ""}
         </span>
 
         <p className="mt-2 text-sm text-gray-200">{item.description}</p>
+
+        {item.setId && (
+          <div className="mt-3 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 p-2">
+            <p className="text-[10px] font-bold text-fuchsia-300">
+              {SET_BY_ID[item.setId].icon} {SET_BY_ID[item.setId].name}セット
+            </p>
+            <ul className="mt-1 space-y-0.5 text-[10px] text-fuchsia-100">
+              {SET_BY_ID[item.setId].bonuses.map((b) => (
+                <li key={b.pieces}>・{b.pieces}部位: {b.desc}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           {item.attack !== 0 && <Stat label={`攻撃 +${item.attack}`} />}

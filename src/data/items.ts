@@ -1,6 +1,16 @@
 import { applyAffix, getAffixById } from "@/data/affixes";
 import { applyModifier } from "@/data/modifiers";
-import type { EquipTag, Equipment, EquipmentSlot, Rarity } from "@/types/game";
+import { applyQuality } from "@/data/quality";
+import { setPieceId } from "@/data/sets";
+import type {
+  DiceValue,
+  EquipTag,
+  Equipment,
+  EquipmentSlot,
+  Quality,
+  Rarity,
+  SetId,
+} from "@/types/game";
 
 /**
  * Hand-crafted "signature" items — the ones with dice-rewrite effects.
@@ -450,14 +460,27 @@ const MATERIALS = [
   "木", "銅", "青銅", "鉄", "鋼", "銀", "金剛", "ミスリル", "アダマント", "竜骨", "星鉄", "神鉄",
 ];
 const WEAPON_NOUNS = ["短剣", "剣", "槍", "斧", "大剣", "杖"];
+const HELM_NOUNS = ["帽子", "兜", "鉢金", "面甲", "頭巾"];
 const ARMOR_NOUNS = ["布鎧", "革鎧", "鎖鎧", "板鎧", "重鎧"];
-const ACC_NOUNS = ["指輪", "腕輪", "護符", "宝珠", "首飾り"];
+const GLOVE_NOUNS = ["手袋", "篭手", "拳甲", "腕輪", "指甲"];
+const BOOT_NOUNS = ["靴", "革靴", "鉄靴", "軍靴", "脚甲"];
+const ACC_NOUNS = ["指輪", "首飾り", "護符", "宝珠", "耳飾り"];
 
 const WEAPON_TAG: Record<string, EquipTag> = {
   短剣: "light", 剣: "light", 槍: "heavy", 斧: "heavy", 大剣: "heavy", 杖: "magic",
 };
 const ARMOR_TAG: Record<string, EquipTag> = {
   布鎧: "magic", 革鎧: "light", 鎖鎧: "heavy", 板鎧: "heavy", 重鎧: "heavy",
+};
+
+/** The six defensive/utility slots and the noun list each one draws from. */
+const SLOT_NOUNS: Record<EquipmentSlot, string[]> = {
+  weapon: WEAPON_NOUNS,
+  helm: HELM_NOUNS,
+  armor: ARMOR_NOUNS,
+  gloves: GLOVE_NOUNS,
+  boots: BOOT_NOUNS,
+  accessory: ACC_NOUNS,
 };
 
 function rarityForTier(t: number): Rarity {
@@ -491,6 +514,21 @@ function generatedItem(slot: EquipmentSlot, t: number, noun: string): Equipment 
     item.maxHp = Math.round(t * 1.5);
     item.equipTag = ARMOR_TAG[noun];
     item.description = `防御+${item.defense} / HP+${item.maxHp}`;
+  } else if (slot === "helm") {
+    item.defense = Math.round(1 + t * 0.4);
+    item.maxHp = Math.round(t * 1.1);
+    item.equipTag = t % 2 === 0 ? "heavy" : "light";
+    item.description = `防御+${item.defense} / HP+${item.maxHp}`;
+  } else if (slot === "gloves") {
+    item.attack = Math.round(t * 0.35);
+    item.defense = Math.round(1 + t * 0.3);
+    item.equipTag = "light";
+    item.description = `攻+${item.attack} / 防+${item.defense}`;
+  } else if (slot === "boots") {
+    item.defense = Math.round(1 + t * 0.35);
+    item.maxHp = Math.round(t * 0.9);
+    item.equipTag = "light";
+    item.description = `防御+${item.defense} / HP+${item.maxHp}`;
   } else {
     item.maxHp = Math.round(t * 1.2);
     item.attack = Math.round(t * 0.3);
@@ -505,39 +543,137 @@ function generatedItem(slot: EquipmentSlot, t: number, noun: string): Equipment 
 
 function buildGenerated(): Equipment[] {
   const out: Equipment[] = [];
+  const slots: EquipmentSlot[] = ["weapon", "helm", "armor", "gloves", "boots", "accessory"];
   for (let t = 1; t <= 61; t++) {
-    out.push(generatedItem("weapon", t, WEAPON_NOUNS[(t - 1) % WEAPON_NOUNS.length]));
-    out.push(generatedItem("armor", t, ARMOR_NOUNS[(t - 1) % ARMOR_NOUNS.length]));
-    out.push(generatedItem("accessory", t, ACC_NOUNS[(t - 1) % ACC_NOUNS.length]));
+    for (const slot of slots) {
+      const nouns = SLOT_NOUNS[slot];
+      out.push(generatedItem(slot, t, nouns[(t - 1) % nouns.length]));
+    }
   }
   return out;
 }
 
-/** Full registry: signature items + generated progression (~200 total). */
-export const ITEMS: readonly Equipment[] = [...SIGNATURE_ITEMS, ...buildGenerated()];
+// ===== Set items (4 sets × 6 slots) =====
+const SET_SLOT_NOUN: Record<EquipmentSlot, string> = {
+  weapon: "刃", helm: "兜", armor: "鎧", gloves: "篭手", boots: "靴", accessory: "印",
+};
+const SET_META: { id: SetId; name: string; minFloor: number; tag: EquipTag }[] = [
+  { id: "gambler", name: "賭博師", minFloor: 30, tag: "light" },
+  { id: "vampire", name: "吸血鬼", minFloor: 60, tag: "light" },
+  { id: "executioner", name: "処刑人", minFloor: 90, tag: "heavy" },
+  { id: "oracle", name: "神託", minFloor: 120, tag: "magic" },
+];
+
+function buildSetItems(): Equipment[] {
+  const out: Equipment[] = [];
+  const slots: EquipmentSlot[] = ["weapon", "helm", "armor", "gloves", "boots", "accessory"];
+  for (const set of SET_META) {
+    for (const slot of slots) {
+      const isWeapon = slot === "weapon";
+      const isAcc = slot === "accessory";
+      out.push({
+        id: setPieceId(set.id, slot),
+        name: `${set.name}の${SET_SLOT_NOUN[slot]}`,
+        rarity: "epic",
+        slot,
+        attack: isWeapon ? 14 : isAcc ? 5 : 4,
+        defense: isWeapon ? 0 : 6,
+        maxHp: isWeapon ? 0 : 14,
+        rerollModifier: 0,
+        description: `${set.name}セット装備`,
+        diceModifiers: [],
+        setId: set.id,
+        equipTag: isAcc ? undefined : set.tag,
+        minFloor: set.minFloor,
+      });
+    }
+  }
+  return out;
+}
+
+// ===== 神機マキナ (the one-and-only unique weapon) =====
+// Granted only by the 1000F ending (YES route) or by reaching floor 1250 (NO
+// route). Stats are 92% of the strongest droppable weapon; every face becomes a
+// plain normal attack ("Complete").
+function makinaAttackValue(): number {
+  const strongest = Math.max(
+    0,
+    ...buildGenerated().filter((i) => i.slot === "weapon").map((i) => i.attack),
+  );
+  return Math.round(strongest * 0.92);
+}
+
+export const MAKINA_ID = "makina_god";
+
+export function makeMakina(): Equipment {
+  const normalAll = {
+    faces: [1, 2, 3, 4, 5, 6] as DiceValue[],
+    effect: {
+      kind: "normal" as const,
+      isMiss: false,
+      damageMultiplier: 1.0,
+      selfDamagePct: 0,
+      extraHits: 0,
+      guard: 0,
+      lifestealPct: 0,
+    },
+    label: "通常",
+    description: "Complete: 全ての出目が通常攻撃になる",
+  };
+  return {
+    id: MAKINA_ID,
+    name: "神機マキナ",
+    rarity: "legendary",
+    quality: "unique",
+    slot: "weapon",
+    attack: makinaAttackValue(),
+    defense: 0,
+    maxHp: 0,
+    rerollModifier: 0,
+    description:
+      "終わりを見届けた者だけが手にすることを許された武器。何度失われても、必ずここへ帰ってくる。最強ではない。ただ、もう迷う必要はない。",
+    diceModifiers: [normalAll],
+    unique: true,
+    noSell: true,
+    noModifier: true,
+    equipTag: "light",
+  };
+}
+
+/** Full registry: signature + generated + set items. (神機マキナ is special.) */
+export const ITEMS: readonly Equipment[] = [
+  ...SIGNATURE_ITEMS,
+  ...buildGenerated(),
+  ...buildSetItems(),
+];
 
 const ITEM_MAP: Map<string, Equipment> = new Map(ITEMS.map((i) => [i.id, i]));
 
 /** Get a fresh copy of an item by id, or null if unknown. */
 export function getItemById(id: string): Equipment | null {
+  if (id === MAKINA_ID) return makeMakina();
   const item = ITEM_MAP.get(id);
   return item ? { ...item } : null;
 }
 
-/** Rehydrate an item instance from a base id plus optional affix + ★ tier. */
+/** Rehydrate an item instance from a base id plus optional affix + ★ tier + quality. */
 export function getItemInstance(
   id: string,
   affixId?: string,
   modTier?: number,
+  quality?: Quality,
 ): Equipment | null {
   const base = getItemById(id);
   if (!base) return null;
+  // 神機マキナ is fixed — never re-rolls affix/modifier/quality.
+  if (base.unique) return base;
   let item = base;
   if (affixId) {
     const affix = getAffixById(affixId);
     if (affix) item = applyAffix(base, affix);
   }
-  if (modTier && modTier > 0) item = applyModifier(item, modTier);
+  if (modTier && modTier > 0 && !item.noModifier) item = applyModifier(item, modTier);
+  if (quality) item = applyQuality(item, quality);
   return item;
 }
 

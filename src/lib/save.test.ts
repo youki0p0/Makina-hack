@@ -19,7 +19,7 @@ const validSave = {
   currentFloor: 7,
 };
 
-const STORAGE_KEY = "dice-hackslash-save-v2";
+const STORAGE_KEY = "dice-hackslash-save-v3";
 
 describe("save import/export", () => {
   beforeEach(() => {

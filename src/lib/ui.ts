@@ -47,7 +47,10 @@ export const rarityStyle: Record<Rarity, { text: string; border: string; bg: str
 
 export const slotLabel: Record<string, string> = {
   weapon: "武器",
-  armor: "防具",
+  helm: "兜",
+  armor: "鎧",
+  gloves: "篭手",
+  boots: "靴",
   accessory: "装飾",
 };
 

@@ -50,14 +50,14 @@ export default function TitlePage() {
       </div>
       <div>
         <h1 className="text-4xl font-black tracking-tight">
-          🎲 ダイス
+          🎲 Dice Ex
           <br />
-          ダンジョン
+          Machina
         </h1>
         <p className="mt-3 text-sm text-gray-400">
-          装備で出目が書き換わる
+          ダイス版 Diablo
           <br />
-          コマンド式ハクスラRPG
+          装備で出目が書き換わるハクスラRPG
         </p>
       </div>
 

@@ -18,8 +18,9 @@ import {
   isClassUnlocked,
 } from "@/data/classes";
 import { generateEnemy } from "@/data/enemies";
-import { getItemById } from "@/data/items";
-import { applyModifier, rollDropModTier } from "@/data/modifiers";
+import { getItemById, makeMakina, MAKINA_ID } from "@/data/items";
+import { applyModifier, modTierForFloor, rollDropModTier } from "@/data/modifiers";
+import { computeSetEffects } from "@/data/sets";
 import { jobAttackMult } from "@/data/jobBalance";
 import {
   crossedMilestones,
@@ -27,6 +28,7 @@ import {
   newlyEarnedFloorAchievements,
 } from "@/data/milestones";
 import { isWorldBossFloor, FINAL_FLOOR } from "@/data/worlds";
+import { ENDLESS_MESSAGES, MAKINA_FLOOR, ENDING_TITLE_ID } from "@/data/lore";
 import {
   addStatus,
   applyExp,
@@ -97,7 +99,14 @@ function createPlayer(): Player {
 }
 
 function emptyEquipped(): EquippedItems {
-  return { weapon: null, armor: null, accessory: null };
+  return {
+    weapon: null,
+    helm: null,
+    armor: null,
+    gloves: null,
+    boots: null,
+    accessory: null,
+  };
 }
 
 /** Add an id to a list if not already present (set-union). */
@@ -169,6 +178,10 @@ interface GameState {
   startFloorPref: number;
   /** Floor of a just-cleared world boss (drives the world-clear overlay). */
   worldCleared: number | null;
+  /** 1000F DEUS EX MACHINA ending is pending (unskippable overlay). */
+  pendingEnding: boolean;
+  /** Transient Endless-Abyss story line to display (null = none). */
+  endlessMessage: string | null;
   /** Items for sale at the current shop floor (not persisted). */
   shopStock: ShopEntry[];
 
@@ -210,6 +223,12 @@ interface GameState {
   setStartFloor: (floor: number) => void;
   /** Dismiss the world-clear overlay. */
   clearWorldClear: () => void;
+  /** YES at the 1000F ending: 強くてニューゲーム (reset, grant title + 神機マキナ). */
+  newGamePlus: () => void;
+  /** NO at the 1000F ending: descend into the Endless Abyss. */
+  declineEnding: () => void;
+  /** Dismiss the current Endless-Abyss story line. */
+  clearEndlessMessage: () => void;
   exportSaveData: () => string;
   importSaveData: (code: string) => boolean;
 
@@ -273,28 +292,37 @@ export const useGameStore = create<GameState>((set, get) => {
     return next.slice(-LOG_LIMIT);
   }
 
-  function refreshFaces(): DiceFace[] {
-    const { equipped } = get();
-    const cls = getClass(get().classId);
-    // Class rewrites apply before equipment so gear can still override faces.
+  /** Build the dice table from class + all equipped slots + set bonuses. */
+  function buildFaces(equipped: EquippedItems, classId: ClassId): DiceFace[] {
+    const cls = getClass(classId);
+    const setEff = computeSetEffects(equipped);
+    // Class first, then equipment (so gear overrides), then set rewrites last.
     return applyEquipmentModifiers([
       { name: cls.name, diceModifiers: cls.diceModifiers },
-      equipped.weapon,
-      equipped.armor,
-      equipped.accessory,
+      ...EQUIP_SLOTS.map((s) => equipped[s]),
+      { name: "セット", diceModifiers: setEff.diceModifiers },
     ]);
   }
 
-  /** Roll the die, honoring any active "luck" buff (minimum value). */
-  function rollWithLuck(): DiceValue {
-    const min = luckFloor(get().activeBuffs);
-    return Math.max(rollDice(), min) as DiceValue;
+  function refreshFaces(): DiceFace[] {
+    return buildFaces(get().equipped, get().classId);
   }
 
-  /** Sum of artifacts, the current class's mods, and the daily bonus. */
+  /** Roll the die, honoring "luck" buffs and the oracle 6pc (roll 2, keep higher). */
+  function rollWithLuck(): DiceValue {
+    const min = luckFloor(get().activeBuffs);
+    let r = Math.max(rollDice(), min);
+    if (computeSetEffects(get().equipped).rollTwoDice) {
+      r = Math.max(r, Math.max(rollDice(), min));
+    }
+    return r as DiceValue;
+  }
+
+  /** Sum of artifacts, the current class's mods, set bonuses, and the daily bonus. */
   function passiveBonus(): StatBonus {
     const a = artifactBonus(get().artifacts);
     const c = classStatBonus(get().classId);
+    const set = computeSetEffects(get().equipped).statBonus;
     const daily = getDailyBonus();
     const d: StatBonus = {
       attack: daily.stat === "attack" ? daily.value : 0,
@@ -303,10 +331,10 @@ export const useGameStore = create<GameState>((set, get) => {
       reroll: daily.stat === "reroll" ? daily.value : 0,
     };
     return {
-      attack: a.attack + c.attack + d.attack,
-      defense: a.defense + c.defense + d.defense,
-      maxHp: a.maxHp + c.maxHp + d.maxHp,
-      reroll: a.reroll + c.reroll + d.reroll,
+      attack: a.attack + c.attack + d.attack + set.attack,
+      defense: a.defense + c.defense + d.defense + set.defense,
+      maxHp: a.maxHp + c.maxHp + d.maxHp + set.maxHp,
+      reroll: a.reroll + c.reroll + d.reroll + set.reroll,
     };
   }
 
@@ -349,6 +377,8 @@ export const useGameStore = create<GameState>((set, get) => {
       lastResult: null,
       activeBuffs: [],
       worldCleared: null,
+      pendingEnding: false,
+      endlessMessage: null,
       shopStock: [],
     });
     set({ diceFaces: refreshFaces() });
@@ -386,6 +416,8 @@ export const useGameStore = create<GameState>((set, get) => {
     tapToBuy: false,
     startFloorPref: 1,
     worldCleared: null,
+    pendingEnding: false,
+    endlessMessage: null,
     shopStock: [],
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
@@ -474,11 +506,21 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     reroll: () => {
-      const { rerollsLeft, battleState } = get();
+      const state = get();
+      const { rerollsLeft, battleState } = state;
       if (battleState !== "player" || rerollsLeft <= 0) return;
+      // Oracle 2pc: reroll heals a little.
+      const setEff = computeSetEffects(state.equipped);
+      let player = state.player;
+      if (setEff.healOnReroll > 0) {
+        const maxHp = currentStats(player, state.equipped, state.activeBuffs).maxHp;
+        const healed = Math.min(maxHp, player.hp + setEff.healOnReroll);
+        if (healed !== player.hp) player = { ...player, hp: healed };
+      }
       set({
         diceValue: rollWithLuck(),
         rerollsLeft: rerollsLeft - 1,
+        player,
       });
     },
 
@@ -492,13 +534,56 @@ export const useGameStore = create<GameState>((set, get) => {
 
       const action = resolvePlayerAction(face, stats, enemy);
 
-      let enemyHp = enemy.hp - action.enemyDamage;
-      let playerHp = state.player.hp - action.selfDamage + action.heal;
+      // ===== Set-bonus combat effects =====
+      const setEff = computeSetEffects(state.equipped);
+      const v = state.diceValue;
+      const setLogs: string[] = [];
+      let bonusDamage = 0;
+      let bonusHeal = 0;
+      if (action.enemyDamage > 0) {
+        if (setEff.highFaceDmgBonus > 0 && (v === 5 || v === 6)) {
+          bonusDamage += Math.round(stats.attack * setEff.highFaceDmgBonus);
+        }
+        if (setEff.sixDmgBonus > 0 && v === 6) {
+          bonusDamage += Math.round(stats.attack * setEff.sixDmgBonus);
+        }
+        if (setEff.extraHit && action.hits > 0) {
+          bonusDamage += Math.round(action.enemyDamage / action.hits);
+          setLogs.push("処刑人セット: 追撃！");
+        }
+        if (setEff.sixDouble && v === 6) {
+          bonusDamage += action.enemyDamage;
+          bonusHeal += action.heal;
+          setLogs.push("賭博師セット: 6が2回発動！");
+        }
+      }
+      let totalEnemyDamage = action.enemyDamage + bonusDamage;
+      const attackHp = enemy.hp - totalEnemyDamage;
+      if (setEff.lifestealAllPct > 0 && totalEnemyDamage > 0) {
+        bonusHeal += Math.round(totalEnemyDamage * setEff.lifestealAllPct);
+      }
+      if (setEff.lifestealHighFacePct > 0 && v >= 4 && totalEnemyDamage > 0) {
+        bonusHeal += Math.round(totalEnemyDamage * setEff.lifestealHighFacePct);
+      }
+      // Executioner 6pc: execute non-boss enemies at ≤15% HP.
+      if (
+        setEff.executePct > 0 &&
+        !enemy.isBoss &&
+        attackHp > 0 &&
+        enemy.hp <= enemy.maxHp * setEff.executePct
+      ) {
+        totalEnemyDamage = enemy.hp;
+        setLogs.push("処刑人セット: 処刑！ (即死)");
+      }
+      if (bonusHeal > 0) setLogs.push(`セット効果で ${bonusHeal} 回復`);
+
+      let enemyHp = enemy.hp - totalEnemyDamage;
+      let playerHp = state.player.hp - action.selfDamage + action.heal + bonusHeal;
       playerHp = Math.min(stats.maxHp, playerHp);
 
       let log = pushLogs(
         state.battleLog,
-        action.logs.map((text) => ({ text, tone: "good" as const })),
+        [...action.logs, ...setLogs].map((text) => ({ text, tone: "good" as const })),
       );
 
       // 1) Enemy defeated by the player's attack?
@@ -767,7 +852,7 @@ export const useGameStore = create<GameState>((set, get) => {
         equipped,
         inventory,
         player,
-        diceFaces: applyEquipmentModifiers([equipped.weapon, equipped.armor, equipped.accessory]),
+        diceFaces: buildFaces(equipped, state.classId),
       });
       persist();
     },
@@ -784,7 +869,7 @@ export const useGameStore = create<GameState>((set, get) => {
         equipped,
         inventory,
         player,
-        diceFaces: applyEquipmentModifiers([equipped.weapon, equipped.armor, equipped.accessory]),
+        diceFaces: buildFaces(equipped, state.classId),
       });
       persist();
     },
@@ -843,6 +928,56 @@ export const useGameStore = create<GameState>((set, get) => {
 
     clearWorldClear: () => set({ worldCleared: null }),
 
+    newGamePlus: () => {
+      const state = get();
+      const starter = getItemById("rusty_sword");
+      const equipped: EquippedItems = { ...emptyEquipped(), weapon: starter };
+      // 強くてニューゲーム: lose level/gear/gold, keep souls & artifacts, gain the
+      // ending title and the one-and-only 神機マキナ.
+      set({
+        player: createPlayer(),
+        equipped,
+        inventory: [makeMakina()],
+        currentFloor: 1,
+        currentEnemy: null,
+        battleState: "idle",
+        battleLog: [],
+        lastResult: null,
+        activeBuffs: [],
+        gachaPoints: 0,
+        lastPull: null,
+        classId: DEFAULT_CLASS_ID,
+        winStreak: 0,
+        checkpoint: 1,
+        startFloorPref: 1,
+        worldCleared: null,
+        pendingEnding: false,
+        endlessMessage: null,
+        titleId: ENDING_TITLE_ID,
+        progress: {
+          ...state.progress,
+          endingSeen: true,
+          ngPlus: state.progress.ngPlus + 1,
+          makinaGranted: true,
+          rebirths: state.progress.rebirths + 1,
+        },
+        diceFaces: buildFaces(equipped, DEFAULT_CLASS_ID),
+      });
+      persist();
+    },
+
+    declineEnding: () => {
+      const state = get();
+      set({
+        pendingEnding: false,
+        progress: { ...state.progress, endingSeen: true },
+      });
+      persist();
+      get().enterCurrentFloor();
+    },
+
+    clearEndlessMessage: () => set({ endlessMessage: null }),
+
     exportSaveData: () => exportSave(),
 
     importSaveData: (code: string) => {
@@ -857,8 +992,8 @@ export const useGameStore = create<GameState>((set, get) => {
       const state = get();
       const item = state.inventory[itemIndex];
       if (!item) return;
-      // Favorited items are locked from scrapping.
-      if (state.favorites.includes(itemKey(item))) return;
+      // Locked items and the unique 神機マキナ can't be scrapped.
+      if (item.noSell || state.favorites.includes(itemKey(item))) return;
       const gain = SCRAP_VALUE[item.rarity];
       set({
         inventory: state.inventory.filter((_, i) => i !== itemIndex),
@@ -873,7 +1008,7 @@ export const useGameStore = create<GameState>((set, get) => {
       let gain = 0;
       const kept: Equipment[] = [];
       for (const item of state.inventory) {
-        const locked = state.favorites.includes(itemKey(item));
+        const locked = item.noSell || state.favorites.includes(itemKey(item));
         if (!locked && rarityRank[item.rarity] <= threshold) {
           gain += SCRAP_VALUE[item.rarity];
         } else {
@@ -892,7 +1027,7 @@ export const useGameStore = create<GameState>((set, get) => {
       let gold = 0;
       const kept: Equipment[] = [];
       for (const item of state.inventory) {
-        const locked = state.favorites.includes(itemKey(item));
+        const locked = item.noSell || state.favorites.includes(itemKey(item));
         if (item.rarity === "legendary" && !locked) {
           gold += SELL_GOLD;
         } else {
@@ -920,7 +1055,8 @@ export const useGameStore = create<GameState>((set, get) => {
     pullPremium: () => {
       const state = get();
       if (state.gachaPoints < PREMIUM_COST) return;
-      const pulled = pullPremiumItem();
+      // ★ modifier is capped by the deepest floor reached — no future-tier gear.
+      const pulled = pullPremiumItem(modTierForFloor(state.progress.highestFloorReached));
       set({
         gachaPoints: state.gachaPoints - PREMIUM_COST,
         inventory: [...state.inventory, pulled],
@@ -1006,7 +1142,7 @@ export const useGameStore = create<GameState>((set, get) => {
           rebirths: state.progress.rebirths + 1,
           maxFloor: Math.max(state.progress.maxFloor, state.currentFloor),
         },
-        diceFaces: applyEquipmentModifiers([equipped.weapon, equipped.armor, equipped.accessory]),
+        diceFaces: buildFaces(equipped, DEFAULT_CLASS_ID),
       });
       persist();
     },
@@ -1030,12 +1166,7 @@ export const useGameStore = create<GameState>((set, get) => {
         }
       }
 
-      const diceFaces = applyEquipmentModifiers([
-        { name: cls.name, diceModifiers: cls.diceModifiers },
-        equipped.weapon,
-        equipped.armor,
-        equipped.accessory,
-      ]);
+      const diceFaces = buildFaces(equipped, id);
       // Re-clamp hp to the new class's max (don't auto-heal).
       const stats = computeStats(state.player, equipped, state.activeBuffs, {
         attack: artifactBonus(state.artifacts).attack + cls.statMods.attack,
@@ -1186,6 +1317,32 @@ export const useGameStore = create<GameState>((set, get) => {
       }
     }
 
+    // ===== Ending / Endless Abyss narrative =====
+    let endingPending = false;
+    let endlessMessage: string | null = null;
+    let makinaGranted = state.progress.makinaGranted;
+    let claimedEndlessMessages = state.progress.claimedEndlessMessages;
+    let invWithGrants = inventory;
+
+    // 1000F: DEUS EX MACHINA defeated → trigger the one-time, unskippable ending.
+    if (state.currentFloor === FINAL_FLOOR && !state.progress.endingSeen) {
+      endingPending = true;
+    }
+    // Endless story lines (NO route), shown once when first crossing each floor.
+    if (newHighest > prevHighest) {
+      for (const m of ENDLESS_MESSAGES) {
+        if (m.floor <= prevHighest || m.floor > newHighest) continue;
+        if (claimedEndlessMessages.includes(m.floor)) continue;
+        endlessMessage = m.text;
+        claimedEndlessMessages = [...claimedEndlessMessages, m.floor];
+        if (m.floor === MAKINA_FLOOR && !makinaGranted) {
+          invWithGrants = [...invWithGrants, makeMakina()];
+          makinaGranted = true;
+          finalLog = pushLogs(finalLog, [{ text: "神機マキナ を授かった。", tone: "good" }]);
+        }
+      }
+    }
+
     const progress: Progress = {
       ...state.progress,
       kills: state.progress.kills + 1,
@@ -1197,14 +1354,20 @@ export const useGameStore = create<GameState>((set, get) => {
       highestFloorReached: newHighest,
       claimedMilestones,
       claimedFloorAchievements,
+      makinaGranted,
+      claimedEndlessMessages,
     };
 
-    // World-clear overlay when a 100th-floor world boss falls (#3).
-    const worldCleared = isWorldBossFloor(state.currentFloor) ? state.currentFloor : null;
+    // World-clear overlay when a 100th-floor world boss falls — except the 1000F
+    // boss, where the ending takes over instead (#3).
+    const worldCleared =
+      isWorldBossFloor(state.currentFloor) && state.currentFloor !== FINAL_FLOOR
+        ? state.currentFloor
+        : null;
 
     return {
       player: leveledPlayer,
-      inventory,
+      inventory: invWithGrants,
       currentEnemy: enemy,
       currentFloor: newFloor,
       battleState: "won",
@@ -1217,6 +1380,8 @@ export const useGameStore = create<GameState>((set, get) => {
       souls,
       gachaPoints: state.gachaPoints + bonusGacha,
       worldCleared,
+      pendingEnding: endingPending,
+      endlessMessage,
     };
   }
 

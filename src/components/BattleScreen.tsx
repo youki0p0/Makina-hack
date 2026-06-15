@@ -12,6 +12,7 @@ import SoundToggle from "@/components/SoundToggle";
 import { sfx } from "@/lib/audio";
 import { rarityStyle } from "@/lib/ui";
 import { getWorld, FINAL_FLOOR } from "@/data/worlds";
+import { ENDING_STAFF_ROLL, ENDING_PROMPT, NG_PLUS_SEQUENCE } from "@/data/lore";
 import { useGameStore } from "@/store/gameStore";
 
 export default function BattleScreen() {
@@ -20,6 +21,8 @@ export default function BattleScreen() {
   const diceValue = useGameStore((s) => s.diceValue);
   const currentFloor = useGameStore((s) => s.currentFloor);
   const worldCleared = useGameStore((s) => s.worldCleared);
+  const pendingEnding = useGameStore((s) => s.pendingEnding);
+  const endlessMessage = useGameStore((s) => s.endlessMessage);
   const enterCurrentFloor = useGameStore((s) => s.enterCurrentFloor);
   const confirm = useGameStore((s) => s.confirm);
   const [auto, setAuto] = useState(false);
@@ -42,6 +45,8 @@ export default function BattleScreen() {
       return () => clearTimeout(t);
     }
     if (battleState === "won") {
+      // Pause auto-advance while a narrative/world overlay is up.
+      if (pendingEnding || endlessMessage || worldCleared !== null) return;
       const t = setTimeout(() => enterCurrentFloor(), 750);
       return () => clearTimeout(t);
     }
@@ -120,10 +125,94 @@ export default function BattleScreen() {
         <ActionButtons />
       </div>
 
-      {worldCleared !== null && <WorldClearOverlay floor={worldCleared} />}
-      {worldCleared === null && (battleState === "won" || battleState === "lost") && (
+      {pendingEnding ? (
+        <EndingOverlay />
+      ) : endlessMessage ? (
+        <EndlessMessageOverlay text={endlessMessage} />
+      ) : worldCleared !== null ? (
+        <WorldClearOverlay floor={worldCleared} />
+      ) : battleState === "won" || battleState === "lost" ? (
         <ResultOverlay />
-      )}
+      ) : null}
+    </div>
+  );
+}
+
+/** The unskippable 1000F ending: staff roll → YES/NO → (YES) 強くてニューゲーム. */
+function EndingOverlay() {
+  const newGamePlus = useGameStore((s) => s.newGamePlus);
+  const declineEnding = useGameStore((s) => s.declineEnding);
+  const [step, setStep] = useState<"roll" | "ngplus">("roll");
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black p-6 text-center">
+      <div className="w-full max-w-sm">
+        {step === "roll" ? (
+          <>
+            <div className="space-y-1 text-sm leading-relaxed text-white">
+              {ENDING_STAFF_ROLL.map((line, i) => (
+                <p key={i} className={line === "" ? "h-3" : ""}>
+                  {line}
+                </p>
+              ))}
+            </div>
+            <div className="mt-6 flex flex-col gap-2">
+              <button
+                onClick={() => setStep("ngplus")}
+                className="h-14 rounded-2xl border border-white/40 bg-white/5 text-lg font-bold text-white active:scale-95"
+              >
+                ▶ {ENDING_PROMPT.yes}
+              </button>
+              <button
+                onClick={declineEnding}
+                className="h-12 rounded-2xl border border-white/15 text-sm font-bold text-gray-300 active:scale-95"
+              >
+                {ENDING_PROMPT.no}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-1 text-sm leading-relaxed text-white">
+              {NG_PLUS_SEQUENCE.map((line, i) => (
+                <p key={i} className={line === "" ? "h-3" : ""}>
+                  {line}
+                </p>
+              ))}
+            </div>
+            <button
+              onClick={newGamePlus}
+              className="mt-6 h-14 w-full rounded-2xl border border-white/40 bg-white/5 text-lg font-bold text-white active:scale-95"
+            >
+              再起動する
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A single Endless-Abyss story line (NO route), shown once. */
+function EndlessMessageOverlay({ text }: { text: string }) {
+  const clearEndlessMessage = useGameStore((s) => s.clearEndlessMessage);
+  const enterCurrentFloor = useGameStore((s) => s.enterCurrentFloor);
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/95 p-6 text-center">
+      <div className="w-full max-w-sm">
+        <div className="space-y-1 whitespace-pre-line text-sm leading-relaxed text-gray-100">
+          {text}
+        </div>
+        <button
+          onClick={() => {
+            clearEndlessMessage();
+            enterCurrentFloor();
+          }}
+          className="mt-8 h-12 w-full rounded-2xl border border-white/20 text-sm font-bold text-gray-200 active:scale-95"
+        >
+          ……続ける
+        </button>
+      </div>
     </div>
   );
 }
