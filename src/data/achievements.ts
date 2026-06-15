@@ -25,6 +25,8 @@ export function defaultProgress(): Progress {
     ngPlus: 0,
     makinaGranted: false,
     claimedEndlessMessages: [],
+    rankPoints: 0,
+    playSeconds: 0,
   };
 }
 
@@ -53,6 +55,8 @@ export function normalizeProgress(p?: Partial<Progress>): Progress {
     claimedEndlessMessages: Array.isArray(p.claimedEndlessMessages)
       ? [...p.claimedEndlessMessages]
       : [],
+    rankPoints: typeof p.rankPoints === "number" ? p.rankPoints : 0,
+    playSeconds: typeof p.playSeconds === "number" ? p.playSeconds : 0,
   };
 }
 

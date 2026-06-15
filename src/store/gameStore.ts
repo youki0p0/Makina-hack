@@ -29,6 +29,7 @@ import {
 } from "@/data/milestones";
 import { isWorldBossFloor, FINAL_FLOOR } from "@/data/worlds";
 import { ENDLESS_MESSAGES, MAKINA_FLOOR, ENDING_TITLE_ID } from "@/data/lore";
+import type { RankingEntry } from "@/lib/ranking";
 import {
   addStatus,
   applyExp,
@@ -244,6 +245,13 @@ interface GameState {
   declineEnding: () => void;
   /** Dismiss the current Endless-Abyss story line. */
   clearEndlessMessage: () => void;
+  /** Snapshot the current progress as a ranking entry (for submission). */
+  currentRankingEntry: (playerName: string) => RankingEntry;
+  /** Apply Echo Battle rewards (gold / material / rank points + optional drop). */
+  grantEchoRewards: (
+    r: { gold: number; gachaPoints: number; rankPoints: number },
+    item?: Equipment | null,
+  ) => void;
   exportSaveData: () => string;
   importSaveData: (code: string) => boolean;
 
@@ -993,6 +1001,42 @@ export const useGameStore = create<GameState>((set, get) => {
 
     clearEndlessMessage: () => set({ endlessMessage: null }),
 
+    currentRankingEntry: (playerName: string) => {
+      const s = get();
+      const score = EQUIP_SLOTS.reduce((sum, slot) => {
+        const it = s.equipped[slot];
+        return it
+          ? sum + it.attack * 2 + it.defense * 1.5 + it.maxHp * 0.3 + it.rerollModifier * 20 + (it.modTier ?? 0) * 10
+          : sum;
+      }, 0);
+      const hi = s.progress.highestFloorReached;
+      return {
+        playerName,
+        highestFloorReached: hi,
+        cleared1000: hi >= FINAL_FLOOR || s.progress.endingSeen,
+        endlessAbyssFloor: hi > FINAL_FLOOR ? hi - FINAL_FLOOR : 0,
+        job: s.classId,
+        difficulty: s.difficulty,
+        title: s.titleId,
+        hasShinkiMakina: s.progress.makinaGranted,
+        equippedWeaponName: s.equipped.weapon?.name ?? "",
+        equipmentScore: Math.round(score),
+        totalPlayTime: s.progress.playSeconds,
+        updatedAt: new Date().toISOString(),
+      };
+    },
+
+    grantEchoRewards: (r, item) => {
+      const s = get();
+      set({
+        player: { ...s.player, gold: s.player.gold + r.gold },
+        gachaPoints: s.gachaPoints + r.gachaPoints,
+        inventory: item ? [...s.inventory, item] : s.inventory,
+        progress: { ...s.progress, rankPoints: s.progress.rankPoints + r.rankPoints },
+      });
+      persist();
+    },
+
     exportSaveData: () => exportSave(),
 
     importSaveData: (code: string) => {
@@ -1375,6 +1419,7 @@ export const useGameStore = create<GameState>((set, get) => {
       claimedFloorAchievements,
       makinaGranted,
       claimedEndlessMessages,
+      playSeconds: state.progress.playSeconds + 8,
     };
 
     // World-clear overlay when a 100th-floor world boss falls — except the 1000F

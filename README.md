@@ -58,6 +58,7 @@ Next.js (App Router) + TypeScript + Tailwind CSS + Zustand + localStorage。Verc
 - **神機マキナ** — 世界に一本だけの唯一武器。全出目を通常攻撃にする。→ [docs/lore.md](docs/lore.md)
 - **図鑑 / 装備比較 / ロック / レジェンド一括売却** — 収集率表示、装備中との差分、ロック保護。
 - **手続き生成ピクセルアイコン** — 装備・敵・ボスのアイコンを画像なしでコード生成。→ [docs/icons.md](docs/icons.md)
+- **ランキング / 残響戦** — 深層到達者ログと、記録から生成したゴーストとのEcho Battle（Supabase任意・未設定でも動作）。→ [docs/online.md](docs/online.md)
 
 ---
 

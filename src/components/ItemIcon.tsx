@@ -13,6 +13,7 @@ export function iconSpecForItem(item: Equipment): IconSpec {
     setId: item.setId,
     unique: item.unique,
     quality: item.quality,
+    echo: item.echo,
     // Same item id ⇒ same icon; affix nudges variation slightly.
     seed: hashSeed(`${item.id}:${item.affixId ?? ""}`),
   };

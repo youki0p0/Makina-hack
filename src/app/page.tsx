@@ -129,6 +129,21 @@ export default function TitlePage() {
             </div>
           )}
 
+          <div className="flex gap-2">
+            <Link
+              href="/ranking"
+              className="h-12 flex-1 rounded-2xl bg-emerald-700/70 pt-3 text-center font-bold active:scale-95"
+            >
+              📡 ランキング
+            </Link>
+            <Link
+              href="/echo"
+              className="h-12 flex-1 rounded-2xl bg-fuchsia-700/70 pt-3 text-center font-bold active:scale-95"
+            >
+              👤 残響戦
+            </Link>
+          </div>
+
           <Link
             href="/collection"
             className="h-12 rounded-2xl bg-white/10 pt-3 font-bold active:scale-95"

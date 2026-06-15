@@ -14,6 +14,8 @@ export interface IconSpec {
   setId?: string;
   unique?: boolean;
   quality?: Quality;
+  /** Echo-drop gear gets a faint ghostly outline. */
+  echo?: boolean;
   seed: number;
 }
 
@@ -289,6 +291,10 @@ function buildGrid(spec: IconSpec): Grid {
   }
 
   drawStars(g, spec.modifierStars, p, fam);
+  if (spec.echo) {
+    // ghostly corners
+    for (const [x, y] of [[0, 0], [15, 0], [0, 15], [15, 15], [0, 8], [15, 8]] as const) set(g, x, y, "#c4b5fd");
+  }
   return g;
 }
 
@@ -415,7 +421,7 @@ export function getEnemyIconDataUrl(spec: EnemyIconSpec): string {
 }
 
 function cacheKey(s: IconSpec): string {
-  return [s.slot, s.rarity, s.modifierStars, s.setId ?? "", s.unique ? "u" : "", s.quality ?? "", s.seed].join("|");
+  return [s.slot, s.rarity, s.modifierStars, s.setId ?? "", s.unique ? "u" : "", s.quality ?? "", s.echo ? "e" : "", s.seed].join("|");
 }
 
 /**
