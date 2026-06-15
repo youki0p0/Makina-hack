@@ -362,4 +362,6 @@ export interface SaveData {
   handedness?: string;
   /** Highest reached 50-floor checkpoint; defeat restarts here (default 1). */
   checkpoint?: number;
+  /** Shop: buy by tapping the whole item row (one-tap purchase). */
+  tapToBuy?: boolean;
 }

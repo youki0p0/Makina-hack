@@ -155,6 +155,8 @@ interface GameState {
   handedness: "right" | "left";
   /** Highest reached 50-floor checkpoint; defeat restarts here. */
   checkpoint: number;
+  /** Shop one-tap purchase (buy by tapping the item row). */
+  tapToBuy: boolean;
   /** Items for sale at the current shop floor (not persisted). */
   shopStock: ShopEntry[];
 
@@ -191,6 +193,7 @@ interface GameState {
   setTitle: (id: string) => void;
   setDifficulty: (id: Difficulty) => void;
   setHandedness: (h: "right" | "left") => void;
+  setTapToBuy: (v: boolean) => void;
   exportSaveData: () => string;
   importSaveData: (code: string) => boolean;
 
@@ -236,6 +239,7 @@ export const useGameStore = create<GameState>((set, get) => {
       difficulty: s.difficulty,
       handedness: s.handedness,
       checkpoint: s.checkpoint,
+      tapToBuy: s.tapToBuy,
     });
   }
 
@@ -315,6 +319,7 @@ export const useGameStore = create<GameState>((set, get) => {
       difficulty: normalizeDifficulty(loaded.difficulty),
       handedness: loaded.handedness,
       checkpoint: loaded.checkpoint,
+      tapToBuy: loaded.tapToBuy,
       hydrated: true,
       currentEnemy: null,
       battleState: "idle",
@@ -355,6 +360,7 @@ export const useGameStore = create<GameState>((set, get) => {
     difficulty: "normal",
     handedness: "right",
     checkpoint: 1,
+    tapToBuy: false,
     shopStock: [],
 
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
@@ -410,6 +416,7 @@ export const useGameStore = create<GameState>((set, get) => {
         difficulty: get().difficulty,
         handedness: get().handedness,
         checkpoint: 1,
+        tapToBuy: get().tapToBuy,
         hydrated: true,
       });
       set({ diceFaces: refreshFaces() });
@@ -783,6 +790,11 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
+    setTapToBuy: (v: boolean) => {
+      set({ tapToBuy: v });
+      persist();
+    },
+
     exportSaveData: () => exportSave(),
 
     importSaveData: (code: string) => {
@@ -1152,6 +1164,7 @@ export const useGameStore = create<GameState>((set, get) => {
       difficulty: snap.difficulty ?? s.difficulty,
       handedness: snap.handedness ?? s.handedness,
       checkpoint: snap.checkpoint ?? s.checkpoint,
+      tapToBuy: snap.tapToBuy ?? s.tapToBuy,
     });
   }
 });

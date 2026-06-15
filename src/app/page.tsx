@@ -26,6 +26,8 @@ export default function TitlePage() {
   const setDifficulty = useGameStore((s) => s.setDifficulty);
   const handedness = useGameStore((s) => s.handedness);
   const setHandedness = useGameStore((s) => s.setHandedness);
+  const tapToBuy = useGameStore((s) => s.tapToBuy);
+  const setTapToBuy = useGameStore((s) => s.setTapToBuy);
   const daily = getDailyBonus();
 
   const hasProgress = hydrated && (floor > 1 || player.level > 1);
@@ -149,6 +151,26 @@ export default function TitlePage() {
                   onClick={() => setHandedness(h)}
                   className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 ${
                     handedness === h ? "bg-sky-600 text-white" : "bg-white/10 text-gray-300"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] text-gray-500">ショップ購入</p>
+            <div className="mt-1 flex gap-1">
+              {([
+                [false, "ボタンで購入"],
+                [true, "タップで購入"],
+              ] as const).map(([v, label]) => (
+                <button
+                  key={String(v)}
+                  onClick={() => setTapToBuy(v)}
+                  className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 ${
+                    tapToBuy === v ? "bg-emerald-600 text-white" : "bg-white/10 text-gray-300"
                   }`}
                 >
                   {label}

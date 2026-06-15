@@ -38,6 +38,7 @@ export interface LoadedState {
   difficulty: string;
   handedness: "right" | "left";
   checkpoint: number;
+  tapToBuy: boolean;
 }
 
 export function saveGame(state: LoadedState): void {
@@ -63,6 +64,7 @@ export function saveGame(state: LoadedState): void {
     difficulty: state.difficulty,
     handedness: state.handedness,
     checkpoint: state.checkpoint,
+    tapToBuy: state.tapToBuy,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -113,6 +115,7 @@ export function loadGame(): LoadedState | null {
       difficulty: data.difficulty ?? "normal",
       handedness: data.handedness === "left" ? "left" : "right",
       checkpoint: typeof data.checkpoint === "number" && data.checkpoint >= 1 ? data.checkpoint : 1,
+      tapToBuy: data.tapToBuy === true,
     };
   } catch {
     return null;
