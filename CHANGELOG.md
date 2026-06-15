@@ -2,6 +2,17 @@
 
 All notable changes to Dice Ex Machina.
 
+## [Unreleased] — オンライン要素（ランキング / 残響戦）
+
+- **ランキング `/ranking`**（深層到達者ログ）: 総合/ジョブ別/難易度別/Endless/神機マキナのフィルタ。
+  記録送信は異常値を弾く（floor<1・>999999 は不可、スコアは丸め）。個人情報は送らず名前は任意(Guest)。
+- **残響戦 `/echo`**（Echo Battle）: ランキング記録からゴースト敵を生成しCPU戦。報酬は素材/ゴールド/
+  ランキングポイント/低確率の「残響装備」。入口はタイトル。リアルタイムPvPなし。
+- **Supabase 任意接続**: 接続情報は env のみ（`NEXT_PUBLIC_SUPABASE_URL`/`..._ANON_KEY`）。
+  未設定/接続失敗時は `localRankingRepository`（localStorage＋ダミー）へ自動フォールバックし落ちない。
+- `@supabase/supabase-js` を追加。`Progress` に `rankPoints`/`playSeconds`、`Equipment.echo` を追加。
+- `docs/online.md`・`.env.example` を追加。README/TODO 更新。test 89件グリーン／build 成功。
+
 ## [Unreleased] — ビルドの深み（ユニーク武器＋セット×職業シナジー）
 
 - **ビルド定義ユニークを7種追加**（ドロップ可）: 狂戦の大剣／運命の片刃／死神の大鎌／疫病の香炉／

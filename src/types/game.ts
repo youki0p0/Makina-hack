@@ -153,6 +153,8 @@ export interface Equipment {
   noSell?: boolean;
   /** ★ modifiers never apply to this item. */
   noModifier?: boolean;
+  /** Dropped from an Echo Battle (slightly distinct icon, not stronger). */
+  echo?: boolean;
 }
 
 export type EquippedItems = {
@@ -359,6 +361,10 @@ export interface Progress {
   makinaGranted: boolean;
   /** Endless-Abyss story floors already shown (1050/1100/…/1250). */
   claimedEndlessMessages: number[];
+  /** Ranking points earned from Echo Battles. */
+  rankPoints: number;
+  /** Rough accumulated play time in seconds (incremented per battle). */
+  playSeconds: number;
 }
 
 // ===== Persistence =====
