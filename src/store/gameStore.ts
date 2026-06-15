@@ -194,6 +194,8 @@ interface GameState {
   setDifficulty: (id: Difficulty) => void;
   setHandedness: (h: "right" | "left") => void;
   setTapToBuy: (v: boolean) => void;
+  /** Choose which floor to (re)start a run from: 1 or a reached checkpoint. */
+  setStartFloor: (floor: number) => void;
   exportSaveData: () => string;
   importSaveData: (code: string) => boolean;
 
@@ -792,6 +794,20 @@ export const useGameStore = create<GameState>((set, get) => {
 
     setTapToBuy: (v: boolean) => {
       set({ tapToBuy: v });
+      persist();
+    },
+
+    setStartFloor: (floor: number) => {
+      const state = get();
+      // Only floor 1 or a 50-mark checkpoint already reached is allowed.
+      const allowed = floor === 1 || (floor % 50 === 0 && floor <= state.checkpoint);
+      if (!allowed) return;
+      set({
+        currentFloor: floor,
+        battleState: "idle",
+        currentEnemy: null,
+        lastResult: null,
+      });
       persist();
     },
 
