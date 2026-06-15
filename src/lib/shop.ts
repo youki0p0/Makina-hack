@@ -1,6 +1,6 @@
 import { rollAffixedCopy } from "@/data/affixes";
 import { CONSUMABLES } from "@/data/consumables";
-import { ITEMS } from "@/data/items";
+import { ITEMS, rollGenDrop } from "@/data/items";
 import type { Consumable, Equipment, Rarity } from "@/types/game";
 
 export interface ShopEntry {
@@ -34,8 +34,8 @@ export function isShopFloor(floor: number): boolean {
   return floor % 4 === 0 && floor % 10 !== 0;
 }
 
-// Shop never sells gacha- or casino-exclusive gear.
-const SHOP_POOL = ITEMS.filter((i) => !i.gachaOnly && !i.casinoOnly);
+// Shop never sells gacha- or casino-exclusive gear (curated, floor-gated).
+const SHOP_CURATED = ITEMS.filter((i) => !i.gachaOnly && !i.casinoOnly && !i.unique);
 
 function pickRandom<T>(arr: readonly T[], count: number): T[] {
   const pool = [...arr];
@@ -47,19 +47,25 @@ function pickRandom<T>(arr: readonly T[], count: number): T[] {
   return out;
 }
 
+/** One shop equipment: ~50% a curated (effect/set) item, else procedural gear. */
+function pickShopEquipment(floor: number): Equipment {
+  const curated = SHOP_CURATED.filter((i) => (i.minFloor ?? 1) <= floor);
+  if (curated.length > 0 && Math.random() < 0.5) {
+    return rollAffixedCopy({ ...pickRandom(curated, 1)[0] });
+  }
+  return rollAffixedCopy(rollGenDrop(floor));
+}
+
 /** Build a fresh shop stock for the given floor: 3 equipment + 2 consumables. */
 export function generateShopStock(floor: number): ShopEntry[] {
-  // Only sell gear unlocked by the current floor.
-  let pool = SHOP_POOL.filter((i) => (i.minFloor ?? 1) <= floor);
-  if (pool.length === 0) pool = SHOP_POOL;
-  const equipment = pickRandom(pool, 3).map((item, i) => {
-    const rolled = rollAffixedCopy({ ...item });
+  const equipment = Array.from({ length: 3 }, (_, i) => {
+    const rolled = pickShopEquipment(floor);
     return {
-      key: `eq-${i}-${item.id}`,
+      key: `eq-${i}-${rolled.id}`,
       kind: "equipment" as const,
       equipment: rolled,
       // Affixed items cost a bit more.
-      price: EQUIP_PRICE[item.rarity] + floor * 3 + (rolled.affixId ? 20 : 0),
+      price: EQUIP_PRICE[rolled.rarity] + floor * 3 + (rolled.affixId ? 20 : 0),
       sold: false,
     };
   });

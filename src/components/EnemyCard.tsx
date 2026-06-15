@@ -1,6 +1,7 @@
 "use client";
 
 import { ENEMY_ABILITY_LABEL } from "@/data/enemies";
+import EnemyIcon from "@/components/EnemyIcon";
 import { useDamageFx } from "@/hooks/useDamageFx";
 import { useGameStore } from "@/store/gameStore";
 import type { ActiveStatus, StatusKind } from "@/types/game";
@@ -58,12 +59,9 @@ export default function EnemyCard() {
         />
       </div>
 
-      {/* Emoji */}
-      <div
-        key={shake}
-        className={`self-center text-4xl leading-none ${shake ? "animate-shake" : ""}`}
-      >
-        {enemy.emoji}
+      {/* Procedurally-generated pixel-art portrait */}
+      <div key={shake} className={`self-center ${shake ? "animate-shake" : ""}`}>
+        <EnemyIcon enemy={enemy} size={56} />
       </div>
 
       {/* Name + HP/stats */}

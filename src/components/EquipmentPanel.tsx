@@ -1,7 +1,8 @@
 "use client";
 
 import { EQUIP_SLOTS } from "@/lib/battle";
-import { computeSetEffects, SET_BY_ID } from "@/data/sets";
+import { computeSetEffects, getSetDef } from "@/data/sets";
+import ItemIcon from "@/components/ItemIcon";
 import { rarityStyle, slotLabel } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 import type { EquippedItems } from "@/types/game";
@@ -20,12 +21,12 @@ export default function EquipmentPanel() {
           <p className="text-[10px] font-bold text-fuchsia-200">発動中のセット効果</p>
           <ul className="mt-1 space-y-1 text-[10px] text-fuchsia-100">
             {setEff.activeTiers.map((t) => {
-              const def = SET_BY_ID[t.id];
+              const def = getSetDef(t.key);
               return (
-                <li key={t.id}>
+                <li key={t.key}>
                   {t.icon} {t.name} ({t.pieces}部位)
                   <ul className="ml-3 text-gray-300">
-                    {def.bonuses
+                    {def?.bonuses
                       .filter((b) => t.pieces >= b.pieces)
                       .map((b) => (
                         <li key={b.pieces}>・{b.pieces}部位: {b.desc}</li>
@@ -47,15 +48,18 @@ export default function EquipmentPanel() {
                 item ? rarityStyle[item.rarity].border : "border-white/10"
               } ${item ? rarityStyle[item.rarity].bg : "bg-black/20"}`}
             >
-              <div className="min-w-0">
-                <span className="text-[10px] text-gray-400">{slotLabel[slot]}</span>
-                {item ? (
-                  <p className={`truncate font-bold ${rarityStyle[item.rarity].text}`}>
-                    {item.name}
-                  </p>
-                ) : (
-                  <p className="text-gray-500">なし</p>
-                )}
+              <div className="flex min-w-0 items-center gap-2">
+                {item && <ItemIcon item={item} size={48} />}
+                <div className="min-w-0">
+                  <span className="text-[10px] text-gray-400">{slotLabel[slot]}</span>
+                  {item ? (
+                    <p className={`truncate font-bold ${rarityStyle[item.rarity].text}`}>
+                      {item.name}
+                    </p>
+                  ) : (
+                    <p className="text-gray-500">なし</p>
+                  )}
+                </div>
               </div>
               {item && (
                 <button

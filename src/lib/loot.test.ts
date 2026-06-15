@@ -1,13 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { getAffixById } from "@/data/affixes";
-import { getItemById, getItemInstance, ITEMS } from "@/data/items";
+import {
+  genItem,
+  getItemById,
+  getItemInstance,
+  ITEMS,
+  parseGenId,
+  SLOT_LIST,
+} from "@/data/items";
 import { pullGachaItem, pullPremiumItem, pullTargetedItem, rollLoot, SCRAP_VALUE } from "@/lib/loot";
 import { generateShopStock } from "@/lib/shop";
 import { applyAffix, rollAffixedCopy } from "@/data/affixes";
 
-describe("item registry", () => {
-  it("has around 200 items", () => {
-    expect(ITEMS.length).toBeGreaterThanOrEqual(200);
+describe("item registry (curated) + procedural gear", () => {
+  it("keeps a small, finite curated registry of signature items", () => {
+    expect(ITEMS.length).toBeGreaterThanOrEqual(10);
+    // Curated gear is finite — it never grows with slots, sets, or floors.
+    expect(ITEMS.length).toBeLessThan(60);
+    expect(ITEMS.some((i) => i.diceModifiers.length > 0)).toBe(true);
+  });
+
+  it("generates plain gear procedurally for every slot, reconstructable by id", () => {
+    for (const slot of SLOT_LIST) {
+      const item = genItem(slot, 25);
+      expect(item.slot).toBe(slot);
+      const parsed = parseGenId(item.id)!;
+      expect(parsed.slot).toBe(slot);
+      expect(getItemById(item.id)?.attack).toBe(item.attack);
+    }
+  });
+
+  it("supports deep tiers without storing them", () => {
+    // No registry entry exists, yet a floor-1000-era item reconstructs fine.
+    const deep = genItem("weapon", 60);
+    expect(getItemById(deep.id)?.id).toBe(deep.id);
   });
 });
 

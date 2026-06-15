@@ -2,6 +2,47 @@
 
 All notable changes to Dice Ex Machina.
 
+## [Unreleased] — 手続き生成ピクセルアイコン（画像アセット不使用）
+
+- 装備・敵・ボスのアイコンを **16×16ドット絵のプログラム生成** に（`lib/itemIcon.ts`）。
+  png/jpg/webp 等の画像アセットは持たない。Nearest-Neighbor 拡大・base64キャッシュ・SSR安全。
+- `ItemIcon`（武器/防具/装飾の形状、レアリティ色、★装飾、Set紋章）と `EnemyIcon`
+  （クリーチャー形状、ボス王冠、★オーラ）コンポーネントを追加。
+- 神機マキナは専用ジェネレータ（歯車＋ダイス融合・黒金・虹色）。
+- インベントリ/装備/詳細/ドロップ/ガチャ結果/戦闘の敵/図鑑に組み込み。
+- `docs/icons.md` を追加。test 73件グリーン／build 成功。
+
+## [Unreleased] — アイテム/装備/セットの無限化
+
+- **装備ステの無限スケール**: 基底ティア上限(60)を撤廃。`genTierForFloor=floor` で深さに応じ
+  無限にスケール（★も併用）。深層素材名も `materialFor` で破綻せず生成。
+- **セットの効果プリミティブ化**: 名前付き4セットを `SetTierBonus` の合成で表現（`computeSetEffects`）。
+- **無限セット**: `proceduralSetDef(n)`（key `gset<n>`）が深層で新セット原型を無限生成。
+  `availableSetKeys(floor)`／`proceduralSetFloor`（150階ごと）で解禁。
+- **セット装備のティア化**: `genSetItem(key, slot, tier)`／id `setp_<key>_<slot>_<tier>` で無限スケール。
+  静的セット装備リストを廃止し、ドロップ専用に（`rollSetDrop`）。
+- `Equipment.setId` を string 化（手続きセットキー対応）。UIは `getSetDef` で解決。
+- 図鑑「セット」タブは名前付きセットを表示し、深層は手続き生成である旨を明記。
+- test 71件グリーン／build 成功。
+
+## [Unreleased] — 手続き生成への移行（エンティティ非増殖）
+
+6スロット化で「スロット×ティア」を静的に持つと装備数が倍々に増える問題を解消。
+
+### Changed
+- 通常ステ装備を **手続き生成**（`genItem(slot, tier)` / id `gen_<slot>_<tier>`）に移行。
+  `getItemById` がIDから再構築するため、静的な生成装備リスト（旧366件）を廃止。
+- `ITEMS` は **キュレーション装備（署名＋セット）のみ** の有限リストに。スロット数・階層が
+  増えても登録数は一定、floor 1000+ もティアを保存せず表現可能。
+- ドロップ/ガチャ/ショップを手続き生成に対応（限定・署名・セットはキュレーション側から混合）。
+- **スマートドロップ**: 手続きドロップを空き/弱いスロットへ寄せ、6スロットでも収集が
+  2倍にならないように（`gameStore` の `weakestSlot`）。
+- 図鑑の装備収集率は **署名＋セットのみ** を対象（素材装備は対象外）。
+
+### Tests
+- `loot.test` を手続き生成前提に更新。全 69 件グリーン。`npm run build` 成功。
+
+
 ## [Unreleased] — Major world progression & balance + Dice Ex Machina overhaul
 
 `feature/world-progression-major-update` ブランチ。デバッグ段階のため **saveVersion を 3 に更新し

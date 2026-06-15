@@ -11,6 +11,7 @@ import ShopScreen from "@/components/ShopScreen";
 import SoundToggle from "@/components/SoundToggle";
 import { sfx } from "@/lib/audio";
 import { rarityStyle } from "@/lib/ui";
+import ItemIcon from "@/components/ItemIcon";
 import { getWorld, FINAL_FLOOR } from "@/data/worlds";
 import { ENDING_STAFF_ROLL, ENDING_PROMPT, NG_PLUS_SEQUENCE } from "@/data/lore";
 import { useGameStore } from "@/store/gameStore";
@@ -313,12 +314,15 @@ function ResultOverlay() {
             {result.leveledUp && <p className="text-yellow-300">レベルアップ！</p>}
             {result.drop ? (
               <div
-                className={`mt-3 rounded-lg border p-2 ${rarityStyle[result.drop.rarity].border} ${rarityStyle[result.drop.rarity].bg}`}
+                className={`mt-3 flex items-center gap-2 rounded-lg border p-2 text-left ${rarityStyle[result.drop.rarity].border} ${rarityStyle[result.drop.rarity].bg}`}
               >
-                <p className={`font-bold ${rarityStyle[result.drop.rarity].text}`}>
-                  🎁 {result.drop.name}
-                </p>
-                <p className="mt-0.5 text-xs text-gray-300">{result.drop.description}</p>
+                <ItemIcon item={result.drop} size={48} />
+                <div className="min-w-0 flex-1">
+                  <p className={`font-bold ${rarityStyle[result.drop.rarity].text}`}>
+                    🎁 {result.drop.name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-300">{result.drop.description}</p>
+                </div>
               </div>
             ) : (
               <p className="text-xs text-gray-500">ドロップなし</p>
