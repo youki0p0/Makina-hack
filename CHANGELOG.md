@@ -2,6 +2,15 @@
 
 All notable changes to Dice Ex Machina.
 
+## [Unreleased] — ビルドの深み（ユニーク武器＋セット×職業シナジー）
+
+- **ビルド定義ユニークを7種追加**（ドロップ可）: 狂戦の大剣／運命の片刃／死神の大鎌／疫病の香炉／
+  雷霆の杖／運命のダイス／守護の盟約。ダイス表そのものを書き換える。
+- **セット×職業シナジー**（`SYNERGIES`）: 盗賊×賭博師・聖騎士×吸血鬼・魔法使い×神託・
+  狂戦士×処刑人・戦士×賭博師（各4部位）で追加効果。装備画面に「⚡ シナジー発動」表示。
+- `computeSetEffects(equipped, classId?)` に職業引数を追加。`SetEffects.synergies` を追加。
+- docs(items/set-items) 更新。test 76件グリーン／build 成功。
+
 ## [Unreleased] — 手続き生成ピクセルアイコン（画像アセット不使用）
 
 - 装備・敵・ボスのアイコンを **16×16ドット絵のプログラム生成** に（`lib/itemIcon.ts`）。

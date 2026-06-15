@@ -10,7 +10,8 @@ import type { EquippedItems } from "@/types/game";
 export default function EquipmentPanel() {
   const equipped = useGameStore((s) => s.equipped);
   const unequip = useGameStore((s) => s.unequipItem);
-  const setEff = computeSetEffects(equipped);
+  const classId = useGameStore((s) => s.classId);
+  const setEff = computeSetEffects(equipped, classId);
 
   return (
     <div className="space-y-2">
@@ -38,6 +39,20 @@ export default function EquipmentPanel() {
           </ul>
         </div>
       )}
+
+      {setEff.synergies.length > 0 && (
+        <div className="rounded-xl border border-amber-400/50 bg-amber-400/10 p-2">
+          <p className="text-[10px] font-bold text-amber-200">⚡ シナジー発動</p>
+          <ul className="mt-1 space-y-0.5 text-[10px] text-amber-100">
+            {setEff.synergies.map((s) => (
+              <li key={s.name}>
+                <span className="font-bold">{s.name}</span> — {s.desc}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="space-y-2">
         {EQUIP_SLOTS.map((slot) => {
           const item = equipped[slot as keyof EquippedItems];

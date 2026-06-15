@@ -310,7 +310,7 @@ export const useGameStore = create<GameState>((set, get) => {
   /** Build the dice table from class + all equipped slots + set bonuses. */
   function buildFaces(equipped: EquippedItems, classId: ClassId): DiceFace[] {
     const cls = getClass(classId);
-    const setEff = computeSetEffects(equipped);
+    const setEff = computeSetEffects(equipped, classId);
     // Class first, then equipment (so gear overrides), then set rewrites last.
     return applyEquipmentModifiers([
       { name: cls.name, diceModifiers: cls.diceModifiers },
@@ -327,7 +327,7 @@ export const useGameStore = create<GameState>((set, get) => {
   function rollWithLuck(): DiceValue {
     const min = luckFloor(get().activeBuffs);
     let r = Math.max(rollDice(), min);
-    if (computeSetEffects(get().equipped).rollTwoDice) {
+    if (computeSetEffects(get().equipped, get().classId).rollTwoDice) {
       r = Math.max(r, Math.max(rollDice(), min));
     }
     return r as DiceValue;
@@ -337,7 +337,7 @@ export const useGameStore = create<GameState>((set, get) => {
   function passiveBonus(): StatBonus {
     const a = artifactBonus(get().artifacts);
     const c = classStatBonus(get().classId);
-    const set = computeSetEffects(get().equipped).statBonus;
+    const set = computeSetEffects(get().equipped, get().classId).statBonus;
     const daily = getDailyBonus();
     const d: StatBonus = {
       attack: daily.stat === "attack" ? daily.value : 0,
@@ -525,7 +525,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const { rerollsLeft, battleState } = state;
       if (battleState !== "player" || rerollsLeft <= 0) return;
       // Oracle 2pc: reroll heals a little.
-      const setEff = computeSetEffects(state.equipped);
+      const setEff = computeSetEffects(state.equipped, state.classId);
       let player = state.player;
       if (setEff.healOnReroll > 0) {
         const maxHp = currentStats(player, state.equipped, state.activeBuffs).maxHp;
@@ -550,7 +550,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const action = resolvePlayerAction(face, stats, enemy);
 
       // ===== Set-bonus combat effects =====
-      const setEff = computeSetEffects(state.equipped);
+      const setEff = computeSetEffects(state.equipped, state.classId);
       const v = state.diceValue;
       const setLogs: string[] = [];
       let bonusDamage = 0;
