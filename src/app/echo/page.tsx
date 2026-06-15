@@ -8,7 +8,13 @@ import ItemIcon from "@/components/ItemIcon";
 import { faceByValue } from "@/data/diceFaces";
 import { resolveEnemyTurn, resolvePlayerAction } from "@/lib/battle";
 import { rollDice } from "@/lib/dice";
-import { echoRewards, generateEcho, rollEchoEquipment } from "@/lib/echoBattle";
+import {
+  echoRewards,
+  generateEcho,
+  rollEchoEquipment,
+  TRIAL_GHOSTS,
+  TRIAL_REWARD_BONUS,
+} from "@/lib/echoBattle";
 import { loadRanking, rankingSource, type RankingEntry } from "@/lib/ranking";
 import { rarityStyle } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
@@ -18,7 +24,8 @@ export default function EchoPage() {
   const hydrate = useGameStore((s) => s.hydrate);
   const hydrated = useGameStore((s) => s.hydrated);
   const [entries, setEntries] = useState<RankingEntry[]>([]);
-  const [fighting, setFighting] = useState<RankingEntry | null>(null);
+  const [fighting, setFighting] = useState<{ entry: RankingEntry; bonus: number } | null>(null);
+  const [mode, setMode] = useState<"records" | "trial">("records");
 
   useEffect(() => {
     hydrate();
@@ -47,16 +54,59 @@ export default function EchoPage() {
       </div>
 
       {fighting ? (
-        <EchoFight entry={fighting} canPlay={hydrated} onExit={() => setFighting(null)} />
+        <EchoFight
+          entry={fighting.entry}
+          bonus={fighting.bonus}
+          canPlay={hydrated}
+          onExit={() => setFighting(null)}
+        />
       ) : (
-        <div className="space-y-2">
-          {entries.length === 0 && (
-            <p className="font-mono text-xs text-fuchsia-400/60">記録を読み込み中…</p>
+        <>
+          <div className="grid grid-cols-2 gap-1">
+            {([
+              ["records", "記録の残響"],
+              ["trial", "試し場 (Trial)"],
+            ] as ["records" | "trial", string][]).map(([m, label]) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`h-9 rounded-lg text-[11px] font-bold active:scale-95 ${
+                  mode === m ? "bg-fuchsia-600 text-white" : "bg-white/10 text-gray-300"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {mode === "records" ? (
+            <div className="space-y-2">
+              {entries.length === 0 && (
+                <p className="font-mono text-xs text-fuchsia-400/60">記録を読み込み中…</p>
+              )}
+              {entries.map((e, i) => (
+                <EchoBattleCard
+                  key={`${e.playerName}-${i}`}
+                  entry={e}
+                  onChallenge={() => setFighting({ entry: e, bonus: 1 })}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="font-mono text-[10px] text-fuchsia-400/70">
+                20段階の練習ゴースト。勝つとその強さより一回り大きい報酬（×{TRIAL_REWARD_BONUS}）。
+              </p>
+              {TRIAL_GHOSTS.map((e, i) => (
+                <EchoBattleCard
+                  key={`trial-${i}`}
+                  entry={e}
+                  onChallenge={() => setFighting({ entry: e, bonus: TRIAL_REWARD_BONUS })}
+                />
+              ))}
+            </div>
           )}
-          {entries.map((e, i) => (
-            <EchoBattleCard key={`${e.playerName}-${i}`} entry={e} onChallenge={() => setFighting(e)} />
-          ))}
-        </div>
+        </>
       )}
     </main>
   );
@@ -66,10 +116,12 @@ type Phase = "fight" | "won" | "lost";
 
 function EchoFight({
   entry,
+  bonus,
   canPlay,
   onExit,
 }: {
   entry: RankingEntry;
+  bonus: number;
   canPlay: boolean;
   onExit: () => void;
 }) {
@@ -134,7 +186,7 @@ function EchoFight({
   };
 
   const win = () => {
-    const r = echoRewards(entry);
+    const r = echoRewards(entry, bonus);
     const item = rollEchoEquipment(entry);
     useGameStore.getState().grantEchoRewards(r, item);
     setReward({ ...r, item });

@@ -2,6 +2,13 @@
 
 All notable changes to Dice Ex Machina.
 
+## [Unreleased] — 残響戦の試し場（20段ゴースト）
+
+- `/echo` に **試し場（Trial）** を追加。20段階の練習ゴースト（`TRIAL_GHOSTS`）で強さが段階的に上昇。
+- 勝利報酬はその強さより**一回り大きい**（`TRIAL_REWARD_BONUS = 1.3` 倍）。`echoRewards(entry, bonus)`。
+- 「記録の残響 / 試し場」タブで切替。ランキングデータ無しでもゴースト戦をテスト可能。
+- docs/online.md 更新。test 91件グリーン／build 成功。
+
 ## [Unreleased] — オンライン要素（ランキング / 残響戦）
 
 - **ランキング `/ranking`**（深層到達者ログ）: 総合/ジョブ別/難易度別/Endless/神機マキナのフィルタ。
