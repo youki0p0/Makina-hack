@@ -799,8 +799,10 @@ export const useGameStore = create<GameState>((set, get) => {
 
     setStartFloor: (floor: number) => {
       const state = get();
-      // Only floor 1 or a 50-mark checkpoint already reached is allowed.
-      const allowed = floor === 1 || (floor % 50 === 0 && floor <= state.checkpoint);
+      // Only floor 1, or one floor past a reached 50-mark checkpoint (51,101…).
+      const allowed =
+        floor === 1 ||
+        (floor > 1 && (floor - 1) % 50 === 0 && floor - 1 <= state.checkpoint);
       if (!allowed) return;
       set({
         currentFloor: floor,
@@ -1083,7 +1085,7 @@ export const useGameStore = create<GameState>((set, get) => {
     if (newFloor % 50 === 0 && newFloor > checkpoint) {
       checkpoint = newFloor;
       finalLog = pushLogs(finalLog, [
-        { text: `💾 セーブポイント到達！(${newFloor}階) 以降の敗北はここから再開`, tone: "good" },
+        { text: `💾 セーブポイント到達！(${newFloor}階クリア) 以降の敗北は${newFloor + 1}階から再開`, tone: "good" },
       ]);
     }
     const progress: Progress = {
@@ -1139,7 +1141,8 @@ export const useGameStore = create<GameState>((set, get) => {
       streakBonusPct: 0,
     };
 
-    const restart = state.checkpoint > 1 ? state.checkpoint : 1;
+    // Restart just AFTER the cleared checkpoint boss (e.g. 50 -> 51).
+    const restart = state.checkpoint > 1 ? state.checkpoint + 1 : 1;
     const finalLog = pushLogs(log, [
       { text: `力尽きた… ゴールド -${goldLost}`, tone: "bad" },
       {

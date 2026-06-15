@@ -32,9 +32,10 @@ export default function TitlePage() {
   const setStartFloor = useGameStore((s) => s.setStartFloor);
   const daily = getDailyBonus();
 
-  // Start-floor options: 1 and every reached 50-mark checkpoint.
+  // Start-floor options: 1, and the floor just past each reached 50-mark
+  // checkpoint (51, 101, …) so you resume after the cleared boss.
   const startFloors: number[] = [1];
-  for (let f = 50; f <= checkpoint; f += 50) startFloors.push(f);
+  for (let f = 50; f <= checkpoint; f += 50) startFloors.push(f + 1);
 
   const hasProgress = hydrated && (floor > 1 || player.level > 1);
   const artifactsUnlocked = isFeatureUnlocked("artifacts", progress);
@@ -80,7 +81,7 @@ export default function TitlePage() {
               >
                 {startFloors.map((f) => (
                   <option key={f} value={f}>
-                    {f === 1 ? "1階から（最初）" : `${f}階から（セーブポイント）`}
+                    {f === 1 ? "1階から（最初）" : `${f}階から（セーブポイント）`}{/* 51,101… */}
                   </option>
                 ))}
               </select>
