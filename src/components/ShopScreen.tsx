@@ -11,6 +11,7 @@ export default function ShopScreen() {
   const gold = useGameStore((s) => s.player.gold);
   const buy = useGameStore((s) => s.buyShopItem);
   const leave = useGameStore((s) => s.leaveShop);
+  const tapToBuy = useGameStore((s) => s.tapToBuy);
 
   return (
     <div
@@ -44,6 +45,27 @@ export default function ShopScreen() {
               : entry.consumable!.description;
           const affordable = gold >= entry.price && !entry.sold;
           const style = rarityStyle[rarity];
+          // One-tap mode: the whole card is the buy button.
+          if (tapToBuy) {
+            return (
+              <button
+                key={entry.key}
+                onClick={() => buy(entry.key)}
+                disabled={!affordable}
+                className={`w-full rounded-xl border p-2 text-left active:scale-[0.98] disabled:opacity-40 ${style.border} ${style.bg} ${entry.sold ? "opacity-40" : ""}`}
+              >
+                <div className="flex items-center justify-between">
+                  <p className={`font-bold ${style.text}`}>
+                    {name} <span className="text-[10px] text-gray-400">{rarityLabel[rarity]}</span>
+                  </p>
+                  <span className="ml-2 shrink-0 text-xs font-bold text-emerald-300">
+                    {entry.sold ? "売切" : `💰${entry.price}`}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[10px] text-gray-300">{desc}</p>
+              </button>
+            );
+          }
           return (
             <div
               key={entry.key}
