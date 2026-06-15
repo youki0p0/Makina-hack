@@ -12,8 +12,6 @@ import {
 } from "@/data/milestones";
 import { TITLES, isTitleUnlocked } from "@/data/titles";
 import { SETS } from "@/data/sets";
-import { setPieceId } from "@/data/sets";
-import { EQUIP_SLOTS } from "@/lib/battle";
 import { rarityLabel, rarityStyle } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 
@@ -169,24 +167,20 @@ export default function CollectionPage() {
         <div className="space-y-2">
           <p className="text-xs text-gray-400">
             セット装備は2/4/6部位でビルドが変わる。装飾以外は職業制限あり。
+            深層では新しいセットが手続き生成で無限に出現する。
           </p>
-          {SETS.map((set) => {
-            const pieceIds = EQUIP_SLOTS.map((slot) => setPieceId(set.id, slot));
-            const found = pieceIds.filter((id) => progress.discoveredItems.includes(id)).length;
-            return (
-              <div key={set.id} className="rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/10 p-2">
-                <p className="font-bold text-fuchsia-200">
-                  {set.icon} {set.name}セット{" "}
-                  <span className="text-[10px] text-gray-400">収集 {found}/{pieceIds.length}</span>
-                </p>
-                <ul className="mt-1 space-y-0.5 text-[10px] text-fuchsia-100">
-                  {set.bonuses.map((b) => (
-                    <li key={b.pieces}>・{b.pieces}部位: {b.desc}</li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
+          {SETS.map((set) => (
+            <div key={set.key} className="rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/10 p-2">
+              <p className="font-bold text-fuchsia-200">
+                {set.icon} {set.name}セット
+              </p>
+              <ul className="mt-1 space-y-0.5 text-[10px] text-fuchsia-100">
+                {set.bonuses.map((b) => (
+                  <li key={b.pieces}>・{b.pieces}部位: {b.desc}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       )}
 

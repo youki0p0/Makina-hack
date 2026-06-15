@@ -5,7 +5,7 @@ import { canEquip } from "@/data/classes";
 import { SCRAP_VALUE } from "@/lib/loot";
 import { itemKey, rarityLabel, rarityPipString, rarityRank, rarityStyle, slotLabel } from "@/lib/ui";
 import { QUALITIES } from "@/data/quality";
-import { SET_BY_ID } from "@/data/sets";
+import { getSetDef } from "@/data/sets";
 import { useGameStore } from "@/store/gameStore";
 import type { Equipment, EquipmentSlot, Rarity } from "@/types/game";
 
@@ -208,7 +208,7 @@ export default function InventoryList() {
                         <span className="ml-1 text-cyan-300">{QUALITIES[item.quality].label}</span>
                       )}
                       {item.setId && (
-                        <span className="ml-1 text-fuchsia-300">[{SET_BY_ID[item.setId].name}]</span>
+                        <span className="ml-1 text-fuchsia-300">[{getSetDef(item.setId)?.name}]</span>
                       )}
                       {!canEquip(item, classId) && <span className="ml-1 text-red-400">装備不可</span>}
                     </p>
@@ -303,13 +303,13 @@ function EquipmentDetailModal({
 
         <p className="mt-2 text-sm text-gray-200">{item.description}</p>
 
-        {item.setId && (
+        {item.setId && getSetDef(item.setId) && (
           <div className="mt-3 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 p-2">
             <p className="text-[10px] font-bold text-fuchsia-300">
-              {SET_BY_ID[item.setId].icon} {SET_BY_ID[item.setId].name}セット
+              {getSetDef(item.setId)!.icon} {getSetDef(item.setId)!.name}セット
             </p>
             <ul className="mt-1 space-y-0.5 text-[10px] text-fuchsia-100">
-              {SET_BY_ID[item.setId].bonuses.map((b) => (
+              {getSetDef(item.setId)!.bonuses.map((b) => (
                 <li key={b.pieces}>・{b.pieces}部位: {b.desc}</li>
               ))}
             </ul>

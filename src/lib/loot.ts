@@ -1,6 +1,7 @@
 import { AFFIXES, applyAffix, rollAffixedCopy } from "@/data/affixes";
 import { CONSUMABLES } from "@/data/consumables";
-import { ITEMS, genCommon, genRarePlus, rollGenDrop } from "@/data/items";
+import { ITEMS, genCommon, genRarePlus, rollGenDrop, rollSetDrop } from "@/data/items";
+import { availableSetKeys } from "@/data/sets";
 import { applyModifier } from "@/data/modifiers";
 import { applyQuality, rollQuality } from "@/data/quality";
 import { rarityRank } from "@/lib/ui";
@@ -117,6 +118,12 @@ export function rollLoot(
   slotHint?: EquipmentSlot,
 ): Equipment | null {
   if (Math.random() > enemy.dropRate) return null;
+
+  // Set-piece drop (build-defining gear). Sets unlock by depth and scale forever.
+  const setChance = enemy.isBoss ? 0.18 : 0.12;
+  if (availableSetKeys(floor).length > 0 && Math.random() < setChance) {
+    return withQuality(rollSetDrop(floor));
+  }
 
   // Floor-gated curated pool (recent window), with fallbacks.
   const WINDOW = 20;

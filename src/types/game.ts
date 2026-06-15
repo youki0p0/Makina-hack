@@ -143,8 +143,8 @@ export interface Equipment {
   volatile?: boolean;
   /** Infinite ★ modifier tier (0 = none). Scales stats additively. */
   modTier?: number;
-  /** Set membership (drives 2/4/6-piece set bonuses). */
-  setId?: SetId;
+  /** Set membership key (named or procedural `gset<n>`); drives set bonuses. */
+  setId?: string;
   /** Quality tier (ancient/mythic/unique) layered on rarity. */
   quality?: Quality;
   /** Never drops/gacha/shop — granted only by special events (e.g. 神機マキナ). */

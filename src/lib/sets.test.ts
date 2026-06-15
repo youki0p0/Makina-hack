@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { computeSetEffects, setPieceId, SETS } from "@/data/sets";
+import { computeSetEffects, getSetDef, proceduralSetDef, SETS } from "@/data/sets";
 import { applyQuality, rollQuality } from "@/data/quality";
-import { getItemById, getItemInstance, makeMakina, MAKINA_ID } from "@/data/items";
+import {
+  genSetItem,
+  getItemById,
+  getItemInstance,
+  makeMakina,
+  MAKINA_ID,
+  setPieceId,
+} from "@/data/items";
 import { EQUIP_SLOTS } from "@/lib/battle";
-import type { EquipmentSlot, EquippedItems, SetId } from "@/types/game";
+import type { EquipmentSlot, EquippedItems } from "@/types/game";
 
 function emptyEquipped(): EquippedItems {
   return {
@@ -17,11 +24,11 @@ function emptyEquipped(): EquippedItems {
 }
 
 /** Equip the first `n` slots with pieces of the given set. */
-function equipSet(setId: SetId, n: number): EquippedItems {
+function equipSet(key: string, n: number): EquippedItems {
   const eq = emptyEquipped();
   const slots = EQUIP_SLOTS.slice(0, n) as EquipmentSlot[];
   for (const slot of slots) {
-    eq[slot] = getItemById(setPieceId(setId, slot));
+    eq[slot] = genSetItem(key, slot, 30);
   }
   return eq;
 }
@@ -53,12 +60,29 @@ describe("set bonuses", () => {
     expect(computeSetEffects(equipSet("gambler", 1)).activeTiers).toHaveLength(0);
   });
 
-  it("every set has six equippable pieces", () => {
+  it("every named set has six equippable pieces, reconstructable by id", () => {
     for (const set of SETS) {
       for (const slot of EQUIP_SLOTS) {
-        expect(getItemById(setPieceId(set.id, slot))?.setId).toBe(set.id);
+        const id = setPieceId(set.key, slot, 30);
+        expect(getItemById(id)?.setId).toBe(set.key);
       }
     }
+  });
+
+  it("generates infinite procedural sets that still grant effects", () => {
+    const def0 = proceduralSetDef(0);
+    const def99 = proceduralSetDef(99);
+    expect(def0.key).toBe("gset0");
+    expect(getSetDef("gset99")?.name).toBe(def99.name);
+    // A deep procedural set still confers something at 6 pieces.
+    const eff = computeSetEffects(equipSet("gset5", 6));
+    expect(eff.activeTiers[0]?.pieces).toBe(6);
+  });
+
+  it("set pieces are tiered (scale with depth)", () => {
+    const low = genSetItem("gambler", "weapon", 10);
+    const high = genSetItem("gambler", "weapon", 200);
+    expect(high.attack).toBeGreaterThan(low.attack);
   });
 });
 

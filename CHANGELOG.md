@@ -2,6 +2,19 @@
 
 All notable changes to Dice Ex Machina.
 
+## [Unreleased] — アイテム/装備/セットの無限化
+
+- **装備ステの無限スケール**: 基底ティア上限(60)を撤廃。`genTierForFloor=floor` で深さに応じ
+  無限にスケール（★も併用）。深層素材名も `materialFor` で破綻せず生成。
+- **セットの効果プリミティブ化**: 名前付き4セットを `SetTierBonus` の合成で表現（`computeSetEffects`）。
+- **無限セット**: `proceduralSetDef(n)`（key `gset<n>`）が深層で新セット原型を無限生成。
+  `availableSetKeys(floor)`／`proceduralSetFloor`（150階ごと）で解禁。
+- **セット装備のティア化**: `genSetItem(key, slot, tier)`／id `setp_<key>_<slot>_<tier>` で無限スケール。
+  静的セット装備リストを廃止し、ドロップ専用に（`rollSetDrop`）。
+- `Equipment.setId` を string 化（手続きセットキー対応）。UIは `getSetDef` で解決。
+- 図鑑「セット」タブは名前付きセットを表示し、深層は手続き生成である旨を明記。
+- test 71件グリーン／build 成功。
+
 ## [Unreleased] — 手続き生成への移行（エンティティ非増殖）
 
 6スロット化で「スロット×ティア」を静的に持つと装備数が倍々に増える問題を解消。

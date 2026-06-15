@@ -1,7 +1,7 @@
 import { applyAffix, getAffixById } from "@/data/affixes";
 import { applyModifier } from "@/data/modifiers";
 import { applyQuality } from "@/data/quality";
-import { setPieceId } from "@/data/sets";
+import { availableSetKeys, getSetDef } from "@/data/sets";
 import type {
   DiceValue,
   EquipTag,
@@ -9,7 +9,6 @@ import type {
   EquipmentSlot,
   Quality,
   Rarity,
-  SetId,
 } from "@/types/game";
 
 /**
@@ -500,18 +499,27 @@ export const SLOT_LIST: EquipmentSlot[] = [
   "accessory",
 ];
 
-/** Highest base tier. Beyond this, depth comes from ★ modifiers, not new bases. */
+/** Top base tier referenced for the unique weapon's stat anchor. */
 export const GEN_MAX_TIER = 60;
+
+/** Material name for a tier — extends past the base list for infinite depth. */
+function materialFor(t: number): string {
+  const idx = Math.floor((t - 1) / 5);
+  if (idx < MATERIALS.length) return MATERIALS[idx];
+  // Deep tiers keep producing distinct names beyond the base materials.
+  return `${MATERIALS[MATERIALS.length - 1]}・改${idx - MATERIALS.length + 1}`;
+}
 
 /**
  * Procedurally build a "plain" stat item for a slot/tier. These are NEVER stored
  * in a registry — the id (`gen_<slot>_<tier>`) is enough to reconstruct them, so
- * the entity count stays flat no matter how many slots or floors exist.
+ * the entity count stays flat no matter how many slots, sets, or floors exist.
+ * Tiers are UNBOUNDED, so gear scales infinitely with depth.
  */
 export function genItem(slot: EquipmentSlot, tier: number): Equipment {
   const t = Math.max(1, Math.round(tier));
   const noun = SLOT_NOUNS[slot][(t - 1) % SLOT_NOUNS[slot].length];
-  const mat = MATERIALS[Math.min(MATERIALS.length - 1, Math.floor((t - 1) / 5))];
+  const mat = materialFor(t);
   const item: Equipment = {
     id: `gen_${slot}_${t}`,
     name: `${mat}の${noun}`,
@@ -564,9 +572,9 @@ export function genItem(slot: EquipmentSlot, tier: number): Equipment {
 const randInt = (lo: number, hi: number) =>
   lo + Math.floor(Math.random() * (hi - lo + 1));
 
-/** The base tier appropriate for a floor (capped; ★ handles deeper scaling). */
+/** The base tier appropriate for a floor (unbounded — gear scales forever). */
 export function genTierForFloor(floor: number): number {
-  return Math.max(1, Math.min(GEN_MAX_TIER, floor));
+  return Math.max(1, floor);
 }
 
 /** Parse a procedural id back into its slot + tier (null if not a gen id). */
@@ -616,42 +624,62 @@ export function genRarePlus(slot: EquipmentSlot): Equipment {
   return genItem(slot, tier);
 }
 
-// ===== Set items (4 sets × 6 slots) =====
+// ===== Set items (tiered & infinite) =====
+// Set pieces are generated procedurally and tiered, so they scale with depth
+// forever. The set itself (named or procedural) is resolved via getSetDef.
 const SET_SLOT_NOUN: Record<EquipmentSlot, string> = {
   weapon: "刃", helm: "兜", armor: "鎧", gloves: "篭手", boots: "靴", accessory: "印",
 };
-const SET_META: { id: SetId; name: string; minFloor: number; tag: EquipTag }[] = [
-  { id: "gambler", name: "賭博師", minFloor: 30, tag: "light" },
-  { id: "vampire", name: "吸血鬼", minFloor: 60, tag: "light" },
-  { id: "executioner", name: "処刑人", minFloor: 90, tag: "heavy" },
-  { id: "oracle", name: "神託", minFloor: 120, tag: "magic" },
-];
+const SET_SLOT_TAG: Record<EquipmentSlot, EquipTag | undefined> = {
+  weapon: "light", helm: "heavy", armor: "heavy", gloves: "light", boots: "light", accessory: undefined,
+};
 
-function buildSetItems(): Equipment[] {
-  const out: Equipment[] = [];
-  const slots: EquipmentSlot[] = ["weapon", "helm", "armor", "gloves", "boots", "accessory"];
-  for (const set of SET_META) {
-    for (const slot of slots) {
-      const isWeapon = slot === "weapon";
-      const isAcc = slot === "accessory";
-      out.push({
-        id: setPieceId(set.id, slot),
-        name: `${set.name}の${SET_SLOT_NOUN[slot]}`,
-        rarity: "epic",
-        slot,
-        attack: isWeapon ? 14 : isAcc ? 5 : 4,
-        defense: isWeapon ? 0 : 6,
-        maxHp: isWeapon ? 0 : 14,
-        rerollModifier: 0,
-        description: `${set.name}セット装備`,
-        diceModifiers: [],
-        setId: set.id,
-        equipTag: isAcc ? undefined : set.tag,
-        minFloor: set.minFloor,
-      });
-    }
-  }
-  return out;
+/** Stable id for a set piece (key + slot + tier), reconstructable on load. */
+export function setPieceId(key: string, slot: EquipmentSlot, tier: number): string {
+  return `setp_${key}_${slot}_${Math.max(1, Math.round(tier))}`;
+}
+
+export function parseSetPieceId(
+  id: string,
+): { key: string; slot: EquipmentSlot; tier: number } | null {
+  const m = /^setp_([a-z0-9]+)_([a-z]+)_(\d+)$/.exec(id);
+  if (!m) return null;
+  const slot = m[2] as EquipmentSlot;
+  if (!SLOT_LIST.includes(slot)) return null;
+  return { key: m[1], slot, tier: Number(m[3]) };
+}
+
+/** Build a tiered set piece for a set key / slot / tier. */
+export function genSetItem(key: string, slot: EquipmentSlot, tier: number): Equipment {
+  const t = Math.max(1, Math.round(tier));
+  const def = getSetDef(key);
+  const name = def ? def.name : "謎";
+  const isWeapon = slot === "weapon";
+  const isAcc = slot === "accessory";
+  return {
+    id: setPieceId(key, slot, t),
+    name: `${name}の${SET_SLOT_NOUN[slot]}`,
+    rarity: t > 60 ? "legendary" : "epic",
+    slot,
+    attack: isWeapon ? Math.round(6 + t * 0.85) : isAcc ? Math.round(2 + t * 0.35) : Math.round(t * 0.4),
+    defense: isWeapon ? 0 : Math.round(2 + t * 0.55),
+    maxHp: isWeapon ? 0 : Math.round(6 + t * 1.1),
+    rerollModifier: 0,
+    description: `${name}セット装備`,
+    diceModifiers: [],
+    setId: key,
+    equipTag: SET_SLOT_TAG[slot],
+    minFloor: t,
+  };
+}
+
+/** Roll a floor-appropriate set piece (random available set + slot + tier). */
+export function rollSetDrop(floor: number): Equipment {
+  const keys = availableSetKeys(floor);
+  const key = keys.length ? keys[randInt(0, keys.length - 1)] : "gambler";
+  const slot = SLOT_LIST[randInt(0, SLOT_LIST.length - 1)];
+  const top = genTierForFloor(floor);
+  return genSetItem(key, slot, randInt(Math.max(1, top - 10), top));
 }
 
 // ===== 神機マキナ (the one-and-only unique weapon) =====
@@ -702,12 +730,12 @@ export function makeMakina(): Equipment {
 }
 
 /**
- * Curated registry: hand-made signature items + set items. Procedural "gen_*"
- * gear is NOT listed here — it's reconstructed on demand (see getItemById), so
- * adding slots or going deeper never grows this array. This is also what the
- * codex tracks as collectible.
+ * Curated registry: hand-made signature items only. Procedural "gen_*" stat gear
+ * and "setp_*" set gear are reconstructed on demand (see getItemById), so adding
+ * slots, sets, or going deeper never grows this array. This is what the codex
+ * tracks as individually-collectible.
  */
-export const ITEMS: readonly Equipment[] = [...SIGNATURE_ITEMS, ...buildSetItems()];
+export const ITEMS: readonly Equipment[] = [...SIGNATURE_ITEMS];
 
 const ITEM_MAP: Map<string, Equipment> = new Map(ITEMS.map((i) => [i.id, i]));
 
@@ -716,6 +744,8 @@ export function getItemById(id: string): Equipment | null {
   if (id === MAKINA_ID) return makeMakina();
   const gen = parseGenId(id);
   if (gen) return genItem(gen.slot, gen.tier);
+  const setp = parseSetPieceId(id);
+  if (setp) return genSetItem(setp.key, setp.slot, setp.tier);
   const item = ITEM_MAP.get(id);
   return item ? { ...item } : null;
 }

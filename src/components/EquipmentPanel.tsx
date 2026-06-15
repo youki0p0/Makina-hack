@@ -1,7 +1,7 @@
 "use client";
 
 import { EQUIP_SLOTS } from "@/lib/battle";
-import { computeSetEffects, SET_BY_ID } from "@/data/sets";
+import { computeSetEffects, getSetDef } from "@/data/sets";
 import { rarityStyle, slotLabel } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 import type { EquippedItems } from "@/types/game";
@@ -20,12 +20,12 @@ export default function EquipmentPanel() {
           <p className="text-[10px] font-bold text-fuchsia-200">発動中のセット効果</p>
           <ul className="mt-1 space-y-1 text-[10px] text-fuchsia-100">
             {setEff.activeTiers.map((t) => {
-              const def = SET_BY_ID[t.id];
+              const def = getSetDef(t.key);
               return (
-                <li key={t.id}>
+                <li key={t.key}>
                   {t.icon} {t.name} ({t.pieces}部位)
                   <ul className="ml-3 text-gray-300">
-                    {def.bonuses
+                    {def?.bonuses
                       .filter((b) => t.pieces >= b.pieces)
                       .map((b) => (
                         <li key={b.pieces}>・{b.pieces}部位: {b.desc}</li>
