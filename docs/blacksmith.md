@@ -50,6 +50,13 @@ forge / boss。`AudioController` が `usePathname()`＋`currentFloor` で切替:
 - 戦闘 → **50階ごとにキーが上がる world**（`transpose=2^((⌊(floor-1)/50⌋%6)/12)`）、大ボス階(`bossRank≥2`)は boss（速い・緊迫）。
 - それ以外 → dungeon（既存ループ）。
 
+## 上位ジョブ（解禁条件）
+
+- 200階到達（`highestFloorReached>=200`）: 剣聖 / 大魔道士 / 武神（既存よりひと回り強い）。
+- 500階到達: 白の天啓（攻防一体）。
+- **黒の終焉は特殊解禁**: 1000階の結末（`progress.endingSeen`）を見届けた者のみ。最強格ゆえ階層では解禁不可。
+- 倍率は `data/jobBalance.ts`（2.4〜3.0）。転職は従来どおり「倒れた後」だけ可能。
+
 ## セーブ「バッグのみ引継ぎ」
 
 `SAVE_VERSION 3→4`。v4が無く v3 がある場合、**inventory/equipped のみ移行**し、階層・レベル・

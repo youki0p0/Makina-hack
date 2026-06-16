@@ -212,9 +212,10 @@ export const CLASSES: readonly CharacterClass[] = [
     id: "abyssal",
     name: "黒の終焉",
     icon: "🃏",
-    description: "【黒の上位職】全てを焼く超火力。リスクと引き換えに最強格。",
-    unlock: (p) => p.highestFloorReached >= 500,
-    unlockHint: "500階に到達で解放",
+    description: "【黒の最上位職】全てを焼く超火力。リスクと引き換えに最強格。",
+    // Special unlock: only those who have witnessed the 1000F ending.
+    unlock: (p) => p.endingSeen,
+    unlockHint: "1000階の結末を見届けて解放",
     statMods: { attack: 14, defense: -3, maxHp: 0, reroll: 0 },
     diceModifiers: [
       { faces: [1, 2, 3, 4, 5], effect: { kind: "strong", damageMultiplier: 1.7, isMiss: false, selfDamagePct: 0.06 }, label: "業", description: "全出目: 強攻撃(反動)" },
