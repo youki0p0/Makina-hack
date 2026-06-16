@@ -190,6 +190,7 @@ export function proceduralSetDef(n: number): SetDef {
 // getSetDef runs several times per turn via computeSetEffects. Cache by key so the
 // build happens once per unique set (#perf).
 const setDefCache = new Map<string, SetDef | null>();
+const SETDEF_CACHE_MAX = 128;
 
 /** Resolve any set key (fixed or `gset<n>`) into its definition. */
 export function getSetDef(key: string): SetDef | null {
@@ -199,6 +200,11 @@ export function getSetDef(key: string): SetDef | null {
   const m = /^gset(\d+)$/.exec(key);
   const def = m ? proceduralSetDef(Number(m[1])) : null;
   setDefCache.set(key, def);
+  // Bound the cache: deep Endless runs touch unboundedly many gset<n> keys.
+  if (setDefCache.size > SETDEF_CACHE_MAX) {
+    const oldest = setDefCache.keys().next().value;
+    if (oldest !== undefined) setDefCache.delete(oldest);
+  }
   return def;
 }
 
