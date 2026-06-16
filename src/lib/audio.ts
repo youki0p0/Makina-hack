@@ -297,15 +297,41 @@ const DYN: Record<Mode, Dyn> = {
   Ap: { padFifth: true, arp: true, arpGhost: false, lead: false, hat: false, kickMid: false, bassOct: true, arpVol: 0.05 },
 };
 
+// Warm detuned-sine pad (two oscillators a few cents apart) for chord body.
+function pad(freq: number, dur: number, vol: number, when = 0): void {
+  tone(freq, dur, "sine", vol, when);
+  tone(freq * DETUNE, dur, "sine", vol, when);
+}
+
+// Note with delay taps (echo): each tap later and quieter.
+function echoTone(
+  freq: number,
+  dur: number,
+  type: OscillatorType,
+  vol: number,
+  when = 0,
+  taps = 2,
+  spread = 0.1,
+  decay = 0.5,
+): void {
+  for (let i = 0; i <= taps; i++) tone(freq, dur, type, vol * Math.pow(decay, i), when + i * spread);
+}
+
+// Dispatcher: each theme has its own full-band renderer; all share one step clock.
 function bgmTick(): void {
   if (muted) return;
-  // The idol theme has its own full-band renderer (drums/bass/backing/sparkle/
-  // cowbell/vocal), so route it there and advance the same step counter.
-  if (THEMES[bgmTheme].idol) {
-    idolTick();
-    bgmStep = (bgmStep + 1) % (BAR * LOOP_BARS);
-    return;
-  }
+  const def = THEMES[bgmTheme];
+  if (def.idol) idolTick();
+  else if (def.metal) forgeTick();
+  else dungeonTick(); // dungeon / world / boss (variants inside)
+  bgmStep = (bgmStep + 1) % (BAR * LOOP_BARS);
+}
+
+// ===== Dungeon / World / Boss renderer =====
+// One A-minor cycle, layered up: sub-bass with a pitch-drop, detuned pad,
+// rotating square arpeggio, echoing lead, and full drums. Boss = faster, with a
+// dissonant stab, tom fill and ride; World = brighter with an octave shimmer.
+function dungeonTick(): void {
   const def = THEMES[bgmTheme];
   const T = bgmTranspose;
   const step = bgmStep;
@@ -316,25 +342,28 @@ function bgmTick(): void {
   const chord = def.prog[bar % def.prog.length];
   const secBar = bar % 8;
   const phraseStep = (secBar % 4) * BAR + inBar;
-  // Duck other voices on the bar head where pad + kick already stack.
   const duck = inBar === 0 ? 0.6 : 1;
+  const isBoss = bgmTheme === "boss";
+  const isWorld = bgmTheme === "world";
+  const full = mode === "B";
 
-  // Bass: root pedal + octave, with a small mid-bar pulse in section B.
-  if (inBar === 0) tone(chord.root * T, 0.45, "triangle", 0.2);
-  if (inBar === 8 && dyn.bassOct) tone(chord.root * 2 * T, 0.45, "triangle", 0.13);
-  if (inBar === 12 && mode === "B") tone(chord.root * T, 0.3, "triangle", 0.11);
-
-  // Pad: detuned sine, root (+fifth in fuller sections) on each chord change.
+  // ---- Bass: bar head "drops" from the octave (slide) + sine sub; driving pulse on boss ----
   if (inBar === 0) {
-    tone(chord.root * T, 1.6, "sine", 0.06);
-    tone(chord.root * DETUNE * T, 1.6, "sine", 0.06);
-    if (dyn.padFifth) {
-      tone(chord.fifth * T, 1.6, "sine", 0.05);
-      tone(chord.fifth * DETUNE * T, 1.6, "sine", 0.05);
-    }
+    slideTone(chord.root * 2 * T, chord.root * T, 0.42, "triangle", 0.2, 0, 0.07);
+    tone(chord.root * T, 0.5, "sine", 0.12);
+  }
+  if (inBar === 8 && dyn.bassOct) tone(chord.root * (isBoss ? 1 : 2) * T, 0.42, "triangle", 0.13);
+  if (inBar === 12 && full) tone(chord.root * T, 0.3, "triangle", 0.11);
+  if (isBoss && mode !== "A" && inBar % 2 === 1) tone(chord.root * T, 0.1, "sawtooth", 0.1);
+
+  // ---- Pad: detuned sine root (+fifth fuller); world adds a high shimmer layer ----
+  if (inBar === 0) {
+    pad(chord.root * T, 1.6, 0.06);
+    if (dyn.padFifth) pad(chord.fifth * T, 1.6, 0.05);
+    if (isWorld && dyn.padFifth) pad(chord.fifth * 2 * T, 1.8, 0.025);
   }
 
-  // Arpeggio: square eighth-notes following the chord, figure rotates per bar.
+  // ---- Arpeggio: square 8ths, figure rotates; world doubles an octave up in the chorus ----
   if (dyn.arp && inBar % 2 === 0) {
     const shape = ARP_SHAPES[secBar % ARP_SHAPES.length];
     const note = chord.arp[shape[(step >> 1) & 3]];
@@ -342,33 +371,94 @@ function bgmTick(): void {
     if (note) {
       tone(note * T, 0.12, "square", v);
       if (dyn.arpGhost) tone(note * T, 0.1, "square", v * 0.4, 0.075);
+      if (isWorld && full) tone(note * 2 * T, 0.08, "square", v * 0.5, 0.04);
     }
   }
 
-  // Lead: sparse square melody, with a faint vibrato tail in section B.
+  // ---- Lead: sparse melody with echo taps (tighter, harsher on boss) ----
   if (dyn.lead) {
     const note = LEAD_PHRASE[phraseStep];
-    if (note) {
-      tone(note * T, 0.26, "square", 0.12);
-      if (mode === "B" && inBar === 12) tone(note * 1.01 * T, 0.26, "square", 0.05, 0.1);
+    if (note) echoTone(note * T, 0.26, "square", 0.12, 0, isBoss ? 1 : 2, isBoss ? 0.09 : 0.12, 0.45);
+  }
+
+  // ---- Boss extras: tritone stab on chorus heads + tom fill before the loop ----
+  if (isBoss) {
+    if (full && inBar === 0) {
+      tone(chord.root * 1.5 * T, 0.2, "sawtooth", 0.1);
+      tone(chord.root * 1.5 * 1.41 * T, 0.2, "sawtooth", 0.07); // ~tritone bite
+    }
+    if (full && secBar === 7 && inBar >= 12) {
+      const toms = [196, 165, 147, 110];
+      const f = toms[inBar - 12] ?? 110;
+      slideTone(f * 2 * T, f * T, 0.11, "triangle", 0.15);
     }
   }
 
-  // Percussion: kick (+sub) on bar head; mid-bar kick & off-beat hats in B.
+  // ---- Percussion: kick (+sub pitch-fall), off-beat hats, chorus snare, boss ride 8ths ----
   if (inBar === 0 || (dyn.kickMid && inBar === 8)) {
     noise(0.05, 0.18);
-    tone(55, 0.08, "sine", 0.2);
+    slideTone(95 * T, 42 * T, 0.1, "sine", 0.2);
   }
-  if (dyn.hat && inBar % 2 === 1) noise(0.025, 0.06);
+  if (dyn.hat && inBar % 2 === 1) noise(0.025, isBoss ? 0.08 : 0.06);
+  if (full && (inBar === 4 || inBar === 12)) {
+    noise(0.14, 0.14);
+    tone(190 * T, 0.1, "triangle", 0.1);
+  }
+  if (isBoss && mode !== "A" && inBar % 2 === 0) noise(0.018, 0.035);
+}
 
-  // Forge: an anvil "clank" on every bar head and mid-bar.
-  if (def.metal && (inBar === 0 || inBar === 8)) {
-    noise(0.03, 0.12);
-    tone(1568, 0.06, "square", 0.05);
-    tone(2093, 0.05, "square", 0.03, 0.01);
+// ===== Forge renderer =====
+// Heavy, patient D-dorian: detuned-saw drone + deep sub, half-time kick, an anvil
+// clank with metallic overtones and a ringing echo tail, and a slow hammer-fall
+// lead (pitch drop). Builds with the section dynamics like the others.
+function forgeTick(): void {
+  const def = THEMES.forge;
+  const T = bgmTranspose;
+  const step = bgmStep;
+  const bar = Math.floor(step / BAR);
+  const inBar = step % BAR;
+  const mode = sectionOf(bar);
+  const dyn = DYN[mode];
+  const chord = def.prog[bar % def.prog.length];
+  const secBar = bar % 8;
+  const phraseStep = (secBar % 4) * BAR + inBar;
+  const full = mode === "B";
+
+  // ---- Drone bass: detuned saw + deep sub, sustained across the bar ----
+  if (inBar === 0) {
+    tone(chord.root * T, 1.7, "sawtooth", 0.1);
+    tone(chord.root * 1.008 * T, 1.7, "sawtooth", 0.09);
+    tone(chord.root * 0.5 * T, 1.7, "sine", 0.12);
+  }
+  if (inBar === 8) tone(chord.root * T, 0.5, "triangle", 0.12);
+  if (inBar === 0 && dyn.padFifth) pad(chord.fifth * T, 1.7, 0.05);
+
+  // ---- Half-time heavy kick + sub thump ----
+  if (inBar === 0 || (full && inBar === 8)) {
+    noise(0.06, 0.2);
+    slideTone(85 * T, 36 * T, 0.14, "sine", 0.22);
   }
 
-  bgmStep = (bgmStep + 1) % (BAR * LOOP_BARS);
+  // ---- Anvil clank: metallic stack + ringing overtone echo, on each half-bar ----
+  if (inBar === 0 || inBar === 8) {
+    noise(0.03, 0.13);
+    tone(1568, 0.06, "square", 0.06);
+    tone(2093, 0.05, "square", 0.035, 0.01);
+    echoTone(3136, 0.04, "square", 0.03, 0.02, 2, 0.12, 0.5);
+  }
+  if (full && (inBar === 4 || inBar === 12)) {
+    tone(2349, 0.04, "square", 0.04);
+    noise(0.02, 0.05);
+  }
+
+  // ---- Slow hammer-fall lead (pitch drop), only in fuller sections ----
+  if (dyn.lead) {
+    const note = LEAD_PHRASE[phraseStep];
+    if (note) slideTone(note * 1.5 * T, note * T, 0.3, "square", 0.1, 0, 0.06);
+  }
+
+  // ---- Off-beat hat shimmer in the chorus ----
+  if (dyn.hat && inBar % 2 === 1) noise(0.02, 0.05);
 }
 
 // ===== Idol theme renderer =====
