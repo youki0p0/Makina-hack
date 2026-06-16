@@ -118,6 +118,19 @@ function addUnique(list: string[], id: string): string[] {
 }
 
 /**
+ * Record a *curated* item id for the collection (図鑑). Procedural gear
+ * (`gen_*` / `setp_*`) is intentionally NOT tracked: the collection only counts
+ * the finite curated registry, so storing infinite procedural ids just bloats the
+ * save — at floor 700+ `discoveredItems` grew into thousands of entries, and
+ * spreading/serializing it on every victory made the browser freeze and the save
+ * slow to load. Skipping them keeps the array bounded to the curated set.
+ */
+function discover(list: string[], id: string): string[] {
+  if (id.startsWith("gen_") || id.startsWith("setp_")) return list;
+  return addUnique(list, id);
+}
+
+/**
  * Hard cap on inventory size. With infinite drops over hundreds of floors the
  * inventory would balloon and make every save/render freeze the browser. When
  * it overflows we auto-dismantle the WEAKEST non-locked items into material —
@@ -900,11 +913,13 @@ export const useGameStore = create<GameState>((set, get) => {
       const goldAfter = state.player.gold - entry.price;
 
       if (entry.kind === "equipment" && entry.equipment) {
+        const capped = capInventory([...state.inventory, { ...entry.equipment }], state.favorites);
         set({
           player: { ...state.player, gold: goldAfter },
-          inventory: [...state.inventory, { ...entry.equipment }],
+          inventory: capped.kept,
+          gachaPoints: state.gachaPoints + capped.material,
           shopStock: markSold(),
-          progress: { ...state.progress, discoveredItems: addUnique(state.progress.discoveredItems, entry.equipment.id) },
+          progress: { ...state.progress, discoveredItems: discover(state.progress.discoveredItems, entry.equipment.id) },
         });
       } else if (entry.kind === "consumable" && entry.consumable) {
         const c = entry.consumable;
@@ -1245,10 +1260,13 @@ export const useGameStore = create<GameState>((set, get) => {
 
     grantEchoRewards: (r, item) => {
       const s = get();
+      const capped = item
+        ? capInventory([...s.inventory, item], s.favorites)
+        : { kept: s.inventory, material: 0 };
       set({
         player: { ...s.player, gold: s.player.gold + r.gold },
-        gachaPoints: s.gachaPoints + r.gachaPoints,
-        inventory: item ? [...s.inventory, item] : s.inventory,
+        gachaPoints: s.gachaPoints + r.gachaPoints + capped.material,
+        inventory: capped.kept,
         progress: { ...s.progress, rankPoints: s.progress.rankPoints + r.rankPoints },
       });
       persist();
@@ -1324,7 +1342,7 @@ export const useGameStore = create<GameState>((set, get) => {
         gachaPoints: state.gachaPoints - GACHA_COST,
         inventory: [...state.inventory, pulled],
         lastPull: pulled,
-        progress: { ...state.progress, discoveredItems: addUnique(state.progress.discoveredItems, pulled.id) },
+        progress: { ...state.progress, discoveredItems: discover(state.progress.discoveredItems, pulled.id) },
       });
       persist();
     },
@@ -1338,7 +1356,7 @@ export const useGameStore = create<GameState>((set, get) => {
         gachaPoints: state.gachaPoints - PREMIUM_COST,
         inventory: [...state.inventory, pulled],
         lastPull: pulled,
-        progress: { ...state.progress, discoveredItems: addUnique(state.progress.discoveredItems, pulled.id) },
+        progress: { ...state.progress, discoveredItems: discover(state.progress.discoveredItems, pulled.id) },
       });
       persist();
     },
@@ -1363,7 +1381,7 @@ export const useGameStore = create<GameState>((set, get) => {
         gachaPoints: state.gachaPoints - TARGETED_COST,
         inventory: [...state.inventory, pulled],
         lastPull: pulled,
-        progress: { ...state.progress, discoveredItems: addUnique(state.progress.discoveredItems, pulled.id) },
+        progress: { ...state.progress, discoveredItems: discover(state.progress.discoveredItems, pulled.id) },
       });
       persist();
     },
@@ -1377,7 +1395,7 @@ export const useGameStore = create<GameState>((set, get) => {
         ? {
             ...state.progress,
             jackpots: state.progress.jackpots + 1,
-            discoveredItems: addUnique(state.progress.discoveredItems, prize.id),
+            discoveredItems: discover(state.progress.discoveredItems, prize.id),
           }
         : state.progress;
       set({
@@ -1426,7 +1444,7 @@ export const useGameStore = create<GameState>((set, get) => {
           progress: {
             ...state.progress,
             jackpots: state.progress.jackpots + 1,
-            discoveredItems: addUnique(state.progress.discoveredItems, item.id),
+            discoveredItems: discover(state.progress.discoveredItems, item.id),
           },
         });
         persist();
@@ -1637,7 +1655,7 @@ export const useGameStore = create<GameState>((set, get) => {
       ]);
     }
     let discoveredItems = state.progress.discoveredItems;
-    for (const d of drops) discoveredItems = addUnique(discoveredItems, d.id);
+    for (const d of drops) discoveredItems = discover(discoveredItems, d.id);
 
     // ===== Rebirth-point milestones & floor achievements (#15, #17) =====
     // Souls/material are awarded ONLY for reaching a NEW highest floor — never

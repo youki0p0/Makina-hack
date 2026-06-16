@@ -186,12 +186,20 @@ export function proceduralSetDef(n: number): SetDef {
   };
 }
 
+// Procedural set definitions are rebuilt (loop over primitives) on each call, yet
+// getSetDef runs several times per turn via computeSetEffects. Cache by key so the
+// build happens once per unique set (#perf).
+const setDefCache = new Map<string, SetDef | null>();
+
 /** Resolve any set key (fixed or `gset<n>`) into its definition. */
 export function getSetDef(key: string): SetDef | null {
   if (FIXED_BY_KEY[key]) return FIXED_BY_KEY[key];
+  const cached = setDefCache.get(key);
+  if (cached !== undefined) return cached;
   const m = /^gset(\d+)$/.exec(key);
-  if (m) return proceduralSetDef(Number(m[1]));
-  return null;
+  const def = m ? proceduralSetDef(Number(m[1])) : null;
+  setDefCache.set(key, def);
+  return def;
 }
 
 /** First floor a procedural set index becomes available (one per 150 floors). */

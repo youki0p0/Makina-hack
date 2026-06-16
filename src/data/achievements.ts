@@ -41,7 +41,14 @@ export function normalizeProgress(p?: Partial<Progress>): Progress {
     rebirths: typeof p.rebirths === "number" ? p.rebirths : 0,
     jackpots: typeof p.jackpots === "number" ? p.jackpots : 0,
     maxStreak: typeof p.maxStreak === "number" ? p.maxStreak : 0,
-    discoveredItems: Array.isArray(p.discoveredItems) ? [...p.discoveredItems] : [],
+    // Drop any infinite procedural ids (gen_*/setp_*) that older builds wrongly
+    // accumulated here — the collection only tracks curated gear, and a bloated
+    // array froze deep-floor saves. This cleans existing saves on next load.
+    discoveredItems: Array.isArray(p.discoveredItems)
+      ? p.discoveredItems.filter(
+          (id) => typeof id === "string" && !id.startsWith("gen_") && !id.startsWith("setp_"),
+        )
+      : [],
     defeatedEnemies: Array.isArray(p.defeatedEnemies) ? [...p.defeatedEnemies] : [],
     highestFloorReached:
       typeof p.highestFloorReached === "number" ? p.highestFloorReached : base.highestFloorReached,
