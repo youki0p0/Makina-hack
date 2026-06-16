@@ -4,7 +4,7 @@ import { canEquip, CLASSES, isClassUnlocked } from "@/data/classes";
 import { jobAttackMult } from "@/data/jobBalance";
 import { getItemById } from "@/data/items";
 import { difficultyScale, getDifficulty } from "@/data/difficulty";
-import { defaultProgress } from "@/data/achievements";
+import { defaultProgress, normalizeProgress } from "@/data/achievements";
 import { getDailyBonus } from "@/lib/daily";
 import { BOSS_TEMPLATES, ENEMY_TEMPLATES, generateEnemy } from "@/data/enemies";
 
@@ -94,6 +94,27 @@ describe("difficulty", () => {
 describe("daily bonus", () => {
   it("is deterministic for the same seed", () => {
     expect(getDailyBonus("2026-06-14").id).toBe(getDailyBonus("2026-06-14").id);
+  });
+});
+
+describe("progress / collection (deep-floor save bloat fix)", () => {
+  it("prunes infinite procedural item ids from discoveredItems on load", () => {
+    // Older saves accumulated thousands of gen_*/setp_* ids here, freezing
+    // deep-floor saves. Only curated ids should survive normalization.
+    const bloated = {
+      ...defaultProgress(),
+      discoveredItems: [
+        "iron_sword",
+        "makina",
+        "gen_weapon_700",
+        "gen_armor_512",
+        "setp_gambler_helm_640",
+      ],
+    };
+    const cleaned = normalizeProgress(bloated);
+    expect(cleaned.discoveredItems).toEqual(["iron_sword", "makina"]);
+    expect(cleaned.discoveredItems.some((id) => id.startsWith("gen_"))).toBe(false);
+    expect(cleaned.discoveredItems.some((id) => id.startsWith("setp_"))).toBe(false);
   });
 });
 

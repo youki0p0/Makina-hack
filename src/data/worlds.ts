@@ -270,10 +270,17 @@ function dampenSvg(svg: string, factor: number): string {
  * READABILITY: the chapter keeps its color identity, but a dark scrim sits over
  * everything and the themed texture is heavily dampened so text stays legible.
  */
+// Worlds are stable singletons, so each background string is computed once and
+// reused. Without this the SVG dampen-regex + URI encoding ran on every render —
+// i.e. several times a second during auto-battle (#perf).
+const bgCache = new WeakMap<World, string>();
+
 export function getWorldBackground(world: World): string {
+  const cached = bgCache.get(world);
+  if (cached !== undefined) return cached;
   const t = themeFor(world);
   const a = world.accent;
-  return [
+  const bg = [
     // very faint themed texture (top)
     `${svgLayer(dampenSvg(t.texture, 0.4))} 0 0 / ${t.tile}px ${t.tile}px repeat`,
     // readability scrim — darkens everything beneath for high text contrast
@@ -286,6 +293,8 @@ export function getWorldBackground(world: World): string {
     // base chapter gradient (bottom)
     world.background,
   ].join(", ");
+  bgCache.set(world, bg);
+  return bg;
 }
 
 /** The world a given floor belongs to. */

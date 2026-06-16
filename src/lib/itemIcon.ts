@@ -389,7 +389,19 @@ function buildEnemyGrid(spec: EnemyIconSpec): Grid {
 }
 
 // ----- Rendering + cache -----
+// Bounded LRU: distinct item/enemy icons accumulate over a long run; without a
+// cap the cache (base64 PNGs) grows unbounded across hundreds of floors (#perf).
 const cache = new Map<string, string>();
+const ICON_CACHE_MAX = 400;
+
+function cachePut(key: string, url: string): string {
+  cache.set(key, url);
+  if (cache.size > ICON_CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  return url;
+}
 
 function gridToDataUrl(grid: Grid): string {
   if (typeof document === "undefined") return "";
@@ -415,9 +427,7 @@ export function getEnemyIconDataUrl(spec: EnemyIconSpec): string {
   const hit = cache.get(key);
   if (hit !== undefined) return hit;
   if (typeof document === "undefined") return "";
-  const url = gridToDataUrl(buildEnemyGrid(spec));
-  cache.set(key, url);
-  return url;
+  return cachePut(key, gridToDataUrl(buildEnemyGrid(spec)));
 }
 
 function cacheKey(s: IconSpec): string {
@@ -433,9 +443,7 @@ export function getItemIconDataUrl(spec: IconSpec): string {
   const hit = cache.get(key);
   if (hit !== undefined) return hit;
   if (typeof document === "undefined") return "";
-  const url = gridToDataUrl(buildGrid(spec));
-  cache.set(key, url);
-  return url;
+  return cachePut(key, gridToDataUrl(buildGrid(spec)));
 }
 
 // ===== UI glyphs (replace emoji with pixel art) =====

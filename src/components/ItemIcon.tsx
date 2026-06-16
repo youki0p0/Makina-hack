@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { getItemIconDataUrl, hashSeed, type IconSpec } from "@/lib/itemIcon";
 import type { Equipment } from "@/types/game";
 
@@ -23,7 +23,7 @@ export function iconSpecForItem(item: Equipment): IconSpec {
  * Procedurally-rendered pixel-art icon for an item (no image assets).
  * Generated on the client and cached; scaled with nearest-neighbor.
  */
-export default function ItemIcon({
+function ItemIcon({
   item,
   size = 32,
   className = "",
@@ -38,7 +38,7 @@ export default function ItemIcon({
   useEffect(() => {
     setUrl(getItemIconDataUrl(spec));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id, item.affixId, item.modTier, item.rarity, item.setId, item.unique, item.quality]);
+  }, [item.id, item.affixId, item.modTier, item.rarity, item.setId, item.unique, item.quality, item.echo]);
 
   const glow = item.unique || item.rarity === "legendary" ? "legendary-glow" : "";
 
@@ -66,3 +66,7 @@ export default function ItemIcon({
     </span>
   );
 }
+
+// Leaf component in long inventory lists — memoize so it doesn't re-render with
+// the parent on every auto-battle tick when its item is unchanged (#perf).
+export default memo(ItemIcon);
