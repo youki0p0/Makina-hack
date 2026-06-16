@@ -72,7 +72,10 @@ export default function BattleScreen() {
       style={{
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",
         background: getWorldBackground(world),
-        backgroundAttachment: "fixed",
+        // NOTE: no `background-attachment: fixed` — on mobile it forces the whole
+        // multi-layer background to re-rasterize on every repaint (each dice
+        // roll/animation), which froze the battle screen. A normal background is
+        // cached as one layer and repaints stay cheap.
       }}
     >
       <div className="flex items-center justify-between">

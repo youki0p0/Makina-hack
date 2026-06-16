@@ -25,7 +25,7 @@ export default function ShopScreen() {
       style={{
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",
         background: getWorldBackground(world),
-        backgroundAttachment: "fixed",
+        // No `background-attachment: fixed` — it's a mobile repaint killer (see BattleScreen).
       }}
     >
       <div className="flex items-center justify-between">
