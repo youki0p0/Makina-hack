@@ -152,6 +152,75 @@ export const CLASSES: readonly CharacterClass[] = [
       },
     ],
   },
+
+  // ===== Upper jobs (unlocked at floor 200) — a notch stronger =====
+  {
+    id: "swordsaint",
+    name: "剣聖",
+    icon: "⚔️",
+    description: "【上位】戦士の極み。4以上が会心級。",
+    unlock: (p) => p.highestFloorReached >= 200,
+    unlockHint: "200階に到達で解放",
+    statMods: { attack: 6, defense: 2, maxHp: 12, reroll: 0 },
+    diceModifiers: [
+      { faces: [1], effect: { kind: "small", damageMultiplier: 0.6, isMiss: false }, label: "小攻撃", description: "1: 小攻撃" },
+      { faces: [4, 5, 6], effect: { kind: "critical", damageMultiplier: 2.0, isMiss: false }, label: "会心", description: "4以上: 会心" },
+    ],
+  },
+  {
+    id: "archmage",
+    name: "大魔道士",
+    icon: "🪄",
+    description: "【上位】魔法の極致。5でスキル、6で特大火球。",
+    unlock: (p) => p.highestFloorReached >= 200,
+    unlockHint: "200階に到達で解放",
+    statMods: { attack: 9, defense: -1, maxHp: -3, reroll: 0 },
+    diceModifiers: [
+      { faces: [5], effect: { kind: "skill", damageMultiplier: 2.6, isMiss: false }, label: "魔技", description: "5: 魔技 ×2.6" },
+      { faces: [6], effect: { kind: "fireball", damageMultiplier: 3.6 }, label: "特大火球", description: "6: 特大火球 ×3.6" },
+    ],
+  },
+  {
+    id: "warlord",
+    name: "武神",
+    icon: "🪓",
+    description: "【上位】狂戦の極み。1〜2で自傷、5〜6で猛烈な一撃。",
+    unlock: (p) => p.highestFloorReached >= 200,
+    unlockHint: "200階に到達で解放",
+    statMods: { attack: 11, defense: -2, maxHp: 0, reroll: 0 },
+    diceModifiers: [
+      { faces: [1, 2], effect: { kind: "selfDamage", selfDamagePct: 0.2, damageMultiplier: 1.4, isMiss: false }, label: "猛進", description: "1〜2: 自傷つき攻撃" },
+      { faces: [5, 6], effect: { kind: "critical", damageMultiplier: 3.2, isMiss: false }, label: "破軍", description: "5〜6: 破軍 ×3.2" },
+    ],
+  },
+
+  // ===== Elite jobs (unlocked at floor 500) — white & black, even stronger =====
+  {
+    id: "celestial",
+    name: "白の天啓",
+    icon: "✝️",
+    description: "【白の上位職】攻防一体。4以上で吸命、3以下も堅守。",
+    unlock: (p) => p.highestFloorReached >= 500,
+    unlockHint: "500階に到達で解放",
+    statMods: { attack: 9, defense: 5, maxHp: 30, reroll: 0 },
+    diceModifiers: [
+      { faces: [1, 2, 3], effect: { kind: "defend", guard: 8, isMiss: false, damageMultiplier: 0.8 }, label: "聖盾", description: "1〜3: 守りつつ攻撃" },
+      { faces: [4, 5, 6], effect: { kind: "critical", damageMultiplier: 2.4, lifestealPct: 0.2, isMiss: false }, label: "聖撃", description: "4以上: 会心＋吸命" },
+    ],
+  },
+  {
+    id: "abyssal",
+    name: "黒の終焉",
+    icon: "🃏",
+    description: "【黒の上位職】全てを焼く超火力。リスクと引き換えに最強格。",
+    unlock: (p) => p.highestFloorReached >= 500,
+    unlockHint: "500階に到達で解放",
+    statMods: { attack: 14, defense: -3, maxHp: 0, reroll: 0 },
+    diceModifiers: [
+      { faces: [1, 2, 3, 4, 5], effect: { kind: "strong", damageMultiplier: 1.7, isMiss: false, selfDamagePct: 0.06 }, label: "業", description: "全出目: 強攻撃(反動)" },
+      { faces: [6], effect: { kind: "fireball", damageMultiplier: 4.2 }, label: "終焉", description: "6: 終焉 ×4.2" },
+    ],
+  },
 ];
 
 const CLASS_MAP: Map<ClassId, CharacterClass> = new Map(CLASSES.map((c) => [c.id, c]));
@@ -179,6 +248,11 @@ const CLASS_EQUIP_TAGS: Record<ClassId, EquipTag[]> = {
   berserker: ["light", "heavy"],
   paladin: ["light", "heavy"],
   hexer: ["magic", "light"],
+  swordsaint: ["light", "heavy"],
+  archmage: ["magic", "light"],
+  warlord: ["light", "heavy"],
+  celestial: ["light", "heavy", "magic"],
+  abyssal: ["light", "heavy", "magic"],
 };
 
 export function classEquipTags(id: ClassId): EquipTag[] {

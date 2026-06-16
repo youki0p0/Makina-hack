@@ -195,7 +195,14 @@ export type ClassId =
   | "mage"
   | "berserker"
   | "paladin"
-  | "hexer";
+  | "hexer"
+  // Upper jobs — unlocked at floor 200.
+  | "swordsaint"
+  | "archmage"
+  | "warlord"
+  // Elite white/black jobs — unlocked at floor 500.
+  | "celestial"
+  | "abyssal";
 
 // ===== Artifacts (rebirth meta-progression) =====
 

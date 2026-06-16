@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { artifactBonus, artifactUpgradeCost, computeRebirthGain } from "@/data/artifacts";
 import { canEquip, CLASSES, isClassUnlocked } from "@/data/classes";
+import { jobAttackMult } from "@/data/jobBalance";
 import { getItemById } from "@/data/items";
 import { getDifficulty } from "@/data/difficulty";
 import { defaultProgress } from "@/data/achievements";
@@ -38,6 +39,21 @@ describe("class unlocks", () => {
   it("there are no duplicate class ids", () => {
     const ids = new Set(CLASSES.map((c) => c.id));
     expect(ids.size).toBe(CLASSES.length);
+  });
+
+  it("upper jobs unlock at floor 200, elite white/black at 500", () => {
+    const base = defaultProgress();
+    expect(isClassUnlocked("swordsaint", base)).toBe(false);
+    expect(isClassUnlocked("swordsaint", { ...base, highestFloorReached: 200 })).toBe(true);
+    expect(isClassUnlocked("celestial", { ...base, highestFloorReached: 200 })).toBe(false);
+    expect(isClassUnlocked("celestial", { ...base, highestFloorReached: 500 })).toBe(true);
+    expect(isClassUnlocked("abyssal", { ...base, highestFloorReached: 500 })).toBe(true);
+  });
+
+  it("upper/elite jobs are stronger than the base jobs", () => {
+    expect(jobAttackMult("swordsaint")).toBeGreaterThan(jobAttackMult("mage"));
+    expect(jobAttackMult("abyssal")).toBeGreaterThan(jobAttackMult("swordsaint"));
+    expect(jobAttackMult("celestial")).toBeGreaterThan(jobAttackMult("warrior"));
   });
 
   it("enforces class equip restrictions", () => {
