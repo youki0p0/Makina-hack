@@ -29,9 +29,15 @@ export function modMultiplier(tier: number): number {
   return 1 + MOD_BONUS_PER_STAR * Math.max(0, tier);
 }
 
-/** "★★★" style label for a tier (empty string for 0). */
+/**
+ * Star label for a tier. Up to 5 stays as countable pips (★★★★★); from 6 it
+ * switches to a compact numeric form (★6, ★7, …) so deep-floor names don't fill
+ * with an uncountable wall of stars.
+ */
 export function starLabel(tier: number): string {
-  return tier > 0 ? "★".repeat(tier) : "";
+  if (tier <= 0) return "";
+  if (tier < 6) return "★".repeat(tier);
+  return `★${tier}`;
 }
 
 /**
