@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getAffixById } from "@/data/affixes";
 import {
+  estimateTier,
   genItem,
   getItemById,
   getItemInstance,
@@ -94,6 +95,25 @@ describe("premium & targeted gacha", () => {
         expect(pullTargetedItem(slot).slot).toBe(slot);
       }
     }
+  });
+
+  it("targeted pull scales near the reference tier (not a low roll)", () => {
+    const refTier = 50;
+    const lowRefAtk = genItem("weapon", 20).attack;
+    let highEnough = 0;
+    for (let i = 0; i < 60; i++) {
+      const it = pullTargetedItem("weapon", refTier, 2);
+      expect(it.slot).toBe("weapon");
+      if (it.attack >= lowRefAtk) highEnough++;
+    }
+    // Almost all pulls should be around the (high) reference, not tiny.
+    expect(highEnough).toBeGreaterThan(40);
+  });
+});
+
+describe("estimateTier", () => {
+  it("recovers the tier of a generated item", () => {
+    expect(estimateTier(genItem("weapon", 37))).toBe(37);
   });
 });
 

@@ -54,7 +54,12 @@ export default function ForgePanel() {
           points={points}
           highest={highest}
           onForge={(protect) => forgeItem((sel as Target).loc, (sel as Target).index, protect)}
-          onCombine={() => forgeCombine((sel as Target).loc, (sel as Target).index)}
+          onCombine={() => {
+            // Combine removes the feeder, shifting inventory indices — return to
+            // the list so the selection can't point at the wrong row.
+            forgeCombine((sel as Target).loc, (sel as Target).index);
+            if ((sel as Target).loc === "inv") setSel(null);
+          }}
           onStar={() => forgeInjectStar((sel as Target).loc, (sel as Target).index)}
           onBack={() => setSel(null)}
         />
