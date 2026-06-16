@@ -10,6 +10,7 @@ import {
   modMultiplier,
   modTierForFloor,
   rollDropModTier,
+  starLabel,
 } from "@/data/modifiers";
 import {
   crossedMilestones,
@@ -62,6 +63,14 @@ describe("modifiers", () => {
     expect(out.modTier).toBe(2);
     expect(out.attack).toBe(Math.round(base.attack * 1.4));
     expect(out.name).toContain("★★");
+  });
+
+  it("shows pips up to 5 then a compact number from ★6", () => {
+    expect(starLabel(0)).toBe("");
+    expect(starLabel(3)).toBe("★★★");
+    expect(starLabel(5)).toBe("★★★★★");
+    expect(starLabel(6)).toBe("★6");
+    expect(starLabel(42)).toBe("★42");
   });
 
   it("rollDropModTier never goes negative", () => {
