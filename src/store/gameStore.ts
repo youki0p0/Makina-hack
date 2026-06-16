@@ -18,7 +18,8 @@ import {
   isClassUnlocked,
 } from "@/data/classes";
 import { generateEnemy } from "@/data/enemies";
-import { getItemById, makeMakina, MAKINA_ID } from "@/data/items";
+import { estimateTier, getItemById, getItemInstance, makeMakina, MAKINA_ID } from "@/data/items";
+import { forgeCost, rollForge, starInjectCost, FORGE_MAX, type ForgeKind } from "@/data/forge";
 import { applyModifier, modTierForFloor, rollDropModTier } from "@/data/modifiers";
 import { computeSetEffects } from "@/data/sets";
 import { jobAttackMult } from "@/data/jobBalance";
@@ -166,6 +167,8 @@ interface GameState {
   gachaPoints: number;
   /** The most recent gacha pull, for the result popup (not persisted). */
   lastPull: Equipment | null;
+  /** The most recent forge result, for the popup (not persisted). */
+  lastForge: { kind: ForgeKind; from: number; to: number } | null;
   /** Rebirth currency. */
   souls: number;
   /** Permanent artifact levels (persist across rebirths). */
@@ -229,6 +232,16 @@ interface GameState {
   unequipItem: (slot: keyof EquippedItems) => void;
   /** Auto-equip the highest-scoring equippable item in every slot. */
   equipBest: () => void;
+
+  // blacksmith / forge
+  /** Forge a target (inventory index or equipped slot) one attempt; protect avoids fail. */
+  forgeItem: (loc: "inv" | EquipmentSlot, index: number, protect: boolean) => void;
+  /** Combine: feed the cheapest same-slot spare into the target for guaranteed level(s). */
+  forgeCombine: (loc: "inv" | EquipmentSlot, index: number) => void;
+  /** Inject one ★ modifier tier (capped by deepest floor). */
+  forgeInjectStar: (loc: "inv" | EquipmentSlot, index: number) => void;
+  /** Clear the last forge result popup. */
+  clearLastForge: () => void;
 
   // misc
   toggleFavorite: (key: string) => void;
@@ -304,6 +317,25 @@ export const useGameStore = create<GameState>((set, get) => {
       tapToBuy: s.tapToBuy,
       startFloorPref: s.startFloorPref,
     });
+  }
+
+  /** Put a forged item back into its slot/inventory, re-clamping HP & dice if worn. */
+  function placeForged(
+    state: GameState,
+    loc: "inv" | EquipmentSlot,
+    index: number,
+    forged: Equipment,
+  ): Partial<GameState> {
+    if (loc === "inv") {
+      return { inventory: state.inventory.map((it, i) => (i === index ? forged : it)) };
+    }
+    const equipped: EquippedItems = { ...state.equipped, [loc]: forged };
+    const stats = currentStats(state.player, equipped, state.activeBuffs);
+    return {
+      equipped,
+      player: { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) },
+      diceFaces: buildFaces(equipped, state.classId),
+    };
   }
 
   function pushLogs(
@@ -427,6 +459,7 @@ export const useGameStore = create<GameState>((set, get) => {
     playerStunTurns: 0,
     gachaPoints: 0,
     lastPull: null,
+    lastForge: null,
     souls: 0,
     artifacts: defaultArtifactLevels(),
     classId: DEFAULT_CLASS_ID,
@@ -935,6 +968,99 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
+    forgeItem: (loc, index, protect) => {
+      const state = get();
+      const item = loc === "inv" ? state.inventory[index] : state.equipped[loc];
+      if (!item || item.noModifier) return;
+      const level = item.forgeLevel ?? 0;
+      if (level >= FORGE_MAX) return;
+      let cost = forgeCost(level);
+      if (protect) cost = Math.round(cost * 1.5);
+      if (state.gachaPoints < cost) return;
+
+      const streak = item.forgeStreak ?? 0;
+      const out = rollForge(level, streak, protect);
+      const newLevel = out.kind === "fail" ? level : Math.min(FORGE_MAX, level + out.delta);
+      const newStreak = out.kind === "fail" ? streak + 1 : 0;
+      const forged = getItemInstance(item.id, item.affixId, item.modTier, item.quality, newLevel, newStreak);
+      if (!forged) return;
+
+      const partial = placeForged(state, loc, index, forged);
+      set({
+        ...partial,
+        gachaPoints: state.gachaPoints - cost + out.refund,
+        lastForge: { kind: out.kind, from: level, to: newLevel },
+      });
+      persist();
+    },
+
+    forgeCombine: (loc, index) => {
+      const state = get();
+      const item = loc === "inv" ? state.inventory[index] : state.equipped[loc];
+      if (!item || item.noModifier) return;
+      const level = item.forgeLevel ?? 0;
+      if (level >= FORGE_MAX) return;
+      // Cheapest same-slot spare in inventory (not the target, not locked).
+      const score = (it: Equipment) => it.attack + it.defense + it.maxHp + (it.modTier ?? 0) * 5;
+      let feederIdx = -1;
+      let feederScore = Infinity;
+      state.inventory.forEach((it, i) => {
+        if (loc === "inv" && i === index) return;
+        if (it.slot !== item.slot) return;
+        if (it.noSell || state.favorites.includes(itemKey(it))) return;
+        const s = score(it);
+        if (s < feederScore) {
+          feederScore = s;
+          feederIdx = i;
+        }
+      });
+      if (feederIdx < 0) return;
+      const feeder = state.inventory[feederIdx];
+      // Same base id → +2 (duplicate rescue), else +1.
+      const delta = feeder.id === item.id ? 2 : 1;
+      const newLevel = Math.min(FORGE_MAX, level + delta);
+      const forged = getItemInstance(item.id, item.affixId, item.modTier, item.quality, newLevel, item.forgeStreak);
+      if (!forged) return;
+
+      // Remove the feeder, then place the forged target.
+      let inventory = state.inventory.filter((_, i) => i !== feederIdx);
+      const lastForge = { kind: "normal" as ForgeKind, from: level, to: newLevel };
+      if (loc === "inv") {
+        const tIdx = feederIdx < index ? index - 1 : index;
+        inventory = inventory.map((it, i) => (i === tIdx ? forged : it));
+        set({ inventory, lastForge });
+      } else {
+        const equipped: EquippedItems = { ...state.equipped, [loc]: forged };
+        const stats = currentStats(state.player, equipped, state.activeBuffs);
+        set({
+          inventory,
+          equipped,
+          player: { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) },
+          diceFaces: buildFaces(equipped, state.classId),
+          lastForge,
+        });
+      }
+      persist();
+    },
+
+    forgeInjectStar: (loc, index) => {
+      const state = get();
+      const item = loc === "inv" ? state.inventory[index] : state.equipped[loc];
+      if (!item || item.noModifier) return;
+      const cur = item.modTier ?? 0;
+      const cap = modTierForFloor(state.progress.highestFloorReached) + 2;
+      if (cur >= cap) return;
+      const cost = starInjectCost(cur);
+      if (state.gachaPoints < cost) return;
+      const forged = getItemInstance(item.id, item.affixId, cur + 1, item.quality, item.forgeLevel, item.forgeStreak);
+      if (!forged) return;
+      const partial = placeForged(state, loc, index, forged);
+      set({ ...partial, gachaPoints: state.gachaPoints - cost });
+      persist();
+    },
+
+    clearLastForge: () => set({ lastForge: null }),
+
     toggleFavorite: (key: string) => {
       const state = get();
       const favorites = state.favorites.includes(key)
@@ -1122,20 +1248,21 @@ export const useGameStore = create<GameState>((set, get) => {
 
     sellLegendaries: () => {
       const state = get();
-      // Equipped items are not in the inventory list, so they're naturally safe.
-      const SELL_GOLD = 500; // per legendary
-      let gold = 0;
+      // Bulk-DISMANTLE legendaries into material (gachaPoints), not gold — this
+      // feeds the gacha/forge economy. (Equipped items aren't in inventory.)
+      const PER = 24; // material per legendary (> single scrap of 12)
+      let gain = 0;
       const kept: Equipment[] = [];
       for (const item of state.inventory) {
         const locked = item.noSell || state.favorites.includes(itemKey(item));
         if (item.rarity === "legendary" && !locked) {
-          gold += SELL_GOLD;
+          gain += PER;
         } else {
           kept.push(item);
         }
       }
-      if (gold === 0) return;
-      set({ inventory: kept, player: { ...state.player, gold: state.player.gold + gold } });
+      if (gain === 0) return;
+      set({ inventory: kept, gachaPoints: state.gachaPoints + gain });
       persist();
     },
 
@@ -1169,7 +1296,19 @@ export const useGameStore = create<GameState>((set, get) => {
     pullTargeted: (slot: EquipmentSlot) => {
       const state = get();
       if (state.gachaPoints < TARGETED_COST) return;
-      const pulled = pullTargetedItem(slot);
+      // Reference = the player's current best for this slot, so the pull lands
+      // around (±) their owned power instead of a random low roll.
+      let refTier = 0;
+      let refMod = 0;
+      const consider = (it: Equipment | null) => {
+        if (!it || it.slot !== slot) return;
+        const t = estimateTier(it);
+        if (t > refTier) refTier = t;
+        refMod = Math.max(refMod, it.modTier ?? 0);
+      };
+      consider(state.equipped[slot]);
+      for (const it of state.inventory) consider(it);
+      const pulled = pullTargetedItem(slot, refTier, refMod);
       set({
         gachaPoints: state.gachaPoints - TARGETED_COST,
         inventory: [...state.inventory, pulled],
@@ -1371,6 +1510,7 @@ export const useGameStore = create<GameState>((set, get) => {
       goldGained,
       goldLost: 0,
       drop,
+      dropCount: drops.length,
       leveledUp,
       consumable,
       healed,

@@ -19,7 +19,7 @@ const validSave = {
   currentFloor: 7,
 };
 
-const STORAGE_KEY = "dice-hackslash-save-v3";
+const STORAGE_KEY = "dice-hackslash-save-v4";
 
 describe("save import/export", () => {
   beforeEach(() => {
@@ -64,5 +64,28 @@ describe("save import/export", () => {
   it("discards a save written under an older schema version", () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...validSave, saveVersion: 1 }));
     expect(loadGame()).toBeNull();
+  });
+
+  it("carries over ONLY the bag from a v3 save (bag-only migration)", () => {
+    const v3 = {
+      saveVersion: 3,
+      player: { ...validSave.player, gold: 5000 },
+      inventoryItems: [{ id: "iron_sword" }],
+      equippedItems: { weapon: { id: "rusty_sword" }, armor: null, accessory: null },
+      currentFloor: 200,
+      gachaPoints: 999,
+    };
+    window.localStorage.setItem("dice-hackslash-save-v3", JSON.stringify(v3));
+    const loaded = loadGame()!;
+    // Bag kept…
+    expect(loaded.equipped.weapon?.id).toBe("rusty_sword");
+    expect(loaded.inventory.some((i) => i.id === "iron_sword")).toBe(true);
+    // …progression/economy reset.
+    expect(loaded.currentFloor).toBe(1);
+    expect(loaded.gachaPoints).toBe(0);
+    expect(loaded.player.gold).toBe(0);
+    // v3 is consumed; a v4 save now exists.
+    expect(window.localStorage.getItem("dice-hackslash-save-v3")).toBeNull();
+    expect(window.localStorage.getItem(STORAGE_KEY)).not.toBeNull();
   });
 });

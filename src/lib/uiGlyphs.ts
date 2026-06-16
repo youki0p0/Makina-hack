@@ -19,6 +19,16 @@ export function classGlyphKind(id: ClassId): GlyphKind {
       return "defense";
     case "hexer":
       return "poison";
+    case "swordsaint":
+      return "attack";
+    case "archmage":
+      return "soul";
+    case "warlord":
+      return "fire";
+    case "celestial":
+      return "heal";
+    case "abyssal":
+      return "soul";
     default:
       return "star"; // adventurer
   }

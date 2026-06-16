@@ -53,12 +53,14 @@ Next.js (App Router) + TypeScript + Tailwind CSS + Zustand + localStorage。Verc
 - **ガチャ** — 10=コモン量産 / 100=高補正コモン(レア以上なし) / 250=部位指定レア以上保証。★は最高到達階で上限。
 - **難易度** — 高難度ほどドロップ数・上振れ・レア率UP（Normal/Hard/Hell/Expert）。
 - **職業** — 聖騎士(耐久)/戦士(火力)/盗賊(連撃)/魔法使い(爆発)/狂戦士(超火力)。倍率は `data/jobBalance.ts`。
+  200階で上位職(剣聖/大魔道士/武神)、500階で白の天啓、1000階の結末到達で黒の終焉(特殊解禁)。
 - **転生ポイント** — 最高到達階の100階区切り初到達でのみ獲得（死亡・周回では増えない）。
 - **エンディングと物語** — 1000階撃破→スタッフロール→強くてニューゲーム or Endless。→ [docs/lore.md](docs/lore.md)
 - **神機マキナ** — 世界に一本だけの唯一武器。全出目を通常攻撃にする。→ [docs/lore.md](docs/lore.md)
 - **図鑑 / 装備比較 / ロック / レジェンド一括売却** — 収集率表示、装備中との差分、ロック保護。
 - **手続き生成ピクセルアイコン** — 装備・敵・ボスのアイコンを画像なしでコード生成。→ [docs/icons.md](docs/icons.md)
 - **ランキング / 残響戦** — 深層到達者ログと、記録から生成したゴーストとのEcho Battle（Supabase任意・未設定でも動作）。→ [docs/online.md](docs/online.md)
+- **鍛冶屋 / バランス / 場所別BGM** — 素材で装備を確率強化（GREAT/PERFECT・合成・★注入）、難度カーブ調整、場所別の手続きBGM。→ [docs/blacksmith.md](docs/blacksmith.md)
 
 ---
 

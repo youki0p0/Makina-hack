@@ -86,3 +86,5 @@ create policy "write" on ranking_entries for insert with check (true);
 - そのため **Supabase 障害時でも `/ranking` と `/echo` は常に利用可能**。
 - 送信は常にローカルへも控えるため、オフラインでも自分の記録が見える。
 - UI 右上に `● ONLINE` / `○ LOCAL` で現在のバックエンドを表示。
+- 表示は常に**ローカルの自分の記録をマージ**する。Supabase設定時にinsertが失敗/遅延しても、
+  自分の登録がボードに必ず出る（「登録しても追加されない」不具合の対策）。

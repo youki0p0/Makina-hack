@@ -84,6 +84,56 @@ export const SET_DEFS: readonly SetDef[] = [
       { pieces: 6, desc: "ダイスを2個振り、高い方を使う", rollTwoDice: true },
     ],
   },
+  {
+    key: "guardian",
+    name: "守護者",
+    icon: "🛡️",
+    bonuses: [
+      { pieces: 2, desc: "防御+6 / HP+20", defense: 6, maxHp: 20 },
+      { pieces: 4, desc: "HP+40", maxHp: 40 },
+      { pieces: 6, desc: "全ての攻撃が15%吸血", lifestealAllPct: 0.15 },
+    ],
+  },
+  {
+    key: "storm",
+    name: "雷迅",
+    icon: "⚡",
+    bonuses: [
+      { pieces: 2, desc: "リロール +1", reroll: 1 },
+      { pieces: 4, desc: "攻撃時に追撃(+1ヒット)", extraHit: true },
+      { pieces: 6, desc: "出目5・6の威力上昇(+35%)", highFaceDmgBonus: 0.35 },
+    ],
+  },
+  {
+    key: "inferno",
+    name: "業火",
+    icon: "🔥",
+    bonuses: [
+      { pieces: 2, desc: "出目5・6の威力上昇(+30%)", highFaceDmgBonus: 0.3 },
+      { pieces: 4, desc: "出目6の威力上昇(+50%)", sixDmgBonus: 0.5 },
+      { pieces: 6, desc: "出目6が2回発動する", sixDouble: true },
+    ],
+  },
+  {
+    key: "revenant",
+    name: "不死",
+    icon: "☠️",
+    bonuses: [
+      { pieces: 2, desc: "HP+30", maxHp: 30 },
+      { pieces: 4, desc: "出目4以上で追加吸血(+20%)", lifestealHighFacePct: 0.2 },
+      { pieces: 6, desc: "全ての攻撃が25%吸血", lifestealAllPct: 0.25 },
+    ],
+  },
+  {
+    key: "trickster",
+    name: "幻惑",
+    icon: "🃏",
+    bonuses: [
+      { pieces: 2, desc: "リロール +1", reroll: 1 },
+      { pieces: 4, desc: "出目1が2(通常攻撃)になる", faceOneToTwo: true },
+      { pieces: 6, desc: "ダイスを2個振り、高い方を使う", rollTwoDice: true },
+    ],
+  },
 ];
 
 const FIXED_BY_KEY: Record<string, SetDef> = Object.fromEntries(
@@ -155,9 +205,14 @@ export function availableSetKeys(floor: number): string[] {
   // Named sets unlock by depth so early floors aren't overwhelmed.
   const namedFloor: Record<string, number> = {
     gambler: 30,
+    guardian: 45,
     vampire: 60,
+    storm: 75,
     executioner: 90,
+    inferno: 105,
     oracle: 120,
+    revenant: 135,
+    trickster: 150,
   };
   for (const s of SET_DEFS) if (floor >= (namedFloor[s.key] ?? 1)) keys.push(s.key);
   for (let n = 0; proceduralSetFloor(n) <= floor; n++) keys.push(`gset${n}`);

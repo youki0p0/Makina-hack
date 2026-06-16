@@ -1,8 +1,13 @@
 import type { DiceKind, Equipment, Rarity } from "@/types/game";
 
+/** Thousands-separated number for readable deep-floor values (1234 → "1,234"). */
+export function fmt(n: number): string {
+  return Math.round(n).toLocaleString("en-US");
+}
+
 /** Stable key for an item instance (base id + affix + ★ tier), used for locks. */
 export function itemKey(item: Equipment): string {
-  return `${item.id}:${item.affixId ?? ""}:${item.modTier ?? 0}`;
+  return `${item.id}:${item.affixId ?? ""}:${item.modTier ?? 0}:${item.forgeLevel ?? 0}`;
 }
 
 /** Sort rank for rarity (higher = rarer). */

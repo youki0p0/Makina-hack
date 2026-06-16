@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { artifactBonus, artifactUpgradeCost, computeRebirthGain } from "@/data/artifacts";
 import { canEquip, CLASSES, isClassUnlocked } from "@/data/classes";
+import { jobAttackMult } from "@/data/jobBalance";
 import { getItemById } from "@/data/items";
 import { getDifficulty } from "@/data/difficulty";
 import { defaultProgress } from "@/data/achievements";
@@ -38,6 +39,23 @@ describe("class unlocks", () => {
   it("there are no duplicate class ids", () => {
     const ids = new Set(CLASSES.map((c) => c.id));
     expect(ids.size).toBe(CLASSES.length);
+  });
+
+  it("upper jobs unlock at 200, white at 500, black only after the ending", () => {
+    const base = defaultProgress();
+    expect(isClassUnlocked("swordsaint", base)).toBe(false);
+    expect(isClassUnlocked("swordsaint", { ...base, highestFloorReached: 200 })).toBe(true);
+    expect(isClassUnlocked("celestial", { ...base, highestFloorReached: 200 })).toBe(false);
+    expect(isClassUnlocked("celestial", { ...base, highestFloorReached: 500 })).toBe(true);
+    // 黒の終焉 is special: floor alone never unlocks it — only the 1000F ending.
+    expect(isClassUnlocked("abyssal", { ...base, highestFloorReached: 999 })).toBe(false);
+    expect(isClassUnlocked("abyssal", { ...base, endingSeen: true })).toBe(true);
+  });
+
+  it("upper/elite jobs are stronger than the base jobs", () => {
+    expect(jobAttackMult("swordsaint")).toBeGreaterThan(jobAttackMult("mage"));
+    expect(jobAttackMult("abyssal")).toBeGreaterThan(jobAttackMult("swordsaint"));
+    expect(jobAttackMult("celestial")).toBeGreaterThan(jobAttackMult("warrior"));
   });
 
   it("enforces class equip restrictions", () => {

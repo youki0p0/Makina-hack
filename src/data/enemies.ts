@@ -164,17 +164,18 @@ export function generateEnemy(floor: number, enemyMult = 1): Enemy {
 
   // Linear-ish scaling with floor; bosses get extra by depth and boss rank.
   const tier = Math.floor(floor / 10);
-  const hpScale = 1 + floor * 0.18;
-  const atkScale = 1 + floor * 0.12;
+  // Eased scaling so enemy growth doesn't outrun the player's (see modifiers.ts).
+  const hpScale = 1 + floor * 0.13;
+  const atkScale = 1 + floor * 0.095;
   const defScale = 1 + floor * 0.08;
-  // Great/chapter bosses are tougher than small bosses.
-  const rankMult = rank >= 3 ? 1.6 : rank === 2 ? 1.3 : 1;
+  // Great/chapter bosses are tougher than small bosses (slightly eased).
+  const rankMult = rank >= 3 ? 1.45 : rank === 2 ? 1.22 : 1;
 
   const maxHp = Math.round((template.baseHp * hpScale + (isBossFloor ? tier * 30 : 0)) * rankMult * enemyMult);
   const attack = Math.round((template.baseAttack * atkScale + (isBossFloor ? tier * 3 : 0)) * rankMult * enemyMult);
   const defense = Math.round(template.baseDefense * defScale);
-  const exp = Math.round(template.baseExp * (1 + floor * 0.15) * rankMult);
-  const gold = Math.round(template.baseGold * (1 + floor * 0.15) * rankMult);
+  const exp = Math.round(template.baseExp * (1 + floor * 0.2) * rankMult);
+  const gold = Math.round(template.baseGold * (1 + floor * 0.2) * rankMult);
 
   const enemy: Enemy = {
     id: `${template.id}_${floor}`,

@@ -1,4 +1,5 @@
 import { applyAffix, getAffixById } from "@/data/affixes";
+import { applyForge } from "@/data/forge";
 import { applyModifier } from "@/data/modifiers";
 import { applyQuality } from "@/data/quality";
 import { availableSetKeys, getSetDef } from "@/data/sets";
@@ -693,7 +694,7 @@ export function genItem(slot: EquipmentSlot, tier: number): Equipment {
     minFloor: t,
   };
   if (slot === "weapon") {
-    item.attack = Math.round(2 + t * 0.8);
+    item.attack = Math.round(2 + t * 0.9);
     item.equipTag = WEAPON_TAG[noun];
     item.description = `攻撃+${item.attack}`;
   } else if (slot === "armor") {
@@ -781,6 +782,33 @@ export function genRarePlus(slot: EquipmentSlot): Equipment {
   // Tiers 16+ are Rare/Epic/Legendary; bias toward the middle for fairness.
   const tier = randInt(16, GEN_MAX_TIER);
   return genItem(slot, tier);
+}
+
+/** Rough power tier of any item (for "pull near my current best" gacha). */
+export function estimateTier(item: Equipment): number {
+  const parsed = parseGenId(item.id);
+  if (parsed) return parsed.tier;
+  const sp = parseSetPieceId(item.id);
+  if (sp) return sp.tier;
+  // Signature/other: estimate from raw numbers.
+  return Math.max(
+    1,
+    Math.round(item.attack / 0.9),
+    Math.round(item.defense / 0.7),
+    Math.round(item.maxHp / 1.5),
+  );
+}
+
+/**
+ * A Rare+ item of a slot, scaled to sit AROUND a reference tier (the player's
+ * current best for that slot) so targeted pulls are a meaningful side/up-grade
+ * instead of a random low roll. Returns the item already ★-modified.
+ */
+export function genRarePlusNear(slot: EquipmentSlot, refTier: number, refMod: number): Equipment {
+  const tier = Math.max(16, Math.min(GEN_MAX_TIER, Math.round(refTier) + randInt(-3, 4)));
+  const base = genItem(slot, tier);
+  const mod = Math.max(0, Math.round(refMod) + randInt(-1, 1));
+  return mod > 0 ? applyModifier(base, mod) : base;
 }
 
 // ===== Set items (tiered & infinite) =====
@@ -915,6 +943,8 @@ export function getItemInstance(
   affixId?: string,
   modTier?: number,
   quality?: Quality,
+  forgeLevel?: number,
+  forgeStreak?: number,
 ): Equipment | null {
   const base = getItemById(id);
   if (!base) return null;
@@ -927,6 +957,8 @@ export function getItemInstance(
   }
   if (modTier && modTier > 0 && !item.noModifier) item = applyModifier(item, modTier);
   if (quality) item = applyQuality(item, quality);
+  if (forgeLevel && forgeLevel > 0) item = applyForge(item, forgeLevel);
+  if (forgeStreak) item = { ...item, forgeStreak };
   return item;
 }
 

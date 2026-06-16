@@ -42,6 +42,7 @@ export default function TitlePage() {
   const hasProgress = hydrated && (floor > 1 || player.level > 1);
   const artifactsUnlocked = isFeatureUnlocked("artifacts", progress);
   const casinoUnlocked = isFeatureUnlocked("casino", progress);
+  const forgeUnlocked = isFeatureUnlocked("forge", progress);
   const showFirstRun = hydrated && !seenHelp;
 
   return (
@@ -114,6 +115,19 @@ export default function TitlePage() {
           ) : (
             <div className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/5 text-sm text-gray-500">
               <PixelGlyph kind="lock" size={16} /> アーティファクト（{FEATURE_UNLOCKS.artifacts.hint}）
+            </div>
+          )}
+
+          {forgeUnlocked ? (
+            <Link
+              href="/forge"
+              className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-amber-700/80 font-bold active:scale-95"
+            >
+              <PixelGlyph kind="attack" size={18} /> 鍛冶屋
+            </Link>
+          ) : (
+            <div className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/5 text-sm text-gray-500">
+              <PixelGlyph kind="lock" size={16} /> 鍛冶屋（{FEATURE_UNLOCKS.forge.hint}）
             </div>
           )}
 

@@ -87,6 +87,16 @@ export default function InventoryList() {
 
   const selectedItem = selected !== null ? inventory[selected] : null;
 
+  // "Stronger than what's equipped in this slot" → show a ▲ to speed decisions.
+  const itemScore = (it: Equipment) =>
+    it.attack * 2 + it.defense * 1.5 + it.maxHp * 0.4 + it.rerollModifier * 25 + (it.modTier ?? 0) * 5;
+  const isUpgrade = (it: Equipment) => {
+    if (!canEquip(it, classId)) return false;
+    const cur = equipped[it.slot];
+    if (cur && itemKey(cur) === itemKey(it)) return false;
+    return !cur || itemScore(it) > itemScore(cur);
+  };
+
   // Keep original indices for equip/scrap while filtering+sorting for display.
   const rows = inventory
     .map((item, index) => ({ item, index }))
@@ -162,7 +172,7 @@ export default function InventoryList() {
       </div>
       <button
         onClick={() => {
-          const SELL_GOLD = 500;
+          const PER = 24;
           const targets = inventory.filter(
             (it) =>
               it.rarity === "legendary" && !favorites.includes(itemKey(it)),
@@ -170,7 +180,7 @@ export default function InventoryList() {
           if (targets.length === 0) return;
           if (
             confirm(
-              `未装備・未ロックのレジェンド ${targets.length}個 を売却して 💰+${targets.length * SELL_GOLD}`,
+              `未装備・未ロックのレジェンド ${targets.length}個 を一括分解して 素材+${targets.length * PER}`,
             )
           ) {
             sellLegendaries();
@@ -178,10 +188,10 @@ export default function InventoryList() {
         }}
         className="flex h-8 w-full items-center justify-center gap-1 rounded-lg bg-amber-600/80 text-[11px] font-bold text-white active:scale-95"
       >
-        <PixelGlyph kind="rainbow" size={14} /> 未装備レジェンドを一括売却（ロック除外）
+        <PixelGlyph kind="material" size={14} /> 未装備レジェンドを一括分解（素材・ロック除外）
       </button>
       <p className="flex items-center gap-1 text-[10px] text-gray-500">
-        <PixelGlyph kind="lock" size={12} /> ロックした装備は分解・一括売却の対象外です。
+        <PixelGlyph kind="lock" size={12} /> ロックした装備は分解の対象外です。
       </p>
 
       {rows.length === 0 ? (
@@ -213,6 +223,7 @@ export default function InventoryList() {
                       }`}
                     >
                       <RarityPips item={item} />{" "}
+                      {isUpgrade(item) && <span className="text-emerald-400" title="装備中より強い">▲</span>}
                       {item.name}
                       {item.equipTag && (
                         <span className="ml-1 text-[9px] text-gray-400">[{TAG_LABEL[item.equipTag]}]</span>

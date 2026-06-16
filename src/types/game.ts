@@ -155,6 +155,10 @@ export interface Equipment {
   noModifier?: boolean;
   /** Dropped from an Echo Battle (slightly distinct icon, not stronger). */
   echo?: boolean;
+  /** Blacksmith forge level (0 = none). Scales numbers, not dice faces. */
+  forgeLevel?: number;
+  /** Consecutive forge failures (pity counter). */
+  forgeStreak?: number;
 }
 
 export type EquippedItems = {
@@ -191,7 +195,14 @@ export type ClassId =
   | "mage"
   | "berserker"
   | "paladin"
-  | "hexer";
+  | "hexer"
+  // Upper jobs — unlocked at floor 200.
+  | "swordsaint"
+  | "archmage"
+  | "warlord"
+  // Elite white/black jobs — unlocked at floor 500.
+  | "celestial"
+  | "abyssal";
 
 // ===== Artifacts (rebirth meta-progression) =====
 
@@ -322,6 +333,8 @@ export interface BattleResult {
   goldGained: number;
   goldLost: number;
   drop: Equipment | null;
+  /** Total equipment pieces dropped this victory (drop is the first). */
+  dropCount?: number;
   leveledUp: boolean;
   /** Consumable that dropped and was auto-used this victory. */
   consumable: Consumable | null;
@@ -377,6 +390,10 @@ export interface SavedItem {
   modTier?: number;
   /** Quality tier (ancient/mythic/unique). */
   quality?: Quality;
+  /** Blacksmith forge level. */
+  forgeLevel?: number;
+  /** Forge pity streak. */
+  forgeStreak?: number;
 }
 
 export interface SaveData {

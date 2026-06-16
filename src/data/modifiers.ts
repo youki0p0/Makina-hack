@@ -5,8 +5,15 @@
 
 import type { Enemy, Equipment } from "@/types/game";
 
-/** Bonus per star (additive). ★ = +20%, ★★ = +40%, ★★★ = +60%, … */
+/** Bonus per star on ITEMS (additive). ★ = +20%, ★★ = +40%, … (player stays strong). */
 export const MOD_BONUS_PER_STAR = 0.2;
+
+/**
+ * Bonus per star on ENEMIES (additive). Deliberately LOWER than the item value
+ * so the enemy's multiplicative growth doesn't outrun the player. This is the
+ * single biggest lever against the late-game difficulty wall.
+ */
+export const ENEMY_MOD_BONUS_PER_STAR = 0.13;
 
 /** How many floors between star tiers. */
 export const FLOORS_PER_STAR = 50;
@@ -63,7 +70,7 @@ export function enemyModTierForFloor(floor: number): number {
 /** Apply an enemy star modifier (HP / attack / drop rate up, name tagged). */
 export function applyEnemyModifier(enemy: Enemy, tier: number): Enemy {
   if (tier <= 0) return { ...enemy, modTier: 0 };
-  const mult = modMultiplier(tier);
+  const mult = 1 + ENEMY_MOD_BONUS_PER_STAR * Math.max(0, tier);
   const hp = Math.round(enemy.maxHp * mult);
   return {
     ...enemy,
