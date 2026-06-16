@@ -76,6 +76,7 @@ function noise(dur: number, vol = 0.3): void {
   src.connect(g);
   g.connect(master);
   src.start(t);
+  src.stop(t + dur); // deterministic release so the node is freed promptly
 }
 
 /**
@@ -559,12 +560,43 @@ function idolTick(): void {
   }
 }
 
+// Whether the player WANTS music on (independent of the timer, which we pause
+// while the tab is hidden so the synth stops generating nodes in the background).
+let bgmPlaying = false;
+let visHooked = false;
+
+function startTimer(): void {
+  if (bgmTimer != null) return;
+  bgmTimer = setInterval(bgmTick, THEMES[bgmTheme].stepMs);
+}
+function clearTimer(): void {
+  if (bgmTimer != null) {
+    clearInterval(bgmTimer);
+    bgmTimer = null;
+  }
+}
+
+// Pause the BGM synth while the tab is backgrounded; resume on return. A long
+// auto-battle session left in a background tab otherwise keeps spawning hundreds
+// of audio nodes per second, bloating memory and stalling the tab on return.
+function ensureVisibilityHook(): void {
+  if (visHooked || typeof document === "undefined") return;
+  visHooked = true;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) clearTimer();
+    else if (bgmPlaying && !muted) startTimer();
+  });
+}
+
 export function startBgm(): void {
-  if (muted || bgmTimer != null) return;
+  if (muted) return;
   const c = getCtx();
   if (!c) return;
+  ensureVisibilityHook();
+  bgmPlaying = true;
+  if (bgmTimer != null) return;
   bgmStep = 0;
-  bgmTimer = setInterval(bgmTick, THEMES[bgmTheme].stepMs);
+  startTimer();
 }
 
 /** Switch BGM theme (and optional pitch transpose for deeper chapters). */
@@ -573,17 +605,16 @@ export function setBgmTheme(theme: BgmTheme, transpose = 1): void {
   bgmTheme = theme;
   bgmTranspose = transpose;
   bgmStep = 0;
-  if (bgmTimer != null) {
-    clearInterval(bgmTimer);
-    bgmTimer = setInterval(bgmTick, THEMES[theme].stepMs);
+  // Only (re)start the timer if music is wanted and the tab is visible.
+  clearTimer();
+  if (bgmPlaying && !muted && (typeof document === "undefined" || !document.hidden)) {
+    startTimer();
   }
 }
 
 export function stopBgm(): void {
-  if (bgmTimer != null) {
-    clearInterval(bgmTimer);
-    bgmTimer = null;
-  }
+  bgmPlaying = false;
+  clearTimer();
 }
 
 export function setMuted(m: boolean): void {

@@ -44,6 +44,9 @@ export default function BattleScreen() {
     if (!auto) return;
     const period = auto === 2 ? 180 : 480;
     const id = setInterval(() => {
+      // Don't churn state / audio in a backgrounded tab — it bloats memory and
+      // stalls the page on return. Resume automatically when visible again.
+      if (typeof document !== "undefined" && document.hidden) return;
       const s = useGameStore.getState();
       if (s.battleState === "player") {
         s.confirm();
