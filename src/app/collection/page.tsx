@@ -14,6 +14,7 @@ import { TITLES, isTitleUnlocked } from "@/data/titles";
 import { SETS } from "@/data/sets";
 import EnemyIcon from "@/components/EnemyIcon";
 import PixelGlyph from "@/components/PixelGlyph";
+import GlyphText from "@/components/GlyphText";
 import { rarityLabel, rarityStyle } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 
@@ -174,7 +175,7 @@ export default function CollectionPage() {
           {SETS.map((set) => (
             <div key={set.key} className="rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/10 p-2">
               <p className="font-bold text-fuchsia-200">
-                {set.icon} {set.name}セット
+                <GlyphText text={set.icon} size={14} /> {set.name}セット
               </p>
               <ul className="mt-1 space-y-0.5 text-[10px] text-fuchsia-100">
                 {set.bonuses.map((b) => (

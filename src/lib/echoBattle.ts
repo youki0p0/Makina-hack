@@ -4,11 +4,11 @@
 // deterministically from a ranking entry. No realtime networking.
 
 import { getDifficulty, normalizeDifficulty } from "@/data/difficulty";
-import { genItem, SLOT_LIST } from "@/data/items";
+import { genItem } from "@/data/items";
 import { modTierForFloor } from "@/data/modifiers";
 import { hashSeed } from "@/lib/itemIcon";
 import type { RankingEntry } from "@/lib/ranking";
-import type { EnemyAbility, Enemy, Equipment } from "@/types/game";
+import type { EnemyAbility, Enemy, Equipment, EquipmentSlot } from "@/types/game";
 
 /** Job → echo behaviour tendency (drives the CPU's special action). */
 const JOB_ABILITY: Record<string, EnemyAbility | null> = {
@@ -105,27 +105,30 @@ export interface EchoRewards {
 }
 
 /**
- * Rewards for defeating an echo (scales with the record's depth/difficulty).
- * `bonus` multiplies all rewards (trials pass TRIAL_REWARD_BONUS for a notch more).
+ * Rewards for defeating an echo. Modest currency — the real prize is a single
+ * piece of gear (see rollEchoEquipment). `bonus` lightly scales it (trials).
  */
 export function echoRewards(entry: RankingEntry, bonus = 1): EchoRewards {
   const floor = Math.max(1, entry.highestFloorReached);
   const diffMult = getDifficulty(normalizeDifficulty(entry.difficulty)).rewardMult;
   return {
-    gold: Math.round((60 + floor * 2.5) * diffMult * bonus),
-    gachaPoints: Math.round((6 + floor * 0.12) * diffMult * bonus),
-    rankPoints: Math.round((10 + floor * 0.06 + (diffMult - 1) * 20) * bonus),
+    gold: Math.round((20 + floor * 0.6) * diffMult * bonus),
+    gachaPoints: Math.round((2 + floor * 0.03) * diffMult * bonus),
+    rankPoints: Math.round((3 + floor * 0.02 + (diffMult - 1) * 6) * bonus),
   };
 }
 
 /**
- * Low chance to drop an "echo equipment": a normal-power item with a distinct
- * (ghostly) look. Deliberately NOT stronger than ordinary gear.
+ * The main Echo Battle reward: ONE "slightly good" piece of gear (weapon / armor
+ * / accessory) with a distinct ghostly look. Always drops, but deliberately NOT
+ * stronger than ordinary gear of the same depth.
  */
-export function rollEchoEquipment(entry: RankingEntry): Equipment | null {
-  if (Math.random() > 0.12) return null;
+const ECHO_SLOTS: EquipmentSlot[] = ["weapon", "armor", "accessory"];
+
+export function rollEchoEquipment(entry: RankingEntry): Equipment {
   const floor = Math.max(1, entry.highestFloorReached);
-  const slot = SLOT_LIST[Math.floor(Math.random() * SLOT_LIST.length)];
+  const slot = ECHO_SLOTS[Math.floor(Math.random() * ECHO_SLOTS.length)];
+  // A touch above the floor's baseline, but no ★ / quality — "ちょっといい".
   const tier = Math.max(1, Math.min(floor, 60));
   const base = genItem(slot, tier);
   return {

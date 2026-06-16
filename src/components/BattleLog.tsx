@@ -1,5 +1,6 @@
 "use client";
 
+import GlyphText from "@/components/GlyphText";
 import { useGameStore } from "@/store/gameStore";
 
 const toneClass = {
@@ -19,7 +20,7 @@ export default function BattleLog() {
       ) : (
         recent.map((entry) => (
           <p key={entry.id} className={toneClass[entry.tone]}>
-            {entry.text}
+            <GlyphText text={entry.text} size={12} />
           </p>
         ))
       )}

@@ -468,6 +468,8 @@ export type GlyphKind =
   | "crown"
   | "star"
   | "bag"
+  | "card"
+  | "save"
   | "rainbow";
 
 const GC = {
@@ -610,6 +612,18 @@ const GLYPHS: Record<GlyphKind, (g: Grid) => void> = {
     rect(g, 4, 6, 11, 8, GC.gold);
     set(g, 6, 5, GC.goldd); set(g, 9, 5, GC.goldd); set(g, 7, 4, GC.goldd); set(g, 8, 4, GC.goldd);
     hline(g, 6, 9, 10, GC.gold);
+  },
+  card: (g) => {
+    rect(g, 4, 3, 11, 13, GC.white);
+    rect(g, 4, 3, 11, 3, "#cbd5e1");
+    // red suit pip
+    disc(g, 7, 7, 1, GC.red); disc(g, 9, 7, 1, GC.red); set(g, 8, 9, GC.red); set(g, 7, 8, GC.red); set(g, 9, 8, GC.red);
+  },
+  save: (g) => {
+    rect(g, 3, 3, 12, 12, GC.blue);
+    rect(g, 5, 3, 10, 6, "#e5e7eb"); // label
+    rect(g, 8, 3, 9, 5, "#1e3a8a"); // slider
+    rect(g, 5, 8, 10, 12, "#1e40af"); // disc area
   },
   rainbow: (g) => {
     const cols = [GC.red, GC.orange, GC.yellow, GC.green, GC.cyan, GC.violet];

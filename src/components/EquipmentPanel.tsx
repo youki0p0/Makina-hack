@@ -4,6 +4,7 @@ import { EQUIP_SLOTS } from "@/lib/battle";
 import { computeSetEffects, getSetDef } from "@/data/sets";
 import ItemIcon from "@/components/ItemIcon";
 import PixelGlyph from "@/components/PixelGlyph";
+import GlyphText from "@/components/GlyphText";
 import { rarityStyle, slotLabel } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 import type { EquippedItems } from "@/types/game";
@@ -26,7 +27,7 @@ export default function EquipmentPanel() {
               const def = getSetDef(t.key);
               return (
                 <li key={t.key}>
-                  {t.icon} {t.name} ({t.pieces}部位)
+                  <GlyphText text={t.icon} size={12} /> {t.name} ({t.pieces}部位)
                   <ul className="ml-3 text-gray-300">
                     {def?.bonuses
                       .filter((b) => t.pieces >= b.pieces)

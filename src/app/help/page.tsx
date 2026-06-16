@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import GlyphText from "@/components/GlyphText";
 import { baseDiceFaces, diceKindIcon } from "@/data/diceFaces";
 
 const PIPS = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
@@ -60,7 +61,7 @@ export default function HelpPage() {
         <div className="space-y-1">
           {STATUS_HELP.map((s) => (
             <div key={s.name} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 p-2 text-xs">
-              <span className="text-lg">{s.icon}</span>
+              <span className="text-lg"><GlyphText text={s.icon} size={18} /></span>
               <span className="w-24 font-bold">{s.name}</span>
               <span className="text-gray-400">{s.desc}</span>
             </div>
@@ -73,7 +74,7 @@ export default function HelpPage() {
         <div className="space-y-1">
           {SYSTEMS.map((s) => (
             <div key={s.name} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 p-2 text-xs">
-              <span className="text-lg">{s.icon}</span>
+              <span className="text-lg"><GlyphText text={s.icon} size={18} /></span>
               <span className="w-40 font-bold">{s.name}</span>
               <span className="text-gray-400">{s.desc}</span>
             </div>

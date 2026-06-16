@@ -2,6 +2,7 @@
 
 import { ARTIFACTS, artifactUpgradeCost } from "@/data/artifacts";
 import PixelGlyph from "@/components/PixelGlyph";
+import GlyphText from "@/components/GlyphText";
 import { useGameStore } from "@/store/gameStore";
 
 export default function ArtifactPanel() {
@@ -32,7 +33,7 @@ export default function ArtifactPanel() {
             >
               <div className="min-w-0">
                 <p className="font-bold text-indigo-200">
-                  {a.icon} {a.name}{" "}
+                  <GlyphText text={a.icon} size={14} /> {a.name}{" "}
                   <span className="text-xs text-gray-400">Lv{level}/{a.maxLevel}</span>
                 </p>
                 <p className="text-[10px] text-gray-400">{a.description}</p>

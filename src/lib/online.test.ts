@@ -11,6 +11,7 @@ import {
 import {
   echoRewards,
   generateEcho,
+  rollEchoEquipment,
   TRIAL_COUNT,
   TRIAL_GHOSTS,
   TRIAL_REWARD_BONUS,
@@ -102,6 +103,15 @@ describe("echo battle generation", () => {
     const r = echoRewards(sample);
     expect(r.gold).toBeGreaterThan(0);
     expect(r.rankPoints).toBeGreaterThan(0);
+  });
+
+  it("always drops one echo item (weapon/armor/accessory)", () => {
+    for (let i = 0; i < 30; i++) {
+      const item = rollEchoEquipment(sample);
+      expect(item.echo).toBe(true);
+      expect(["weapon", "armor", "accessory"]).toContain(item.slot);
+      expect(item.modTier ?? 0).toBe(0); // not a power spike
+    }
   });
 
   it("the trial ladder has 20 escalating ghosts", () => {

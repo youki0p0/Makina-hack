@@ -227,6 +227,8 @@ interface GameState {
   // equipment
   equipItem: (itemIndex: number) => void;
   unequipItem: (slot: keyof EquippedItems) => void;
+  /** Auto-equip the highest-scoring equippable item in every slot. */
+  equipBest: () => void;
 
   // misc
   toggleFavorite: (key: string) => void;
@@ -897,6 +899,42 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
+    equipBest: () => {
+      const state = get();
+      const score = (it: Equipment) =>
+        it.attack * 2 + it.defense * 1.5 + it.maxHp * 0.4 + it.rerollModifier * 25 + (it.modTier ?? 0) * 5;
+      const equipped: EquippedItems = { ...state.equipped };
+      let inventory = [...state.inventory];
+
+      for (const slot of EQUIP_SLOTS) {
+        // Best candidate in inventory for this slot (class-eligible).
+        let bestIdx = -1;
+        let bestScore = equipped[slot] ? score(equipped[slot] as Equipment) : -Infinity;
+        inventory.forEach((it, i) => {
+          if (it.slot !== slot || !canEquip(it, state.classId)) return;
+          const s = score(it);
+          if (s > bestScore) {
+            bestScore = s;
+            bestIdx = i;
+          }
+        });
+        if (bestIdx < 0) continue; // nothing better than what's equipped
+        const chosen = inventory[bestIdx];
+        inventory = inventory.filter((_, i) => i !== bestIdx);
+        if (equipped[slot]) inventory.push(equipped[slot] as Equipment);
+        equipped[slot] = chosen;
+      }
+
+      const stats = currentStats(state.player, equipped);
+      set({
+        equipped,
+        inventory,
+        player: { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) },
+        diceFaces: buildFaces(equipped, state.classId),
+      });
+      persist();
+    },
+
     toggleFavorite: (key: string) => {
       const state = get();
       const favorites = state.favorites.includes(key)
@@ -939,9 +977,12 @@ export const useGameStore = create<GameState>((set, get) => {
         floor === 1 ||
         (floor > 1 && (floor - 1) % 50 === 0 && floor - 1 <= state.checkpoint);
       if (!allowed) return;
+      // Start a chosen run at full HP.
+      const maxHp = currentStats(state.player, state.equipped).maxHp;
       set({
         currentFloor: floor,
         startFloorPref: floor,
+        player: { ...state.player, hp: maxHp },
         battleState: "idle",
         currentEnemy: null,
         lastResult: null,
@@ -1338,12 +1379,16 @@ export const useGameStore = create<GameState>((set, get) => {
     };
 
     const newFloor = state.currentFloor + 1;
-    // Reaching a 50-floor mark sets a checkpoint to restart from on defeat.
+    // A checkpoint is earned by CLEARING a 50-floor boss (not merely reaching it).
+    // Clearing floor 50 unlocks restart/start from 51, etc. The death-restart
+    // anchor (startFloorPref) auto-advances to just past the cleared checkpoint.
     let checkpoint = state.checkpoint;
-    if (newFloor % 50 === 0 && newFloor > checkpoint) {
-      checkpoint = newFloor;
+    let startFloorPref = state.startFloorPref;
+    if (state.currentFloor % 50 === 0 && state.currentFloor > checkpoint) {
+      checkpoint = state.currentFloor;
+      startFloorPref = checkpoint + 1;
       finalLog = pushLogs(finalLog, [
-        { text: `💾 セーブポイント到達！(${newFloor}階クリア) 以降の敗北は${newFloor + 1}階から再開`, tone: "good" },
+        { text: `💾 セーブポイント到達！(${checkpoint}階クリア) 以降の敗北は${checkpoint + 1}階から再開`, tone: "good" },
       ]);
     }
     let discoveredItems = state.progress.discoveredItems;
@@ -1441,6 +1486,7 @@ export const useGameStore = create<GameState>((set, get) => {
       winStreak,
       progress,
       checkpoint,
+      startFloorPref,
       souls,
       gachaPoints: state.gachaPoints + bonusGacha,
       worldCleared,
@@ -1460,9 +1506,11 @@ export const useGameStore = create<GameState>((set, get) => {
     const penalty = state.currentFloor * 100;
     const maxLoss = Math.floor(state.player.gold * 0.9);
     const goldLost = Math.max(0, Math.min(penalty, maxLoss));
+    // Restart from the checkpoint at FULL HP.
+    const restartMaxHp = currentStats(state.player, state.equipped).maxHp;
     const player: Player = {
       ...state.player,
-      hp: 0,
+      hp: restartMaxHp,
       gold: state.player.gold - goldLost,
     };
 
@@ -1479,8 +1527,9 @@ export const useGameStore = create<GameState>((set, get) => {
       streakBonusPct: 0,
     };
 
-    // Restart just AFTER the cleared checkpoint boss (e.g. 50 -> 51).
-    const restart = state.checkpoint > 1 ? state.checkpoint + 1 : 1;
+    // Restart at the run's chosen start floor (auto-advances to the cleared
+    // checkpoint+1, or whatever the player picked in the title pulldown).
+    const restart = state.startFloorPref >= 1 ? state.startFloorPref : 1;
     const finalLog = pushLogs(log, [
       { text: `力尽きた… ゴールド -${goldLost}`, tone: "bad" },
       {

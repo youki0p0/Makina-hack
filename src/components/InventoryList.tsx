@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { canEquip } from "@/data/classes";
+import { canEquip, CLASSES } from "@/data/classes";
 import { SCRAP_VALUE } from "@/lib/loot";
 import { itemKey, rarityLabel, rarityPipString, rarityRank, rarityStyle, slotLabel } from "@/lib/ui";
 import { QUALITIES } from "@/data/quality";
 import { getSetDef } from "@/data/sets";
 import ItemIcon from "@/components/ItemIcon";
 import PixelGlyph from "@/components/PixelGlyph";
+import GlyphText from "@/components/GlyphText";
 import { useGameStore } from "@/store/gameStore";
 import type { Equipment, EquipmentSlot, Rarity } from "@/types/game";
 
@@ -42,7 +43,10 @@ type Sort = "rarity" | "attack" | "defense" | "name";
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "全部" },
   { id: "weapon", label: "武器" },
-  { id: "armor", label: "防具" },
+  { id: "helm", label: "兜" },
+  { id: "armor", label: "鎧" },
+  { id: "gloves", label: "篭手" },
+  { id: "boots", label: "靴" },
   { id: "accessory", label: "装飾" },
 ];
 
@@ -71,6 +75,7 @@ export default function InventoryList() {
   const equipped = useGameStore((s) => s.equipped);
   const favorites = useGameStore((s) => s.favorites);
   const equipItem = useGameStore((s) => s.equipItem);
+  const equipBest = useGameStore((s) => s.equipBest);
   const scrapItem = useGameStore((s) => s.scrapItem);
   const scrapBulk = useGameStore((s) => s.scrapBulk);
   const sellLegendaries = useGameStore((s) => s.sellLegendaries);
@@ -96,14 +101,22 @@ export default function InventoryList() {
 
   return (
     <div className="space-y-2">
-      <h2 className="text-sm font-bold text-gray-300">所持品 ({inventory.length})</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold text-gray-300">所持品 ({inventory.length})</h2>
+        <button
+          onClick={() => equipBest()}
+          className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1 text-[11px] font-bold text-white active:scale-95"
+        >
+          <PixelGlyph kind="attack" size={13} /> 最強装備
+        </button>
+      </div>
 
-      <div className="flex gap-1">
+      <div className="grid grid-cols-4 gap-1">
         {FILTERS.map((f) => (
           <button
             key={f.id}
             onClick={() => setFilter(f.id)}
-            className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 ${
+            className={`h-8 rounded-lg text-[11px] font-bold active:scale-95 ${
               filter === f.id ? "bg-emerald-600 text-white" : "bg-white/10 text-gray-300"
             }`}
           >
@@ -301,12 +314,20 @@ function EquipmentDetailModal({
           {item.modTier ? ` ・ ★${item.modTier}` : ""}
         </span>
 
+        <p className="mt-1 text-[10px] text-gray-400">
+          {(() => {
+            const ok = CLASSES.filter((c) => canEquip(item, c.id));
+            if (ok.length >= CLASSES.length) return "装備可能: 全職業";
+            return `装備可能: ${ok.map((c) => c.name).join(" / ")}`;
+          })()}
+        </p>
+
         <p className="mt-2 text-sm text-gray-200">{item.description}</p>
 
         {item.setId && getSetDef(item.setId) && (
           <div className="mt-3 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 p-2">
             <p className="text-[10px] font-bold text-fuchsia-300">
-              {getSetDef(item.setId)!.icon} {getSetDef(item.setId)!.name}セット
+              <GlyphText text={getSetDef(item.setId)!.icon} size={12} /> {getSetDef(item.setId)!.name}セット
             </p>
             <ul className="mt-1 space-y-0.5 text-[10px] text-fuchsia-100">
               {getSetDef(item.setId)!.bonuses.map((b) => (

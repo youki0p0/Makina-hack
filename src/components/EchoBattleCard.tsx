@@ -3,6 +3,7 @@
 import { getClass } from "@/data/classes";
 import { getDifficulty, normalizeDifficulty } from "@/data/difficulty";
 import PixelGlyph from "@/components/PixelGlyph";
+import { classGlyphKind } from "@/lib/uiGlyphs";
 import type { RankingEntry } from "@/lib/ranking";
 
 /** A selectable "echo" (someone's record reconstructed as a foe). */
@@ -25,7 +26,7 @@ export default function EchoBattleCard({
           {entry.playerName}の残響 {power && <span className="text-amber-300">{power}</span>}
         </p>
         <p className="text-[10px] text-gray-400">
-          {cls.icon} {cls.name} ・ {diff.name} ・ {entry.highestFloorReached}F到達
+          <PixelGlyph kind={classGlyphKind(entry.job as never)} size={11} /> {cls.name} ・ {diff.name} ・ {entry.highestFloorReached}F到達
           {entry.hasShinkiMakina && <PixelGlyph kind="rainbow" size={12} className="ml-1" />}
         </p>
       </div>
