@@ -87,6 +87,16 @@ export default function InventoryList() {
 
   const selectedItem = selected !== null ? inventory[selected] : null;
 
+  // "Stronger than what's equipped in this slot" → show a ▲ to speed decisions.
+  const itemScore = (it: Equipment) =>
+    it.attack * 2 + it.defense * 1.5 + it.maxHp * 0.4 + it.rerollModifier * 25 + (it.modTier ?? 0) * 5;
+  const isUpgrade = (it: Equipment) => {
+    if (!canEquip(it, classId)) return false;
+    const cur = equipped[it.slot];
+    if (cur && itemKey(cur) === itemKey(it)) return false;
+    return !cur || itemScore(it) > itemScore(cur);
+  };
+
   // Keep original indices for equip/scrap while filtering+sorting for display.
   const rows = inventory
     .map((item, index) => ({ item, index }))
@@ -213,6 +223,7 @@ export default function InventoryList() {
                       }`}
                     >
                       <RarityPips item={item} />{" "}
+                      {isUpgrade(item) && <span className="text-emerald-400" title="装備中より強い">▲</span>}
                       {item.name}
                       {item.equipTag && (
                         <span className="ml-1 text-[9px] text-gray-400">[{TAG_LABEL[item.equipTag]}]</span>

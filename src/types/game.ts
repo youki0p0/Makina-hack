@@ -333,6 +333,8 @@ export interface BattleResult {
   goldGained: number;
   goldLost: number;
   drop: Equipment | null;
+  /** Total equipment pieces dropped this victory (drop is the first). */
+  dropCount?: number;
   leveledUp: boolean;
   /** Consumable that dropped and was auto-used this victory. */
   consumable: Consumable | null;

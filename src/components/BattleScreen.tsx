@@ -11,6 +11,7 @@ import ShopScreen from "@/components/ShopScreen";
 import SoundToggle from "@/components/SoundToggle";
 import { sfx } from "@/lib/audio";
 import { rarityStyle } from "@/lib/ui";
+import { fmt } from "@/lib/ui";
 import ItemIcon from "@/components/ItemIcon";
 import PixelGlyph from "@/components/PixelGlyph";
 import { getWorld, getWorldBackground, FINAL_FLOOR } from "@/data/worlds";
@@ -27,7 +28,7 @@ export default function BattleScreen() {
   const endlessMessage = useGameStore((s) => s.endlessMessage);
   const enterCurrentFloor = useGameStore((s) => s.enterCurrentFloor);
   const confirm = useGameStore((s) => s.confirm);
-  const [auto, setAuto] = useState(false);
+  const [auto, setAuto] = useState<0 | 1 | 2>(0); // 0 off / 1 auto / 2 fast
   const world = getWorld(currentFloor);
 
   // On entering with nothing in progress, resolve the floor (battle or shop).
@@ -42,17 +43,18 @@ export default function BattleScreen() {
   // Pauses on shop floors; stops on defeat. (diceValue retriggers each turn.)
   useEffect(() => {
     if (!auto) return;
+    const fast = auto === 2;
     if (battleState === "player") {
-      const t = setTimeout(() => confirm(), 450);
+      const t = setTimeout(() => confirm(), fast ? 160 : 450);
       return () => clearTimeout(t);
     }
     if (battleState === "won") {
       // Pause auto-advance while a narrative/world overlay is up.
       if (pendingEnding || endlessMessage || worldCleared !== null) return;
-      const t = setTimeout(() => enterCurrentFloor(), 750);
+      const t = setTimeout(() => enterCurrentFloor(), fast ? 300 : 750);
       return () => clearTimeout(t);
     }
-    if (battleState === "lost") setAuto(false);
+    if (battleState === "lost") setAuto(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auto, battleState, diceValue]);
 
@@ -78,12 +80,12 @@ export default function BattleScreen() {
         </Link>
         <div className="flex gap-2">
           <button
-            onClick={() => setAuto((a) => !a)}
+            onClick={() => setAuto((a) => ((a + 1) % 3) as 0 | 1 | 2)}
             className={`rounded-lg px-3 py-1 text-xs font-bold active:scale-95 ${
               auto ? "bg-amber-500 text-black" : "bg-white/10 text-gray-300"
             }`}
           >
-            {auto ? "⏩ オート中" : "⏵ オート"}
+            {auto === 0 ? "⏵ オート" : auto === 1 ? "⏩ オート中" : "⏩⏩ ×2"}
           </button>
           <SoundToggle />
           <Link
@@ -305,8 +307,8 @@ function ResultOverlay() {
 
         {victory ? (
           <div className="mt-3 space-y-1 text-sm text-gray-200">
-            <p>EXP +{result.expGained}</p>
-            <p>ゴールド +{result.goldGained}</p>
+            <p>EXP +{fmt(result.expGained)}</p>
+            <p>ゴールド +{fmt(result.goldGained)}</p>
             {result.streakBonusPct > 0 && (
               <p className="flex items-center justify-center gap-1 text-orange-300">
                 <PixelGlyph kind="fire" size={14} /> {result.winStreak}連勝 ボーナス +{result.streakBonusPct}%
@@ -321,6 +323,9 @@ function ResultOverlay() {
                 <div className="min-w-0 flex-1">
                   <p className={`flex items-center gap-1 font-bold ${rarityStyle[result.drop.rarity].text}`}>
                     <PixelGlyph kind="drop" size={14} /> {result.drop.name}
+                    {result.dropCount && result.dropCount > 1 && (
+                      <span className="ml-1 text-[10px] text-gray-300">ほか +{result.dropCount - 1}個</span>
+                    )}
                   </p>
                   <p className="mt-0.5 text-xs text-gray-300">{result.drop.description}</p>
                 </div>
@@ -343,7 +348,7 @@ function ResultOverlay() {
           </div>
         ) : (
           <div className="mt-3 space-y-1 text-sm text-gray-200">
-            <p>ゴールド -{result.goldLost}</p>
+            <p>ゴールド -{fmt(result.goldLost)}</p>
             <p className="text-xs text-gray-400">
               {floor > 1 ? `セーブポイント ${floor}階 から再開。` : "ダンジョンの最初に戻された。"}
             </p>

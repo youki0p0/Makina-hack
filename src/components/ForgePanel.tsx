@@ -13,6 +13,7 @@ import {
 import { getItemInstance } from "@/data/items";
 import { modTierForFloor } from "@/data/modifiers";
 import { itemKey, rarityStyle, slotLabel } from "@/lib/ui";
+import { fmt } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 import type { Equipment, EquipmentSlot } from "@/types/game";
 
@@ -40,7 +41,7 @@ export default function ForgePanel() {
           <PixelGlyph kind="attack" size={16} /> 鍛冶屋
         </h2>
         <span className="flex items-center gap-1 text-xs text-purple-200">
-          <PixelGlyph kind="material" size={13} /> {points}
+          <PixelGlyph kind="material" size={13} /> {fmt(points)}
         </span>
       </div>
       <p className="text-[10px] text-gray-500">
@@ -121,7 +122,7 @@ function Row({ item, label, onClick }: { item: Equipment; label: string; onClick
           {item.name}
         </p>
         <p className="text-[10px] text-gray-400">
-          {label} ・ 攻{item.attack} 防{item.defense} HP{item.maxHp}
+          {label} ・ 攻{fmt(item.attack)} 防{fmt(item.defense)} HP{fmt(item.maxHp)}
         </p>
       </div>
       <span className="text-xs text-gray-400">›</span>
@@ -192,8 +193,8 @@ function ForgeDetail({
   const stat = (label: string, cur: number, nx: number) =>
     cur === 0 && nx === 0 ? null : (
       <p key={label}>
-        {label} {cur}
-        {!maxed && nx !== cur && <span className="text-emerald-300"> → {nx}</span>}
+        {label} {fmt(cur)}
+        {!maxed && nx !== cur && <span className="text-emerald-300"> → {fmt(nx)}</span>}
       </p>
     );
 
@@ -237,14 +238,14 @@ function ForgeDetail({
               disabled={maxed || points < cost}
               className="flex h-12 items-center justify-center gap-1 rounded-xl bg-amber-600 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
             >
-              <PixelGlyph kind="material" size={13} /> 鍛える {cost}
+              <PixelGlyph kind="material" size={13} /> 鍛える {fmt(cost)}
             </button>
             <button
               onClick={() => onForge(true)}
               disabled={maxed || points < protectCost}
               className="flex h-12 items-center justify-center gap-1 rounded-xl bg-sky-700 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
             >
-              <PixelGlyph kind="lock" size={13} /> 守護 {protectCost}
+              <PixelGlyph kind="lock" size={13} /> 守護 {fmt(protectCost)}
             </button>
             <button
               onClick={onCombine}
@@ -258,7 +259,7 @@ function ForgeDetail({
               disabled={modTier >= starCap || points < starCost}
               className="flex h-12 items-center justify-center gap-1 rounded-xl bg-indigo-700 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
             >
-              <PixelGlyph kind="star" size={13} /> ★注入 {starCost}
+              <PixelGlyph kind="star" size={13} /> ★注入 {fmt(starCost)}
             </button>
           </div>
           <p className="text-[10px] text-gray-500">

@@ -3,6 +3,7 @@
 import { getClass } from "@/data/classes";
 import PixelGlyph from "@/components/PixelGlyph";
 import { classGlyphKind, consumableGlyphKind } from "@/lib/uiGlyphs";
+import { fmt } from "@/lib/ui";
 import { getTitle } from "@/data/titles";
 import { useDamageFx } from "@/hooks/useDamageFx";
 import { useGameStore } from "@/store/gameStore";
@@ -61,7 +62,7 @@ export default function PlayerBar() {
             )}
             <span className="flex items-center text-amber-300">
               <PixelGlyph kind="gold" size={14} />
-              {player.gold}
+              {fmt(player.gold)}
             </span>
           </span>
         </div>
@@ -74,13 +75,13 @@ export default function PlayerBar() {
             />
           </div>
           <span className="shrink-0 text-[11px] text-gray-300">
-            {Math.max(0, player.hp)}/{stats.maxHp}
+            {fmt(Math.max(0, player.hp))}/{fmt(stats.maxHp)}
           </span>
         </div>
 
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-300">
-          <span className="flex items-center gap-0.5"><PixelGlyph kind="attack" size={14} />{stats.attack}</span>
-          <span className="flex items-center gap-0.5"><PixelGlyph kind="defense" size={14} />{stats.defense}</span>
+          <span className="flex items-center gap-0.5"><PixelGlyph kind="attack" size={14} />{fmt(stats.attack)}</span>
+          <span className="flex items-center gap-0.5"><PixelGlyph kind="defense" size={14} />{fmt(stats.defense)}</span>
           <span className="flex items-center gap-0.5"><PixelGlyph kind="dice" size={14} />{stats.rerolls}</span>
           {buffs.map((b, i) => (
             <span key={`${b.kind}-${i}`} className="flex items-center text-emerald-300">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import PlayerStatus from "@/components/PlayerStatus";
 import PixelGlyph from "@/components/PixelGlyph";
+import { fmt } from "@/lib/ui";
 import { rarityLabel, rarityStyle, slotLabel } from "@/lib/ui";
 import { getWorld, getWorldBackground } from "@/data/worlds";
 import { useGameStore } from "@/store/gameStore";
@@ -29,7 +30,7 @@ export default function ShopScreen() {
         <Link href="/" className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">
           ← タイトル
         </Link>
-        <span className="flex items-center gap-1 text-xs text-amber-300"><PixelGlyph kind="gold" size={14} /> {gold}</span>
+        <span className="flex items-center gap-1 text-xs text-amber-300"><PixelGlyph kind="gold" size={14} /> {fmt(gold)}</span>
       </div>
 
       <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-2 text-center">
@@ -64,7 +65,7 @@ export default function ShopScreen() {
                     {name} <span className="text-[10px] text-gray-400">{rarityLabel[rarity]}</span>
                   </p>
                   <span className="ml-2 flex shrink-0 items-center gap-0.5 text-xs font-bold text-emerald-300">
-                    {entry.sold ? "売切" : <><PixelGlyph kind="gold" size={12} />{entry.price}</>}
+                    {entry.sold ? "売切" : <><PixelGlyph kind="gold" size={12} />{fmt(entry.price)}</>}
                   </span>
                 </div>
                 <p className="mt-0.5 text-[10px] text-gray-300">{desc}</p>
@@ -86,7 +87,7 @@ export default function ShopScreen() {
                   disabled={!affordable}
                   className="ml-2 flex shrink-0 items-center gap-0.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white active:scale-95 disabled:opacity-40"
                 >
-                  {entry.sold ? "売切" : <><PixelGlyph kind="gold" size={12} />{entry.price}</>}
+                  {entry.sold ? "売切" : <><PixelGlyph kind="gold" size={12} />{fmt(entry.price)}</>}
                 </button>
               </div>
               <p className="mt-0.5 text-[10px] text-gray-300">{desc}</p>

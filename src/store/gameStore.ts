@@ -1510,6 +1510,7 @@ export const useGameStore = create<GameState>((set, get) => {
       goldGained,
       goldLost: 0,
       drop,
+      dropCount: drops.length,
       leveledUp,
       consumable,
       healed,

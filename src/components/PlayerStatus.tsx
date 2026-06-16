@@ -2,6 +2,7 @@
 
 import { getClass } from "@/data/classes";
 import PixelGlyph from "@/components/PixelGlyph";
+import { fmt } from "@/lib/ui";
 import { classGlyphKind, consumableGlyphKind } from "@/lib/uiGlyphs";
 import { getTitle } from "@/data/titles";
 import { useDamageFx } from "@/hooks/useDamageFx";
@@ -45,7 +46,7 @@ export default function PlayerStatus() {
           {streak >= 2 && (
             <span className="flex items-center text-orange-300"><PixelGlyph kind="fire" size={13} />{streak}</span>
           )}
-          <span className="flex items-center gap-0.5 text-amber-300"><PixelGlyph kind="gold" size={13} /> {player.gold}</span>
+          <span className="flex items-center gap-0.5 text-amber-300"><PixelGlyph kind="gold" size={13} /> {fmt(player.gold)}</span>
         </span>
       </div>
 
@@ -53,7 +54,7 @@ export default function PlayerStatus() {
         <div className="flex justify-between text-xs text-gray-300">
           <span>HP</span>
           <span>
-            {Math.max(0, player.hp)} / {stats.maxHp}
+            {fmt(Math.max(0, player.hp))} / {fmt(stats.maxHp)}
           </span>
         </div>
         <div className="mt-1 h-3 w-full overflow-hidden rounded-full bg-gray-800">
@@ -65,8 +66,8 @@ export default function PlayerStatus() {
       </div>
 
       <div className="mt-2 flex justify-between text-xs text-gray-300">
-        <span className="flex items-center gap-0.5"><PixelGlyph kind="attack" size={13} /> 攻 {stats.attack}</span>
-        <span className="flex items-center gap-0.5"><PixelGlyph kind="defense" size={13} /> 防 {stats.defense}</span>
+        <span className="flex items-center gap-0.5"><PixelGlyph kind="attack" size={13} /> 攻 {fmt(stats.attack)}</span>
+        <span className="flex items-center gap-0.5"><PixelGlyph kind="defense" size={13} /> 防 {fmt(stats.defense)}</span>
         <span className="flex items-center gap-0.5"><PixelGlyph kind="dice" size={13} /> 振直 {stats.rerolls}</span>
       </div>
 

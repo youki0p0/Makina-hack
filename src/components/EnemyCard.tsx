@@ -4,6 +4,7 @@ import { ENEMY_ABILITY_LABEL } from "@/data/enemies";
 import EnemyIcon from "@/components/EnemyIcon";
 import PixelGlyph from "@/components/PixelGlyph";
 import { useDamageFx } from "@/hooks/useDamageFx";
+import { fmt } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 import type { ActiveStatus, StatusKind } from "@/types/game";
 
@@ -75,11 +76,11 @@ export default function EnemyCard() {
           <span className="shrink-0 text-[10px] text-gray-400">{floor}階</span>
         </div>
         <p className="text-xs text-gray-300">
-          HP {Math.max(0, enemy.hp)}/{enemy.maxHp}
+          HP {fmt(Math.max(0, enemy.hp))}/{fmt(enemy.maxHp)}
         </p>
         <p className="flex items-center gap-x-2 text-[11px] text-gray-400">
-          <span className="flex items-center gap-0.5"><PixelGlyph kind="attack" size={13} />{eatk}</span>
-          <span className="flex items-center gap-0.5"><PixelGlyph kind="defense" size={13} />{edef}</span>
+          <span className="flex items-center gap-0.5"><PixelGlyph kind="attack" size={13} />{fmt(eatk)}</span>
+          <span className="flex items-center gap-0.5"><PixelGlyph kind="defense" size={13} />{fmt(edef)}</span>
           {enemy.ability && (
             <span className="text-rose-300">{ENEMY_ABILITY_LABEL[enemy.ability]}</span>
           )}
