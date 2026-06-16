@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import ForgePanel from "@/components/ForgePanel";
+import PixelGlyph from "@/components/PixelGlyph";
 import PlayerStatus from "@/components/PlayerStatus";
 import { useGameStore } from "@/store/gameStore";
 
@@ -28,9 +29,9 @@ export default function ForgePage() {
         </Link>
         <Link
           href="/inventory"
-          className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
+          className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
         >
-          🎒 装備
+          <PixelGlyph kind="bag" size={14} /> 装備
         </Link>
       </div>
       <PlayerStatus />
