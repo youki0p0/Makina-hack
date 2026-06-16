@@ -258,23 +258,31 @@ function themeFor(world: World): BgTheme {
   }
 }
 
+/** Scale down every opacity in an SVG so a texture reads as a faint hint. */
+function dampenSvg(svg: string, factor: number): string {
+  return svg.replace(/opacity='([\d.]+)'/g, (_m, v) =>
+    `opacity='${(parseFloat(v) * factor).toFixed(2)}'`,
+  );
+}
+
 /**
- * High-quality, fully procedural background for a world (no image assets):
- * a themed SVG texture over layered atmospheric gradients — a top accent glow,
- * a bottom "horizon" glow, the base chapter gradient, and an edge vignette.
+ * Fully procedural background for a world (no image assets), tuned for
+ * READABILITY: the chapter keeps its color identity, but a dark scrim sits over
+ * everything and the themed texture is heavily dampened so text stays legible.
  */
 export function getWorldBackground(world: World): string {
   const t = themeFor(world);
   const a = world.accent;
   return [
-    // texture (top)
-    `${svgLayer(t.texture)} 0 0 / ${t.tile}px ${t.tile}px repeat`,
+    // very faint themed texture (top)
+    `${svgLayer(dampenSvg(t.texture, 0.4))} 0 0 / ${t.tile}px ${t.tile}px repeat`,
+    // readability scrim — darkens everything beneath for high text contrast
+    `linear-gradient(rgba(6,6,10,0.62), rgba(6,6,10,0.72))`,
+    // gentle accent glow + horizon glow (muted)
+    `radial-gradient(120% 70% at 50% -12%, ${hexA(a, 0.1)} 0%, transparent 60%)`,
+    `radial-gradient(120% 55% at 50% 116%, ${hexA(t.glow, 0.14)} 0%, transparent 70%)`,
     // edge vignette for depth
-    `radial-gradient(120% 90% at 50% 38%, transparent 52%, rgba(0,0,0,.6) 100%)`,
-    // soft accent glow from above
-    `radial-gradient(120% 70% at 50% -12%, ${hexA(a, 0.22)} 0%, transparent 60%)`,
-    // horizon glow from below
-    `radial-gradient(120% 55% at 50% 116%, ${hexA(t.glow, 0.35)} 0%, transparent 70%)`,
+    `radial-gradient(120% 92% at 50% 40%, transparent 50%, rgba(0,0,0,.55) 100%)`,
     // base chapter gradient (bottom)
     world.background,
   ].join(", ");

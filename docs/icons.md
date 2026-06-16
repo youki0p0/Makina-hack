@@ -51,9 +51,10 @@ weaken/heal/shop/casino/codex/lock/unlock/ghost/ranking/home/help/crown/star/bag
 
 ## 背景（手続き生成・高品質）
 
-`getWorldBackground(world)`（`data/worlds.ts`）が**画像なし**で章ごとの高品質背景を合成:
-テーマSVGテクスチャ（草・鍾乳石・石壁・雪・残り火・星座・回路など）＋大気グラデ（上方アクセント光・
-下方ホライズン光）＋エッジヴィネット＋基底グラデ。戦闘画面・ショップに適用。
+`getWorldBackground(world)`（`data/worlds.ts`）が**画像なし**で章ごとの背景を合成:
+テーマSVGテクスチャ（草・鍾乳石・石壁・雪・残り火・星座・回路など）＋大気グラデ＋エッジヴィネット
+＋基底グラデ。**可読性優先**で、テクスチャは大幅に減光（`dampenSvg`）し、暗いスクリムを重ねて
+文字のコントラストを確保している。戦闘画面・ショップに適用。
 
 ## 表示サイズ
 
