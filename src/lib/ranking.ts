@@ -193,16 +193,34 @@ export function rankingSource(): "supabase" | "local" {
   return isSupabaseConfigured() ? "supabase" : "local";
 }
 
-/** Load ranking entries, falling back to local on missing config or any error. */
+function dedup(entries: RankingEntry[]): RankingEntry[] {
+  const seen = new Set<string>();
+  const out: RankingEntry[] = [];
+  for (const e of entries) {
+    const k = `${e.playerName}|${e.updatedAt}|${e.highestFloorReached}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(e);
+  }
+  return out;
+}
+
+/**
+ * Load ranking entries. ALWAYS merges the local copy so the player sees their
+ * own record even if the Supabase insert failed/lagged (the reported "登録しても
+ * 追加されない" bug). Falls back to local + dummy when Supabase is absent/erroring.
+ */
 export async function loadRanking(filter: RankingFilter): Promise<RankingEntry[]> {
+  const local = readLocal();
   if (isSupabaseConfigured()) {
     try {
-      return await supabaseRankingRepository.list(filter);
+      const remote = await supabaseRankingRepository.list({ kind: "total" });
+      return rankEntries(dedup([...remote, ...local]), filter);
     } catch {
       // Supabase outage → local still works.
     }
   }
-  return localRankingRepository.list(filter);
+  return rankEntries(dedup([...DUMMY_RANKING, ...local]), filter);
 }
 
 /**
