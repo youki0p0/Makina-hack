@@ -60,6 +60,21 @@ describe("set bonuses", () => {
     expect(computeSetEffects(equipSet("gambler", 1)).activeTiers).toHaveLength(0);
   });
 
+  it("has 9 named sets including the new variations", () => {
+    const keys = SETS.map((s) => s.key);
+    expect(SETS.length).toBe(9);
+    expect(keys).toEqual(
+      expect.arrayContaining(["guardian", "storm", "inferno", "revenant", "trickster"]),
+    );
+  });
+
+  it("guardian gives defense/HP at 2pc and lifesteal at 6pc", () => {
+    const two = computeSetEffects(equipSet("guardian", 2));
+    expect(two.statBonus.maxHp).toBeGreaterThan(0);
+    expect(two.statBonus.defense).toBeGreaterThan(0);
+    expect(computeSetEffects(equipSet("guardian", 6)).lifestealAllPct).toBeGreaterThan(0);
+  });
+
   it("every named set has six equippable pieces, reconstructable by id", () => {
     for (const set of SETS) {
       for (const slot of EQUIP_SLOTS) {

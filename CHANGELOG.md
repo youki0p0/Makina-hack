@@ -11,7 +11,8 @@ All notable changes to Dice Ex Machina.
 - **場所別BGM**: `audio.ts` テーマ駆動化（dungeon/world/casino/forge/boss）。`AudioController` が pathname＋floor で切替（50階ごとにworldのキー上昇、大ボスはboss、鍛冶屋は金床打撃）。
 - **セーブ v4**: 「バッグのみ引継ぎ」— v3→v4 で inventory/equipped のみ移行し他はリセット。
 - **装備中の詳細表示**: 装備画面の装備をタップで詳細（ステ/出目/セット/装備可能職業/鍛冶・★）。
-- docs/blacksmith.md 追加。test 98件グリーン／build 成功。
+- **名前付きセットを4→9種に拡張**: 守護者/雷迅/業火/不死/幻惑 を追加（既存プリミティブの新組合せ）。
+- docs/blacksmith.md 追加。test 102件グリーン／build 成功。
 
 ## [Unreleased] — 背景の可読性改善
 
