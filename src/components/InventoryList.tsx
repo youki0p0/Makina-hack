@@ -162,7 +162,7 @@ export default function InventoryList() {
       </div>
       <button
         onClick={() => {
-          const SELL_GOLD = 500;
+          const PER = 24;
           const targets = inventory.filter(
             (it) =>
               it.rarity === "legendary" && !favorites.includes(itemKey(it)),
@@ -170,7 +170,7 @@ export default function InventoryList() {
           if (targets.length === 0) return;
           if (
             confirm(
-              `未装備・未ロックのレジェンド ${targets.length}個 を売却して 💰+${targets.length * SELL_GOLD}`,
+              `未装備・未ロックのレジェンド ${targets.length}個 を一括分解して 素材+${targets.length * PER}`,
             )
           ) {
             sellLegendaries();
@@ -178,10 +178,10 @@ export default function InventoryList() {
         }}
         className="flex h-8 w-full items-center justify-center gap-1 rounded-lg bg-amber-600/80 text-[11px] font-bold text-white active:scale-95"
       >
-        <PixelGlyph kind="rainbow" size={14} /> 未装備レジェンドを一括売却（ロック除外）
+        <PixelGlyph kind="material" size={14} /> 未装備レジェンドを一括分解（素材・ロック除外）
       </button>
       <p className="flex items-center gap-1 text-[10px] text-gray-500">
-        <PixelGlyph kind="lock" size={12} /> ロックした装備は分解・一括売却の対象外です。
+        <PixelGlyph kind="lock" size={12} /> ロックした装備は分解の対象外です。
       </p>
 
       {rows.length === 0 ? (

@@ -418,10 +418,10 @@ export function applyExp(player: Player, expGained: number): LevelUpResult {
       ...next,
       exp: next.exp - next.expToNext,
       level: next.level + 1,
-      maxHp: next.maxHp + 8,
-      hp: next.maxHp + 8, // full heal on level up
-      baseAttack: next.baseAttack + 2,
-      baseDefense: next.baseDefense + 1,
+      maxHp: next.maxHp + 11,
+      hp: next.maxHp + 11, // full heal on level up
+      baseAttack: next.baseAttack + 3,
+      baseDefense: next.baseDefense + 2,
       expToNext: expForLevel(next.level + 1),
     };
     levelsGained += 1;

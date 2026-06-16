@@ -1,6 +1,6 @@
 import type { Progress } from "@/types/game";
 
-export type FeatureId = "casino" | "artifacts";
+export type FeatureId = "casino" | "artifacts" | "forge";
 
 export interface FeatureUnlock {
   id: FeatureId;
@@ -18,6 +18,11 @@ export const FEATURE_UNLOCKS: Record<FeatureId, FeatureUnlock> = {
     id: "casino",
     check: (p) => p.bossKills >= 1,
     hint: "ボスを1体撃破で解放",
+  },
+  forge: {
+    id: "forge",
+    check: (p) => p.maxFloor >= 10,
+    hint: "10階に到達で解放",
   },
 };
 

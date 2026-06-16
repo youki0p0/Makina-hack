@@ -2,7 +2,7 @@ import type { DiceKind, Equipment, Rarity } from "@/types/game";
 
 /** Stable key for an item instance (base id + affix + ★ tier), used for locks. */
 export function itemKey(item: Equipment): string {
-  return `${item.id}:${item.affixId ?? ""}:${item.modTier ?? 0}`;
+  return `${item.id}:${item.affixId ?? ""}:${item.modTier ?? 0}:${item.forgeLevel ?? 0}`;
 }
 
 /** Sort rank for rarity (higher = rarer). */

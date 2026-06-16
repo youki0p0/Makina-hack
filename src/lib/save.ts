@@ -1,8 +1,8 @@
-import { normalizeProgress } from "@/data/achievements";
-import { normalizeArtifacts } from "@/data/artifacts";
+import { defaultProgress, normalizeProgress } from "@/data/achievements";
+import { defaultArtifactLevels, normalizeArtifacts } from "@/data/artifacts";
 import { normalizeClassId } from "@/data/classes";
 import { getItemInstance } from "@/data/items";
-import { EQUIP_SLOTS } from "@/lib/battle";
+import { EQUIP_SLOTS, expForLevel } from "@/lib/battle";
 import type {
   ArtifactLevels,
   ClassId,
@@ -19,9 +19,11 @@ import type {
  * Bump this whenever the save shape changes incompatibly. During the debug era
  * we simply DISCARD older saves (no migration) so the data model can evolve.
  */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
-const STORAGE_KEY = "dice-hackslash-save-v3";
+const STORAGE_KEY = "dice-hackslash-save-v4";
+/** Previous version key — read for a one-time "bag only" carry-over. */
+const PREV_STORAGE_KEY = "dice-hackslash-save-v3";
 
 function toSavedItem(item: Equipment | null): SavedItem | null {
   if (!item) return null;
@@ -29,6 +31,8 @@ function toSavedItem(item: Equipment | null): SavedItem | null {
   if (item.affixId) out.affixId = item.affixId;
   if (item.modTier && item.modTier > 0) out.modTier = item.modTier;
   if (item.quality) out.quality = item.quality;
+  if (item.forgeLevel && item.forgeLevel > 0) out.forgeLevel = item.forgeLevel;
+  if (item.forgeStreak && item.forgeStreak > 0) out.forgeStreak = item.forgeStreak;
   return out;
 }
 
@@ -51,6 +55,71 @@ export interface LoadedState {
   checkpoint: number;
   tapToBuy: boolean;
   startFloorPref: number;
+}
+
+/** A fresh save (everything reset) but keeping the given bag (gear). */
+function freshLoaded(equipped: EquippedItems, inventory: Equipment[]): LoadedState {
+  const player: Player = {
+    level: 1,
+    exp: 0,
+    expToNext: expForLevel(1),
+    maxHp: 50,
+    hp: 50,
+    baseAttack: 8,
+    baseDefense: 2,
+    gold: 0,
+  };
+  return {
+    player,
+    equipped,
+    inventory,
+    currentFloor: 1,
+    gachaPoints: 0,
+    souls: 0,
+    artifacts: defaultArtifactLevels(),
+    classId: normalizeClassId(undefined),
+    winStreak: 0,
+    progress: defaultProgress(),
+    favorites: [],
+    seenHelp: false,
+    titleId: "",
+    difficulty: "normal",
+    handedness: "right",
+    checkpoint: 1,
+    tapToBuy: false,
+    startFloorPref: 1,
+  };
+}
+
+/**
+ * One-time carry-over from the v3 save: keep ONLY the bag (inventory + equipped),
+ * reset progression/economy ("バッグのみ引継ぎ"). Writes a v4 save and drops v3.
+ */
+function migrateFromV3(): LoadedState | null {
+  if (typeof window === "undefined") return null;
+  const prev = window.localStorage.getItem(PREV_STORAGE_KEY);
+  if (!prev) return null;
+  try {
+    const data = JSON.parse(prev) as SaveData;
+    if (!data.player) {
+      window.localStorage.removeItem(PREV_STORAGE_KEY);
+      return null;
+    }
+    const equipped = EQUIP_SLOTS.reduce((acc, slot) => {
+      const s = data.equippedItems?.[slot];
+      acc[slot] = s ? getItemInstance(s.id, s.affixId, s.modTier, s.quality) : null;
+      return acc;
+    }, {} as EquippedItems);
+    const inventory = (data.inventoryItems ?? [])
+      .map((s) => getItemInstance(s.id, s.affixId, s.modTier, s.quality))
+      .filter((i): i is Equipment => i !== null);
+    const migrated = freshLoaded(equipped, inventory);
+    saveGame(migrated);
+    window.localStorage.removeItem(PREV_STORAGE_KEY);
+    return migrated;
+  } catch {
+    return null;
+  }
 }
 
 export function saveGame(state: LoadedState): void {
@@ -94,7 +163,8 @@ export function loadGame(): LoadedState | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
+    // No v4 save yet: carry over ONLY the bag (inventory+equipped) from v3.
+    if (!raw) return migrateFromV3();
     const data = JSON.parse(raw) as SaveData;
 
     // Debug-era policy: discard saves from an older schema version.
@@ -102,12 +172,14 @@ export function loadGame(): LoadedState | null {
 
     const equipped = EQUIP_SLOTS.reduce((acc, slot) => {
       const saved = data.equippedItems?.[slot];
-      acc[slot] = saved ? getItemInstance(saved.id, saved.affixId, saved.modTier, saved.quality) : null;
+      acc[slot] = saved
+        ? getItemInstance(saved.id, saved.affixId, saved.modTier, saved.quality, saved.forgeLevel, saved.forgeStreak)
+        : null;
       return acc;
     }, {} as EquippedItems);
 
     const inventory = (data.inventoryItems ?? [])
-      .map((s) => getItemInstance(s.id, s.affixId, s.modTier, s.quality))
+      .map((s) => getItemInstance(s.id, s.affixId, s.modTier, s.quality, s.forgeLevel, s.forgeStreak))
       .filter((i): i is Equipment => i !== null);
 
     return {

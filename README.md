@@ -59,6 +59,7 @@ Next.js (App Router) + TypeScript + Tailwind CSS + Zustand + localStorage。Verc
 - **図鑑 / 装備比較 / ロック / レジェンド一括売却** — 収集率表示、装備中との差分、ロック保護。
 - **手続き生成ピクセルアイコン** — 装備・敵・ボスのアイコンを画像なしでコード生成。→ [docs/icons.md](docs/icons.md)
 - **ランキング / 残響戦** — 深層到達者ログと、記録から生成したゴーストとのEcho Battle（Supabase任意・未設定でも動作）。→ [docs/online.md](docs/online.md)
+- **鍛冶屋 / バランス / 場所別BGM** — 素材で装備を確率強化（GREAT/PERFECT・合成・★注入）、難度カーブ調整、場所別の手続きBGM。→ [docs/blacksmith.md](docs/blacksmith.md)
 
 ---
 

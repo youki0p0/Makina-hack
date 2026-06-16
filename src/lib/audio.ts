@@ -154,6 +154,46 @@ const PROG: Chord[] = [
   { root: 110.0, fifth: 164.81, arp: [261.63, 329.63, 523.25, 329.63] }, // Am
 ];
 
+// Casino: bright C-major loop (I vi IV V) — upbeat, "lucky" feel.
+const CASINO_PROG: Chord[] = [
+  { root: 130.81, fifth: 196.0, arp: [261.63, 329.63, 392.0, 523.25] }, // C
+  { root: 110.0, fifth: 164.81, arp: [220.0, 329.63, 440.0, 659.25] }, // Am
+  { root: 174.61, fifth: 261.63, arp: [349.23, 440.0, 523.25, 698.46] }, // F
+  { root: 196.0, fifth: 293.66, arp: [392.0, 493.88, 587.33, 783.99] }, // G
+  { root: 130.81, fifth: 196.0, arp: [261.63, 329.63, 392.0, 523.25] }, // C
+  { root: 110.0, fifth: 164.81, arp: [220.0, 329.63, 440.0, 659.25] }, // Am
+  { root: 174.61, fifth: 261.63, arp: [349.23, 440.0, 523.25, 698.46] }, // F
+  { root: 196.0, fifth: 293.66, arp: [392.0, 493.88, 587.33, 783.99] }, // G
+];
+
+// Forge: D-dorian, heavy and patient — anvil percussion added in bgmTick.
+const FORGE_PROG: Chord[] = [
+  { root: 73.42, fifth: 110.0, arp: [146.83, 220.0, 293.66, 220.0] }, // Dm
+  { root: 73.42, fifth: 110.0, arp: [146.83, 220.0, 293.66, 220.0] }, // Dm
+  { root: 87.31, fifth: 130.81, arp: [174.61, 261.63, 349.23, 261.63] }, // F
+  { root: 98.0, fifth: 146.83, arp: [196.0, 293.66, 392.0, 293.66] }, // G
+  { root: 73.42, fifth: 110.0, arp: [146.83, 220.0, 293.66, 220.0] }, // Dm
+  { root: 65.41, fifth: 98.0, arp: [130.81, 196.0, 261.63, 196.0] }, // C
+  { root: 87.31, fifth: 130.81, arp: [174.61, 261.63, 349.23, 261.63] }, // F
+  { root: 73.42, fifth: 110.0, arp: [146.83, 220.0, 293.66, 220.0] }, // Dm
+];
+
+export type BgmTheme = "dungeon" | "world" | "casino" | "forge" | "boss";
+interface ThemeDef {
+  stepMs: number;
+  prog: Chord[];
+  metal?: boolean;
+}
+const THEMES: Record<BgmTheme, ThemeDef> = {
+  dungeon: { stepMs: 150, prog: PROG },
+  world: { stepMs: 142, prog: PROG },
+  boss: { stepMs: 124, prog: PROG },
+  casino: { stepMs: 132, prog: CASINO_PROG },
+  forge: { stepMs: 172, prog: FORGE_PROG, metal: true },
+};
+let bgmTheme: BgmTheme = "dungeon";
+let bgmTranspose = 1;
+
 // Arpeggio figures (indices into chord.arp), rotated every bar for variety.
 const ARP_SHAPES: number[][] = [
   [0, 1, 2, 1],
@@ -198,29 +238,31 @@ const DYN: Record<Mode, Dyn> = {
 
 function bgmTick(): void {
   if (muted) return;
+  const def = THEMES[bgmTheme];
+  const T = bgmTranspose;
   const step = bgmStep;
   const bar = Math.floor(step / BAR);
   const inBar = step % BAR;
   const mode = sectionOf(bar);
   const dyn = DYN[mode];
-  const chord = PROG[bar % PROG.length];
+  const chord = def.prog[bar % def.prog.length];
   const secBar = bar % 8;
   const phraseStep = (secBar % 4) * BAR + inBar;
   // Duck other voices on the bar head where pad + kick already stack.
   const duck = inBar === 0 ? 0.6 : 1;
 
   // Bass: root pedal + octave, with a small mid-bar pulse in section B.
-  if (inBar === 0) tone(chord.root, 0.45, "triangle", 0.2);
-  if (inBar === 8 && dyn.bassOct) tone(chord.root * 2, 0.45, "triangle", 0.13);
-  if (inBar === 12 && mode === "B") tone(chord.root, 0.3, "triangle", 0.11);
+  if (inBar === 0) tone(chord.root * T, 0.45, "triangle", 0.2);
+  if (inBar === 8 && dyn.bassOct) tone(chord.root * 2 * T, 0.45, "triangle", 0.13);
+  if (inBar === 12 && mode === "B") tone(chord.root * T, 0.3, "triangle", 0.11);
 
   // Pad: detuned sine, root (+fifth in fuller sections) on each chord change.
   if (inBar === 0) {
-    tone(chord.root, 1.6, "sine", 0.06);
-    tone(chord.root * DETUNE, 1.6, "sine", 0.06);
+    tone(chord.root * T, 1.6, "sine", 0.06);
+    tone(chord.root * DETUNE * T, 1.6, "sine", 0.06);
     if (dyn.padFifth) {
-      tone(chord.fifth, 1.6, "sine", 0.05);
-      tone(chord.fifth * DETUNE, 1.6, "sine", 0.05);
+      tone(chord.fifth * T, 1.6, "sine", 0.05);
+      tone(chord.fifth * DETUNE * T, 1.6, "sine", 0.05);
     }
   }
 
@@ -230,8 +272,8 @@ function bgmTick(): void {
     const note = chord.arp[shape[(step >> 1) & 3]];
     const v = dyn.arpVol * duck;
     if (note) {
-      tone(note, 0.12, "square", v);
-      if (dyn.arpGhost) tone(note, 0.1, "square", v * 0.4, 0.075);
+      tone(note * T, 0.12, "square", v);
+      if (dyn.arpGhost) tone(note * T, 0.1, "square", v * 0.4, 0.075);
     }
   }
 
@@ -239,8 +281,8 @@ function bgmTick(): void {
   if (dyn.lead) {
     const note = LEAD_PHRASE[phraseStep];
     if (note) {
-      tone(note, 0.26, "square", 0.12);
-      if (mode === "B" && inBar === 12) tone(note * 1.01, 0.26, "square", 0.05, 0.1);
+      tone(note * T, 0.26, "square", 0.12);
+      if (mode === "B" && inBar === 12) tone(note * 1.01 * T, 0.26, "square", 0.05, 0.1);
     }
   }
 
@@ -251,6 +293,13 @@ function bgmTick(): void {
   }
   if (dyn.hat && inBar % 2 === 1) noise(0.025, 0.06);
 
+  // Forge: an anvil "clank" on every bar head and mid-bar.
+  if (def.metal && (inBar === 0 || inBar === 8)) {
+    noise(0.03, 0.12);
+    tone(1568, 0.06, "square", 0.05);
+    tone(2093, 0.05, "square", 0.03, 0.01);
+  }
+
   bgmStep = (bgmStep + 1) % (BAR * LOOP_BARS);
 }
 
@@ -259,7 +308,19 @@ export function startBgm(): void {
   const c = getCtx();
   if (!c) return;
   bgmStep = 0;
-  bgmTimer = setInterval(bgmTick, 150);
+  bgmTimer = setInterval(bgmTick, THEMES[bgmTheme].stepMs);
+}
+
+/** Switch BGM theme (and optional pitch transpose for deeper chapters). */
+export function setBgmTheme(theme: BgmTheme, transpose = 1): void {
+  if (theme === bgmTheme && Math.abs(transpose - bgmTranspose) < 0.001) return;
+  bgmTheme = theme;
+  bgmTranspose = transpose;
+  bgmStep = 0;
+  if (bgmTimer != null) {
+    clearInterval(bgmTimer);
+    bgmTimer = setInterval(bgmTick, THEMES[theme].stepMs);
+  }
 }
 
 export function stopBgm(): void {

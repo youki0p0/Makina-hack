@@ -2,6 +2,17 @@
 
 All notable changes to Dice Ex Machina.
 
+## [Unreleased] — 鍛冶屋 / バランス / 場所別BGM / ガチャ改善
+
+- **難度バランス**: 敵 hp/atkScale 緩和、**敵★を装備★と分離して引き下げ**(0.13)、レベル成長・武器係数・報酬を底上げ。乗算 vs 加算の剪刀差を是正。
+- **鍛冶屋(`/forge`)**: 素材で装備を強化（`forgeLevel` 0..15、+7%/Lv）。確率で GREAT(+2)/PERFECT(+3)、レベルは下がらない、ピティ＋守護鍛錬で救済。合成（同部位の餌、同名+2）＋★注入（深層天井突破）。出目は不可侵。10階で解放。
+- **レジェンド一括バグ修正**: ゴールド付与→**素材+24/個**に修正（UI文言も統一）。
+- **ガチャ改善**: 部位指定は「現在所持の最強の前後値」で生成（`genRarePlusNear`/`estimateTier`）。常に side/up-grade。
+- **場所別BGM**: `audio.ts` テーマ駆動化（dungeon/world/casino/forge/boss）。`AudioController` が pathname＋floor で切替（50階ごとにworldのキー上昇、大ボスはboss、鍛冶屋は金床打撃）。
+- **セーブ v4**: 「バッグのみ引継ぎ」— v3→v4 で inventory/equipped のみ移行し他はリセット。
+- **装備中の詳細表示**: 装備画面の装備をタップで詳細（ステ/出目/セット/装備可能職業/鍛冶・★）。
+- docs/blacksmith.md 追加。test 98件グリーン／build 成功。
+
 ## [Unreleased] — 背景の可読性改善
 
 - 背景がうるさく文字が読みづらい問題を修正。`getWorldBackground` を可読性優先に調整:

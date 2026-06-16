@@ -155,6 +155,10 @@ export interface Equipment {
   noModifier?: boolean;
   /** Dropped from an Echo Battle (slightly distinct icon, not stronger). */
   echo?: boolean;
+  /** Blacksmith forge level (0 = none). Scales numbers, not dice faces. */
+  forgeLevel?: number;
+  /** Consecutive forge failures (pity counter). */
+  forgeStreak?: number;
 }
 
 export type EquippedItems = {
@@ -377,6 +381,10 @@ export interface SavedItem {
   modTier?: number;
   /** Quality tier (ancient/mythic/unique). */
   quality?: Quality;
+  /** Blacksmith forge level. */
+  forgeLevel?: number;
+  /** Forge pity streak. */
+  forgeStreak?: number;
 }
 
 export interface SaveData {

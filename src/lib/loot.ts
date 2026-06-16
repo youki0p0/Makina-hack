@@ -1,6 +1,6 @@
 import { AFFIXES, applyAffix, rollAffixedCopy } from "@/data/affixes";
 import { CONSUMABLES } from "@/data/consumables";
-import { ITEMS, genCommon, genRarePlus, rollGenDrop, rollSetDrop } from "@/data/items";
+import { ITEMS, genCommon, genRarePlus, genRarePlusNear, rollGenDrop, rollSetDrop } from "@/data/items";
 import { availableSetKeys } from "@/data/sets";
 import { applyModifier } from "@/data/modifiers";
 import { applyQuality, rollQuality } from "@/data/quality";
@@ -98,11 +98,14 @@ export function pullPremiumItem(modCap = Infinity): Equipment {
  * gear of that slot, guaranteed. ~40% chance of a curated Rare+ (incl.
  * exclusives) of that slot, otherwise a procedural Rare+ of that slot.
  */
-export function pullTargetedItem(slot: EquipmentSlot): Equipment {
+export function pullTargetedItem(slot: EquipmentSlot, refTier = 0, refMod = 0): Equipment {
+  // ~25% a curated effect-bearing Rare+ (incl. exclusives); otherwise a procedural
+  // Rare+ scaled to the player's current best for the slot (a real side/up-grade).
   const curated = CURATED_RAREPLUS.filter((i) => i.slot === slot);
-  if (curated.length > 0 && Math.random() < 0.4) {
+  if (curated.length > 0 && Math.random() < 0.25) {
     return withQuality(weightedPull(curated, rarePlusWeight));
   }
+  if (refTier >= 16) return withQuality(genRarePlusNear(slot, refTier, refMod));
   return withQuality(genRarePlus(slot));
 }
 
