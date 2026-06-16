@@ -21,13 +21,11 @@ import { useGameStore } from "@/store/gameStore";
 export default function BattleScreen() {
   const battleState = useGameStore((s) => s.battleState);
   const currentEnemy = useGameStore((s) => s.currentEnemy);
-  const diceValue = useGameStore((s) => s.diceValue);
   const currentFloor = useGameStore((s) => s.currentFloor);
   const worldCleared = useGameStore((s) => s.worldCleared);
   const pendingEnding = useGameStore((s) => s.pendingEnding);
   const endlessMessage = useGameStore((s) => s.endlessMessage);
   const enterCurrentFloor = useGameStore((s) => s.enterCurrentFloor);
-  const confirm = useGameStore((s) => s.confirm);
   const [auto, setAuto] = useState<0 | 1 | 2>(0); // 0 off / 1 auto / 2 fast
   const world = getWorld(currentFloor);
 
@@ -39,24 +37,27 @@ export default function BattleScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-battle: take the current roll each turn, auto-advance on victory.
-  // Pauses on shop floors; stops on defeat. (diceValue retriggers each turn.)
+  // Auto-battle: an INTERVAL drives every step from live store state. This is
+  // robust against repeated dice values (the old effect keyed on diceValue and
+  // stalled when two rolls matched). Also auto-skips shops; pauses on overlays.
   useEffect(() => {
     if (!auto) return;
-    const fast = auto === 2;
-    if (battleState === "player") {
-      const t = setTimeout(() => confirm(), fast ? 160 : 450);
-      return () => clearTimeout(t);
-    }
-    if (battleState === "won") {
-      // Pause auto-advance while a narrative/world overlay is up.
-      if (pendingEnding || endlessMessage || worldCleared !== null) return;
-      const t = setTimeout(() => enterCurrentFloor(), fast ? 300 : 750);
-      return () => clearTimeout(t);
-    }
-    if (battleState === "lost") setAuto(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auto, battleState, diceValue]);
+    const period = auto === 2 ? 180 : 480;
+    const id = setInterval(() => {
+      const s = useGameStore.getState();
+      if (s.battleState === "player") {
+        s.confirm();
+      } else if (s.battleState === "shop") {
+        s.leaveShop();
+      } else if (s.battleState === "won") {
+        if (s.pendingEnding || s.endlessMessage || s.worldCleared !== null) return; // wait for the overlay
+        s.enterCurrentFloor();
+      } else if (s.battleState === "lost") {
+        setAuto(0);
+      }
+    }, period);
+    return () => clearInterval(id);
+  }, [auto]);
 
   if (battleState === "shop") {
     return <ShopScreen />;

@@ -116,6 +116,38 @@ function addUnique(list: string[], id: string): string[] {
   return list.includes(id) ? list : [...list, id];
 }
 
+/**
+ * Hard cap on inventory size. With infinite drops over hundreds of floors the
+ * inventory would balloon and make every save/render freeze the browser. When
+ * it overflows we auto-dismantle the WEAKEST non-locked items into material —
+ * locked/favorited and 神機マキナ are never touched.
+ */
+const MAX_INVENTORY = 150;
+
+function capInventory(
+  inv: Equipment[],
+  favorites: string[],
+): { kept: Equipment[]; material: number } {
+  if (inv.length <= MAX_INVENTORY) return { kept: inv, material: 0 };
+  const score = (it: Equipment) =>
+    it.attack * 2 + it.defense * 1.5 + it.maxHp * 0.4 + (it.modTier ?? 0) * 5 + (it.forgeLevel ?? 0) * 8;
+  const locked: Equipment[] = [];
+  const removable: Equipment[] = [];
+  for (const it of inv) {
+    if (it.noSell || favorites.includes(itemKey(it))) locked.push(it);
+    else removable.push(it);
+  }
+  removable.sort((a, b) => score(a) - score(b)); // weakest first
+  const toRemove = Math.max(0, locked.length + removable.length - MAX_INVENTORY);
+  let material = 0;
+  const kept = [...locked];
+  removable.forEach((it, i) => {
+    if (i < toRemove) material += SCRAP_VALUE[it.rarity];
+    else kept.push(it);
+  });
+  return { kept, material };
+}
+
 /** The emptiest/weakest equipped slot (for biasing "smart drops"). */
 function weakestSlot(eq: EquippedItems): EquipmentSlot {
   let worst: EquipmentSlot = EQUIP_SLOTS[0];
@@ -225,6 +257,8 @@ interface GameState {
 
   // shop
   buyShopItem: (key: string) => void;
+  /** Buy every affordable shop item in one tap. */
+  buyAffordableShop: () => void;
   leaveShop: () => void;
 
   // equipment
@@ -878,6 +912,13 @@ export const useGameStore = create<GameState>((set, get) => {
         return;
       }
       persist();
+    },
+
+    buyAffordableShop: () => {
+      // Buy each not-sold item the player can currently afford (gold updates live).
+      for (const e of get().shopStock) {
+        if (!e.sold && get().player.gold >= e.price) get().buyShopItem(e.key);
+      }
     },
 
     leaveShop: () => {
@@ -1614,9 +1655,18 @@ export const useGameStore = create<GameState>((set, get) => {
         ? state.currentFloor
         : null;
 
+    // Keep the inventory from ballooning (deep-floor freeze fix): auto-dismantle
+    // the weakest non-locked overflow into material.
+    const capped = capInventory(invWithGrants, state.favorites);
+    if (capped.material > 0) {
+      finalLog = pushLogs(finalLog, [
+        { text: `📦 所持上限(${MAX_INVENTORY})到達: 弱い装備を自動分解 素材+${capped.material}`, tone: "neutral" },
+      ]);
+    }
+
     return {
       player: leveledPlayer,
-      inventory: invWithGrants,
+      inventory: capped.kept,
       currentEnemy: enemy,
       currentFloor: newFloor,
       battleState: "won",
@@ -1628,7 +1678,7 @@ export const useGameStore = create<GameState>((set, get) => {
       checkpoint,
       startFloorPref,
       souls,
-      gachaPoints: state.gachaPoints + bonusGacha,
+      gachaPoints: state.gachaPoints + bonusGacha + capped.material,
       worldCleared,
       pendingEnding: endingPending,
       endlessMessage,

@@ -13,8 +13,10 @@ export default function ShopScreen() {
   const stock = useGameStore((s) => s.shopStock);
   const gold = useGameStore((s) => s.player.gold);
   const buy = useGameStore((s) => s.buyShopItem);
+  const buyAll = useGameStore((s) => s.buyAffordableShop);
   const leave = useGameStore((s) => s.leaveShop);
   const tapToBuy = useGameStore((s) => s.tapToBuy);
+  const hasAffordable = stock.some((e) => !e.sold && gold >= e.price);
   const world = getWorld(floor);
 
   return (
@@ -102,12 +104,21 @@ export default function ShopScreen() {
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         <PlayerStatus />
-        <button
-          onClick={leave}
-          className="h-16 rounded-2xl bg-emerald-600 text-xl font-extrabold text-white shadow-lg active:scale-95"
-        >
-          先へ進む →
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={buyAll}
+            disabled={!hasAffordable}
+            className="h-16 flex-1 rounded-2xl bg-amber-600 text-base font-extrabold text-white shadow-lg active:scale-95 disabled:opacity-40"
+          >
+            全部買う
+          </button>
+          <button
+            onClick={leave}
+            className="h-16 flex-[1.4] rounded-2xl bg-emerald-600 text-xl font-extrabold text-white shadow-lg active:scale-95"
+          >
+            先へ進む →
+          </button>
+        </div>
       </div>
     </div>
   );
