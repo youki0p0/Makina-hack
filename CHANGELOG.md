@@ -2,6 +2,14 @@
 
 All notable changes to Dice Ex Machina.
 
+## [Unreleased] — 難易度カーブをモード別に（ライト〜超鬼畜）
+
+- 難易度ごとに**敵の成長曲線（HP/攻撃の階層係数）と敵★の伸び**を変更（従来は flat 倍率のみ）。
+  - Normal: 緩やか（ライト向け、現状維持）／Hard: 急／**Hell: 旧来の鬼畜カーブ**／**Expert: 超鬼畜**。
+- `DifficultyDef` に `hpPerFloor/atkPerFloor/enemyStarBonus` を追加、`difficultyScale()`＋
+  `generateEnemy(floor, scale)` で適用。`applyEnemyModifier(tier, bonusPerStar)` を一般化。
+- 「ぬるくなった」鬼畜勢はHell/Expertで旧来以上の手応え、ライト層はNormalで快適。test 107件/build成功。
+
 ## [Unreleased] — 鍛冶屋 / バランス / 場所別BGM / ガチャ改善
 
 - **難度バランス**: 敵 hp/atkScale 緩和、**敵★を装備★と分離して引き下げ**(0.13)、レベル成長・武器係数・報酬を底上げ。乗算 vs 加算の剪刀差を是正。

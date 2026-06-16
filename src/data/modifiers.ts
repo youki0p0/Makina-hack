@@ -68,9 +68,13 @@ export function enemyModTierForFloor(floor: number): number {
 }
 
 /** Apply an enemy star modifier (HP / attack / drop rate up, name tagged). */
-export function applyEnemyModifier(enemy: Enemy, tier: number): Enemy {
+export function applyEnemyModifier(
+  enemy: Enemy,
+  tier: number,
+  bonusPerStar: number = ENEMY_MOD_BONUS_PER_STAR,
+): Enemy {
   if (tier <= 0) return { ...enemy, modTier: 0 };
-  const mult = 1 + ENEMY_MOD_BONUS_PER_STAR * Math.max(0, tier);
+  const mult = 1 + bonusPerStar * Math.max(0, tier);
   const hp = Math.round(enemy.maxHp * mult);
   return {
     ...enemy,
