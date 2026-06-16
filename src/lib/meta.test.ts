@@ -3,7 +3,7 @@ import { artifactBonus, artifactUpgradeCost, computeRebirthGain } from "@/data/a
 import { canEquip, CLASSES, isClassUnlocked } from "@/data/classes";
 import { jobAttackMult } from "@/data/jobBalance";
 import { getItemById } from "@/data/items";
-import { getDifficulty } from "@/data/difficulty";
+import { difficultyScale, getDifficulty } from "@/data/difficulty";
 import { defaultProgress } from "@/data/achievements";
 import { getDailyBonus } from "@/lib/daily";
 import { BOSS_TEMPLATES, ENEMY_TEMPLATES, generateEnemy } from "@/data/enemies";
@@ -75,6 +75,19 @@ describe("difficulty", () => {
   it("harder difficulties scale enemies and rewards up", () => {
     expect(getDifficulty("hell").enemyMult).toBeGreaterThan(getDifficulty("normal").enemyMult);
     expect(getDifficulty("hard").rewardMult).toBeGreaterThan(getDifficulty("normal").rewardMult);
+  });
+
+  it("harder modes are structurally steeper at depth (curve + ★), not just a flat bump", () => {
+    const floor = 300;
+    const nHp = generateEnemy(floor, difficultyScale("normal")).maxHp;
+    const hHp = generateEnemy(floor, difficultyScale("hell")).maxHp;
+    const xHp = generateEnemy(floor, difficultyScale("expert")).maxHp;
+    expect(hHp).toBeGreaterThan(nHp * 1.5);
+    expect(xHp).toBeGreaterThan(hHp);
+    // Normal stays gentle (well under the old brutal curve).
+    expect(generateEnemy(100, difficultyScale("normal")).maxHp).toBeLessThan(
+      generateEnemy(100, difficultyScale("hell")).maxHp,
+    );
   });
 });
 

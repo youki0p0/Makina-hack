@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { defaultProgress } from "@/data/achievements";
-import { getDifficulty, normalizeDifficulty, type Difficulty } from "@/data/difficulty";
+import { difficultyScale, getDifficulty, normalizeDifficulty, type Difficulty } from "@/data/difficulty";
 import { getDailyBonus } from "@/lib/daily";
 import {
   artifactBonus,
@@ -543,7 +543,7 @@ export const useGameStore = create<GameState>((set, get) => {
     startBattle: () => {
       const { currentFloor, player } = get();
       const stats = currentStats(player, get().equipped, get().activeBuffs);
-      const enemy = generateEnemy(currentFloor, getDifficulty(get().difficulty).enemyMult);
+      const enemy = generateEnemy(currentFloor, difficultyScale(get().difficulty));
       // Heal a little between fights so runs are survivable but not free.
       const healed = Math.min(stats.maxHp, player.hp + Math.round(stats.maxHp * 0.15));
       set({
