@@ -68,3 +68,22 @@ button {
   text-shadow: 0 0 6px rgba(251, 191, 36, 0.6), 0 0 12px rgba(251, 191, 36, 0.35);
   animation: legendaryHue 6s linear infinite;
 }
+
+/* Fate gamble win reveal: a punchy pop-in. */
+@keyframes fatePop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.fate-pop {
+  animation: fatePop 0.5s ease-out;
+}
