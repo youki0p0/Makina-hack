@@ -78,6 +78,37 @@ function noise(dur: number, vol = 0.3): void {
   src.start(t);
 }
 
+/**
+ * Pitch-sliding tone: glides the frequency f0→f1 (linear) while the amplitude
+ * decays. Powers the idol theme's kick pitch-fall (100→40Hz) and the vocal
+ * lead's portamento "scoop" (歌声のうねり). `glide` lets the pitch settle faster
+ * than the note's full length.
+ */
+function slideTone(
+  f0: number,
+  f1: number,
+  dur: number,
+  type: OscillatorType = "square",
+  vol = 0.3,
+  when = 0,
+  glide = dur,
+): void {
+  const c = getCtx();
+  if (!c || !master || muted) return;
+  const t = c.currentTime + when;
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(f0, t);
+  osc.frequency.linearRampToValueAtTime(Math.max(1, f1), t + Math.min(glide, dur));
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.connect(g);
+  g.connect(master);
+  osc.start(t);
+  osc.stop(t + dur);
+}
+
 export type Sfx =
   | "hit"
   | "hurt"
@@ -178,11 +209,39 @@ const FORGE_PROG: Chord[] = [
   { root: 73.42, fifth: 110.0, arp: [146.83, 220.0, 293.66, 220.0] }, // Dm
 ];
 
-export type BgmTheme = "dungeon" | "world" | "casino" | "forge" | "boss";
+// Idol: 王道進行 (F G Em Am) ベースのアゲアゲなアイドルポップ。8小節サイクルの
+// 後半で C を差して持ち上げる。arp[0..2] は各コードのトライアド（バッキング＆
+// 高速アルペジオが使用）。
+const IDOL_PROG: Chord[] = [
+  { root: 87.31, fifth: 130.81, arp: [349.23, 440.0, 523.25, 440.0] }, // F  (F A C)
+  { root: 98.0, fifth: 146.83, arp: [392.0, 493.88, 587.33, 493.88] }, // G  (G B D)
+  { root: 82.41, fifth: 123.47, arp: [329.63, 392.0, 493.88, 392.0] }, // Em (E G B)
+  { root: 110.0, fifth: 164.81, arp: [440.0, 523.25, 659.25, 523.25] }, // Am (A C E)
+  { root: 87.31, fifth: 130.81, arp: [349.23, 440.0, 523.25, 440.0] }, // F
+  { root: 98.0, fifth: 146.83, arp: [392.0, 493.88, 587.33, 493.88] }, // G
+  { root: 65.41, fifth: 98.0, arp: [261.63, 329.63, 392.0, 329.63] }, // C  (C E G)
+  { root: 98.0, fifth: 146.83, arp: [392.0, 493.88, 587.33, 493.88] }, // G
+];
+
+// Catchy 4-bar vocal hook (64 steps), reused over each half of the progression.
+// 0 = rest. Played as `square` with a short portamento scoop per note.
+const IDOL_LEAD: number[] = [
+  // bar A (over F): G A C A
+  392.0, 0, 0, 0, 440.0, 0, 0, 0, 523.25, 0, 0, 0, 440.0, 0, 0, 0,
+  // bar B (over G): B D B A G
+  493.88, 0, 0, 0, 587.33, 0, 0, 0, 493.88, 0, 440.0, 0, 392.0, 0, 0, 0,
+  // bar C (over Em): E G B C B G
+  329.63, 0, 392.0, 0, 493.88, 0, 0, 0, 523.25, 0, 493.88, 0, 392.0, 0, 0, 0,
+  // bar D (over Am): A C E D C A
+  440.0, 0, 523.25, 0, 659.25, 0, 0, 0, 587.33, 0, 523.25, 0, 440.0, 0, 0, 0,
+];
+
+export type BgmTheme = "dungeon" | "world" | "casino" | "forge" | "boss" | "idol";
 interface ThemeDef {
   stepMs: number;
   prog: Chord[];
   metal?: boolean;
+  idol?: boolean;
 }
 const THEMES: Record<BgmTheme, ThemeDef> = {
   dungeon: { stepMs: 150, prog: PROG },
@@ -190,6 +249,8 @@ const THEMES: Record<BgmTheme, ThemeDef> = {
   boss: { stepMs: 124, prog: PROG },
   casino: { stepMs: 132, prog: CASINO_PROG },
   forge: { stepMs: 172, prog: FORGE_PROG, metal: true },
+  // BPM≈178 → 16分音符 ≈ 84ms。専用レンダラ idolTick が全パートを担当。
+  idol: { stepMs: 84, prog: IDOL_PROG, idol: true },
 };
 let bgmTheme: BgmTheme = "dungeon";
 let bgmTranspose = 1;
@@ -238,6 +299,13 @@ const DYN: Record<Mode, Dyn> = {
 
 function bgmTick(): void {
   if (muted) return;
+  // The idol theme has its own full-band renderer (drums/bass/backing/sparkle/
+  // cowbell/vocal), so route it there and advance the same step counter.
+  if (THEMES[bgmTheme].idol) {
+    idolTick();
+    bgmStep = (bgmStep + 1) % (BAR * LOOP_BARS);
+    return;
+  }
   const def = THEMES[bgmTheme];
   const T = bgmTranspose;
   const step = bgmStep;
@@ -301,6 +369,104 @@ function bgmTick(): void {
   }
 
   bgmStep = (bgmStep + 1) % (BAR * LOOP_BARS);
+}
+
+// ===== Idol theme renderer =====
+// 王道進行のアイドルポップを 16bit ゲーム音源風に。A(Aメロ)→A2(Bメロ/ビルドアップ)
+// →B(サビ)→A'(間奏) の起伏を、各パートの ON/OFF と音量で表現する。
+function idolTick(): void {
+  if (muted) return;
+  const def = THEMES.idol;
+  const T = bgmTranspose;
+  const step = bgmStep;
+  const bar = Math.floor(step / BAR);
+  const inBar = step % BAR;
+  const mode = sectionOf(bar);
+  const chord = def.prog[bar % def.prog.length];
+  const secPos = bar % 8; // 0..7 — どのセクションも8小節構成
+
+  const isVerse = mode === "A";
+  const isBuild = mode === "A2";
+  const isChorus = mode === "B";
+
+  const kickStep = inBar % 4 === 0; // 0,4,8,12
+  const hatStep = inBar % 4 === 2; // 2,6,10,14 (裏打ち)
+  const snareStep = inBar === 4 || inBar === 12;
+
+  // ---- ① ドラム ----
+  // キック: ノイズの急速減衰 + ピッチフォール(100→40Hz)で重低音。A2は抜く(解放感)。
+  if (!isBuild && kickStep) {
+    noise(0.05, 0.2);
+    slideTone(100 * T, 40 * T, 0.12, "sine", 0.22);
+  }
+  // ハット: 極短ノイズの裏打ち。
+  if (hatStep) noise(0.03, isChorus ? 0.09 : 0.06);
+  // スネア: ノイズ + 180Hz の胴鳴り。
+  if (!isBuild && snareStep) {
+    noise(0.15, 0.16);
+    tone(180 * T, 0.12, "triangle", 0.12);
+  }
+  // A2 ビルドアップ: 後半2小節でスネアロール + 上昇スイープ(しょわ〜)。
+  if (isBuild) {
+    const build = secPos / 7; // 0→1
+    if (secPos >= 6) {
+      noise(0.04, 0.05 + build * 0.22); // 16分スネアロール(音量上昇)
+      slideTone(400 * T, 1600 * T, 0.08, "sawtooth", 0.04 + build * 0.05); // riser
+    } else if (kickStep) {
+      noise(0.03, 0.05 + build * 0.06); // 拍を保つ軽いパルス
+    }
+  }
+
+  // ---- ② ベース(オクターブ奏法) ----
+  // 偶数=ルート低音 / 奇数=1オクターブ上、頭に square のアタックを重ねる。
+  const bassVol = isChorus ? 0.22 : isVerse ? 0.16 : 0.18;
+  const bf = (inBar % 2 === 0 ? chord.root : chord.root * 2) * T;
+  tone(bf, 0.13, "sawtooth", bassVol);
+  tone(bf, 0.02, "square", bassVol * 0.6); // ポコッとしたアタック
+
+  // ---- ③ バッキング(デチューンsaw和音) + 擬似サイドチェイン ----
+  // Aメロは半分の密度。サビはキック位置で発音をスキップしてダッキング(ポンプ感)。
+  if (!isVerse || inBar % 2 === 0) {
+    const duck = isChorus && kickStep; // サビはキックで完全に抜く
+    if (!duck) {
+      const base = isChorus ? 0.07 : isBuild ? 0.04 + (secPos / 7) * 0.04 : 0.045;
+      const bv = base * (kickStep ? 0.5 : 1); // サビ以外も拍頭は軽く下げる
+      for (let i = 0; i < 3; i++) {
+        const f = chord.arp[i] * T;
+        tone(f, 0.1, "sawtooth", bv);
+        tone(f * 1.005, 0.1, "sawtooth", bv); // ~5Hzデチューンで厚み
+      }
+    }
+  }
+
+  // ---- ④ キラキラ(超高速アルペジオ + エコー) サビのみ ----
+  if (isChorus) {
+    const stepSec = def.stepMs / 1000;
+    for (let i = 0; i < 4; i++) {
+      const f = chord.arp[i] * 2 * T; // 1オクターブ上のトライアド
+      const when = (i / 4) * stepSec; // 1ステップに4音を詰める
+      tone(f, 0.05, "square", 0.05, when);
+      tone(f, 0.05, "square", 0.025, when + 0.02); // ディレイ(エコー)
+    }
+  }
+
+  // ---- ⑤ 金コン(カウベル) セクション切替直前に「ピーン！」 ----
+  if (secPos === 7 && inBar === 15) {
+    tone(800 * T, 0.35, "sine", 0.16);
+    tone(1230 * T, 0.35, "sine", 0.12); // 不協和な超高音アクセント
+  }
+
+  // ---- 主旋律(ボーカル): square + ポルタメントの「うねり」 ----
+  // サビ全開、Bメロ後半から歌い出す。
+  const leadOn = isChorus || (isBuild && secPos >= 4);
+  if (leadOn) {
+    const phraseStep = (bar % 4) * BAR + inBar;
+    const note = IDOL_LEAD[phraseStep];
+    if (note) {
+      const lv = isChorus ? 0.14 : 0.09;
+      slideTone(note * 0.985 * T, note * T, 0.26, "square", lv, 0, 0.04); // しゃくり
+    }
+  }
 }
 
 export function startBgm(): void {
