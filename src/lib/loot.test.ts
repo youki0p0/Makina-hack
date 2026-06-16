@@ -3,6 +3,7 @@ import { getAffixById } from "@/data/affixes";
 import {
   estimateTier,
   genItem,
+  genRarePlusNear,
   getItemById,
   getItemInstance,
   ITEMS,
@@ -97,17 +98,15 @@ describe("premium & targeted gacha", () => {
     }
   });
 
-  it("targeted pull scales near the reference tier (not a low roll)", () => {
-    const refTier = 50;
-    const lowRefAtk = genItem("weapon", 20).attack;
-    let highEnough = 0;
-    for (let i = 0; i < 60; i++) {
-      const it = pullTargetedItem("weapon", refTier, 2);
+  it("genRarePlusNear stays around the reference tier (deterministic)", () => {
+    for (let i = 0; i < 80; i++) {
+      const it = genRarePlusNear("weapon", 50, 2);
       expect(it.slot).toBe("weapon");
-      if (it.attack >= lowRefAtk) highEnough++;
+      const t = estimateTier(it);
+      // tier = clamp(50 + [-3..4], 16, 60) → always 47..54.
+      expect(t).toBeGreaterThanOrEqual(47);
+      expect(t).toBeLessThanOrEqual(54);
     }
-    // Almost all pulls should be around the (high) reference, not tiny.
-    expect(highEnough).toBeGreaterThan(40);
   });
 });
 
