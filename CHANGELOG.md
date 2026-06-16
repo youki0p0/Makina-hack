@@ -2,6 +2,12 @@
 
 All notable changes to Dice Ex Machina.
 
+## [Unreleased] — 背景の可読性改善
+
+- 背景がうるさく文字が読みづらい問題を修正。`getWorldBackground` を可読性優先に調整:
+  テーマSVGテクスチャを大幅減光（`dampenSvg` ×0.4）、暗いスクリムを重ねて文字コントラストを確保、
+  発光（アクセント/ホライズン）を抑制。章ごとの色味は維持。build/test 緑。
+
 ## [Unreleased] — 残り絵文字のグリフ化＋不具合修正
 
 - **残り絵文字をグリフ化**: 戦闘ログ/ヘルプ等の文中絵文字を `GlyphText` で変換、職業/消費/セット/
