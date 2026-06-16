@@ -83,9 +83,15 @@ export default function InventoryList() {
   const classId = useGameStore((s) => s.classId);
   const [selected, setSelected] = useState<number | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  const [setKeyFilter, setSetKeyFilter] = useState<string>("all");
   const [sort, setSort] = useState<Sort>("rarity");
 
   const selectedItem = selected !== null ? inventory[selected] : null;
+
+  // Distinct sets the player currently owns (for the set filter dropdown).
+  const ownedSets = Array.from(
+    new Set(inventory.map((it) => it.setId).filter((s): s is string => Boolean(s))),
+  ).sort();
 
   // "Stronger than what's equipped in this slot" → show a ▲ to speed decisions.
   const itemScore = (it: Equipment) =>
@@ -101,6 +107,7 @@ export default function InventoryList() {
   const rows = inventory
     .map((item, index) => ({ item, index }))
     .filter((r) => filter === "all" || r.item.slot === filter)
+    .filter((r) => setKeyFilter === "all" || r.item.setId === setKeyFilter)
     .sort((a, b) => {
       const aFav = favorites.includes(itemKey(a.item));
       const bFav = favorites.includes(itemKey(b.item));
@@ -134,6 +141,25 @@ export default function InventoryList() {
           </button>
         ))}
       </div>
+
+      {ownedSets.length > 0 && (
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-gray-500">セット:</span>
+          <select
+            value={setKeyFilter}
+            onChange={(e) => setSetKeyFilter(e.target.value)}
+            className="h-8 flex-1 rounded-lg border border-white/15 bg-black/40 px-2 text-[11px] font-bold text-gray-100"
+          >
+            <option value="all">全セット</option>
+            {ownedSets.map((key) => (
+              <option key={key} value={key}>
+                {getSetDef(key)?.name ?? key}セット
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="flex items-center gap-1">
         <span className="text-[10px] text-gray-500">並び:</span>
         {SORTS.map((s) => (
