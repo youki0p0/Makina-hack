@@ -2,6 +2,8 @@
 
 import { getClass } from "@/data/classes";
 import { getDifficulty, normalizeDifficulty } from "@/data/difficulty";
+import PixelGlyph from "@/components/PixelGlyph";
+import { classGlyphKind } from "@/lib/uiGlyphs";
 import { getTitle } from "@/data/titles";
 import type { RankingEntry, RankingFilter } from "@/lib/ranking";
 
@@ -39,7 +41,7 @@ export default function RankingList({
               <span className="font-bold text-emerald-100">{e.playerName}</span>
               {title.id && <span className="ml-1 text-[9px] text-emerald-400/60">《{title.name}》</span>}
               <span className="block text-[9px] text-emerald-300/60">
-                {cls.icon} {cls.name} ・ {diff.name}
+                <PixelGlyph kind={classGlyphKind(e.job as never)} size={11} /> {cls.name} ・ {diff.name}
                 {e.equippedWeaponName ? ` ・ ${e.equippedWeaponName}` : ""}
               </span>
             </span>

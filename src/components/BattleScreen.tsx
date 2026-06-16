@@ -12,7 +12,8 @@ import SoundToggle from "@/components/SoundToggle";
 import { sfx } from "@/lib/audio";
 import { rarityStyle } from "@/lib/ui";
 import ItemIcon from "@/components/ItemIcon";
-import { getWorld, FINAL_FLOOR } from "@/data/worlds";
+import PixelGlyph from "@/components/PixelGlyph";
+import { getWorld, getWorldBackground, FINAL_FLOOR } from "@/data/worlds";
 import { ENDING_STAFF_ROLL, ENDING_PROMPT, NG_PLUS_SEQUENCE } from "@/data/lore";
 import { useGameStore } from "@/store/gameStore";
 
@@ -64,7 +65,7 @@ export default function BattleScreen() {
       className="flex h-[100dvh] flex-col gap-2 overflow-hidden px-3 pt-2"
       style={{
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",
-        background: world.background,
+        background: getWorldBackground(world),
         backgroundAttachment: "fixed",
       }}
     >
@@ -87,15 +88,15 @@ export default function BattleScreen() {
           <SoundToggle />
           <Link
             href="/help"
-            className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
+            className="flex items-center rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
           >
-            ❓
+            <PixelGlyph kind="help" size={16} />
           </Link>
           <Link
             href="/inventory"
-            className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
+            className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
           >
-            🎒 装備
+            <PixelGlyph kind="bag" size={16} /> 装備
           </Link>
         </div>
       </div>
@@ -307,8 +308,8 @@ function ResultOverlay() {
             <p>EXP +{result.expGained}</p>
             <p>ゴールド +{result.goldGained}</p>
             {result.streakBonusPct > 0 && (
-              <p className="text-orange-300">
-                🔥 {result.winStreak}連勝 ボーナス +{result.streakBonusPct}%
+              <p className="flex items-center justify-center gap-1 text-orange-300">
+                <PixelGlyph kind="fire" size={14} /> {result.winStreak}連勝 ボーナス +{result.streakBonusPct}%
               </p>
             )}
             {result.leveledUp && <p className="text-yellow-300">レベルアップ！</p>}
@@ -318,8 +319,8 @@ function ResultOverlay() {
               >
                 <ItemIcon item={result.drop} size={48} />
                 <div className="min-w-0 flex-1">
-                  <p className={`font-bold ${rarityStyle[result.drop.rarity].text}`}>
-                    🎁 {result.drop.name}
+                  <p className={`flex items-center gap-1 font-bold ${rarityStyle[result.drop.rarity].text}`}>
+                    <PixelGlyph kind="drop" size={14} /> {result.drop.name}
                   </p>
                   <p className="mt-0.5 text-xs text-gray-300">{result.drop.description}</p>
                 </div>
@@ -329,8 +330,8 @@ function ResultOverlay() {
             )}
             {result.consumable && (
               <div className="mt-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-2">
-                <p className="font-bold text-emerald-300">
-                  ✨ {result.consumable.name} を使用
+                <p className="flex items-center gap-1 font-bold text-emerald-300">
+                  <PixelGlyph kind="heal" size={14} /> {result.consumable.name} を使用
                 </p>
                 <p className="mt-0.5 text-xs text-gray-300">
                   {result.consumable.kind === "heal"
@@ -358,23 +359,23 @@ function ResultOverlay() {
           </button>
           <Link
             href="/inventory"
-            className="h-12 rounded-2xl bg-white/10 pt-3 text-center font-bold active:scale-95"
+            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/10 text-center font-bold active:scale-95"
           >
-            🎒 装備を整える
+            <PixelGlyph kind="bag" size={18} /> 装備を整える
           </Link>
           {!victory && (
             <>
               <Link
                 href="/class"
-                className="h-12 rounded-2xl bg-white/10 pt-3 text-center font-bold active:scale-95"
+                className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/10 text-center font-bold active:scale-95"
               >
-                🔁 転職する
+                <PixelGlyph kind="attack" size={18} /> 転職する
               </Link>
               <Link
                 href="/"
-                className="h-12 rounded-2xl bg-white/10 pt-3 text-center font-bold active:scale-95"
+                className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/10 text-center font-bold active:scale-95"
               >
-                🏠 ホームに戻る
+                <PixelGlyph kind="home" size={18} /> ホームに戻る
               </Link>
             </>
           )}

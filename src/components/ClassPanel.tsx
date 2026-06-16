@@ -1,6 +1,8 @@
 "use client";
 
 import { CLASSES, isClassUnlocked } from "@/data/classes";
+import PixelGlyph from "@/components/PixelGlyph";
+import { classGlyphKind } from "@/lib/uiGlyphs";
 import { useGameStore } from "@/store/gameStore";
 import type { StatBonus } from "@/types/game";
 
@@ -44,8 +46,8 @@ export default function ClassPanel() {
               }`}
             >
               <div className="flex items-center justify-between">
-                <p className="font-bold">
-                  {unlocked ? c.icon : "🔒"} {c.name}
+                <p className="flex items-center gap-1 font-bold">
+                  <PixelGlyph kind={unlocked ? classGlyphKind(c.id) : "lock"} size={16} /> {c.name}
                   {current && <span className="ml-2 text-[10px] text-emerald-300">現在</span>}
                 </p>
                 <button

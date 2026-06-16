@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import PlayerStatus from "@/components/PlayerStatus";
+import PixelGlyph from "@/components/PixelGlyph";
 import { rarityLabel, rarityStyle, slotLabel } from "@/lib/ui";
-import { getWorld } from "@/data/worlds";
+import { getWorld, getWorldBackground } from "@/data/worlds";
 import { useGameStore } from "@/store/gameStore";
 
 export default function ShopScreen() {
@@ -20,7 +21,7 @@ export default function ShopScreen() {
       className="flex h-[100dvh] flex-col gap-2 overflow-hidden px-3"
       style={{
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",
-        background: world.background,
+        background: getWorldBackground(world),
         backgroundAttachment: "fixed",
       }}
     >
@@ -28,11 +29,11 @@ export default function ShopScreen() {
         <Link href="/" className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">
           ← タイトル
         </Link>
-        <span className="text-xs text-amber-300">💰 {gold}</span>
+        <span className="flex items-center gap-1 text-xs text-amber-300"><PixelGlyph kind="gold" size={14} /> {gold}</span>
       </div>
 
       <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-2 text-center">
-        <h1 className="font-bold text-amber-200">🏪 {floor}階 — ショップ</h1>
+        <h1 className="flex items-center justify-center gap-1 font-bold text-amber-200"><PixelGlyph kind="shop" size={18} /> {floor}階 — ショップ</h1>
         <p className="text-[10px] text-gray-400">ゴールドで装備や消費アイテムを購入できる。</p>
       </div>
 
@@ -62,8 +63,8 @@ export default function ShopScreen() {
                   <p className={`font-bold ${style.text}`}>
                     {name} <span className="text-[10px] text-gray-400">{rarityLabel[rarity]}</span>
                   </p>
-                  <span className="ml-2 shrink-0 text-xs font-bold text-emerald-300">
-                    {entry.sold ? "売切" : `💰${entry.price}`}
+                  <span className="ml-2 flex shrink-0 items-center gap-0.5 text-xs font-bold text-emerald-300">
+                    {entry.sold ? "売切" : <><PixelGlyph kind="gold" size={12} />{entry.price}</>}
                   </span>
                 </div>
                 <p className="mt-0.5 text-[10px] text-gray-300">{desc}</p>
@@ -83,9 +84,9 @@ export default function ShopScreen() {
                 <button
                   onClick={() => buy(entry.key)}
                   disabled={!affordable}
-                  className="ml-2 shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white active:scale-95 disabled:opacity-40"
+                  className="ml-2 flex shrink-0 items-center gap-0.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white active:scale-95 disabled:opacity-40"
                 >
-                  {entry.sold ? "売切" : `💰${entry.price}`}
+                  {entry.sold ? "売切" : <><PixelGlyph kind="gold" size={12} />{entry.price}</>}
                 </button>
               </div>
               <p className="mt-0.5 text-[10px] text-gray-300">{desc}</p>

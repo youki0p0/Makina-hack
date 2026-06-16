@@ -3,6 +3,8 @@
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { computeSetEffects, getSetDef } from "@/data/sets";
 import ItemIcon from "@/components/ItemIcon";
+import PixelGlyph from "@/components/PixelGlyph";
+import GlyphText from "@/components/GlyphText";
 import { rarityStyle, slotLabel } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 import type { EquippedItems } from "@/types/game";
@@ -25,7 +27,7 @@ export default function EquipmentPanel() {
               const def = getSetDef(t.key);
               return (
                 <li key={t.key}>
-                  {t.icon} {t.name} ({t.pieces}部位)
+                  <GlyphText text={t.icon} size={12} /> {t.name} ({t.pieces}部位)
                   <ul className="ml-3 text-gray-300">
                     {def?.bonuses
                       .filter((b) => t.pieces >= b.pieces)
@@ -42,7 +44,7 @@ export default function EquipmentPanel() {
 
       {setEff.synergies.length > 0 && (
         <div className="rounded-xl border border-amber-400/50 bg-amber-400/10 p-2">
-          <p className="text-[10px] font-bold text-amber-200">⚡ シナジー発動</p>
+          <p className="flex items-center gap-1 text-[10px] font-bold text-amber-200"><PixelGlyph kind="stun" size={12} /> シナジー発動</p>
           <ul className="mt-1 space-y-0.5 text-[10px] text-amber-100">
             {setEff.synergies.map((s) => (
               <li key={s.name}>

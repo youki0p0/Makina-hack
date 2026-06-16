@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { canEquip } from "@/data/classes";
+import { canEquip, CLASSES } from "@/data/classes";
 import { SCRAP_VALUE } from "@/lib/loot";
 import { itemKey, rarityLabel, rarityPipString, rarityRank, rarityStyle, slotLabel } from "@/lib/ui";
 import { QUALITIES } from "@/data/quality";
 import { getSetDef } from "@/data/sets";
 import ItemIcon from "@/components/ItemIcon";
+import PixelGlyph from "@/components/PixelGlyph";
+import GlyphText from "@/components/GlyphText";
 import { useGameStore } from "@/store/gameStore";
 import type { Equipment, EquipmentSlot, Rarity } from "@/types/game";
 
@@ -41,7 +43,10 @@ type Sort = "rarity" | "attack" | "defense" | "name";
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "全部" },
   { id: "weapon", label: "武器" },
-  { id: "armor", label: "防具" },
+  { id: "helm", label: "兜" },
+  { id: "armor", label: "鎧" },
+  { id: "gloves", label: "篭手" },
+  { id: "boots", label: "靴" },
   { id: "accessory", label: "装飾" },
 ];
 
@@ -70,6 +75,7 @@ export default function InventoryList() {
   const equipped = useGameStore((s) => s.equipped);
   const favorites = useGameStore((s) => s.favorites);
   const equipItem = useGameStore((s) => s.equipItem);
+  const equipBest = useGameStore((s) => s.equipBest);
   const scrapItem = useGameStore((s) => s.scrapItem);
   const scrapBulk = useGameStore((s) => s.scrapBulk);
   const sellLegendaries = useGameStore((s) => s.sellLegendaries);
@@ -95,14 +101,22 @@ export default function InventoryList() {
 
   return (
     <div className="space-y-2">
-      <h2 className="text-sm font-bold text-gray-300">所持品 ({inventory.length})</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold text-gray-300">所持品 ({inventory.length})</h2>
+        <button
+          onClick={() => equipBest()}
+          className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1 text-[11px] font-bold text-white active:scale-95"
+        >
+          <PixelGlyph kind="attack" size={13} /> 最強装備
+        </button>
+      </div>
 
-      <div className="flex gap-1">
+      <div className="grid grid-cols-4 gap-1">
         {FILTERS.map((f) => (
           <button
             key={f.id}
             onClick={() => setFilter(f.id)}
-            className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 ${
+            className={`h-8 rounded-lg text-[11px] font-bold active:scale-95 ${
               filter === f.id ? "bg-emerald-600 text-white" : "bg-white/10 text-gray-300"
             }`}
           >
@@ -162,12 +176,12 @@ export default function InventoryList() {
             sellLegendaries();
           }
         }}
-        className="h-8 w-full rounded-lg bg-amber-600/80 text-[11px] font-bold text-white active:scale-95"
+        className="flex h-8 w-full items-center justify-center gap-1 rounded-lg bg-amber-600/80 text-[11px] font-bold text-white active:scale-95"
       >
-        🌈 未装備レジェンドを一括売却（ロック除外）
+        <PixelGlyph kind="rainbow" size={14} /> 未装備レジェンドを一括売却（ロック除外）
       </button>
-      <p className="text-[10px] text-gray-500">
-        🔒 ロック（★）した装備は分解・一括売却の対象外です。
+      <p className="flex items-center gap-1 text-[10px] text-gray-500">
+        <PixelGlyph kind="lock" size={12} /> ロックした装備は分解・一括売却の対象外です。
       </p>
 
       {rows.length === 0 ? (
@@ -185,10 +199,10 @@ export default function InventoryList() {
               >
                 <button
                   onClick={() => toggleFavorite(itemKey(item))}
-                  className={`shrink-0 text-lg active:scale-90 ${fav ? "text-amber-300" : "text-gray-600"}`}
+                  className="shrink-0 active:scale-90"
                   aria-label="ロック"
                 >
-                  {fav ? "🔒" : "🔓"}
+                  <PixelGlyph kind={fav ? "lock" : "unlock"} size={18} />
                 </button>
                 <button onClick={() => setSelected(index)} className="flex min-w-0 flex-1 items-center gap-2 text-left active:scale-[0.98]">
                   <ItemIcon item={item} size={32} />
@@ -290,12 +304,8 @@ function EquipmentDetailModal({
           <h3 className={`min-w-0 flex-1 text-lg font-extrabold ${item.rarity === "legendary" ? "legendary-glow" : style.text}`}>
             {item.name}
           </h3>
-          <button
-            onClick={onToggleFavorite}
-            className={`text-xl ${favorite ? "text-amber-300" : "text-gray-600"}`}
-            aria-label="ロック"
-          >
-            {favorite ? "🔒" : "🔓"}
+          <button onClick={onToggleFavorite} className="active:scale-90" aria-label="ロック">
+            <PixelGlyph kind={favorite ? "lock" : "unlock"} size={22} />
           </button>
         </div>
         <span className="text-[10px] text-gray-400">
@@ -304,12 +314,20 @@ function EquipmentDetailModal({
           {item.modTier ? ` ・ ★${item.modTier}` : ""}
         </span>
 
+        <p className="mt-1 text-[10px] text-gray-400">
+          {(() => {
+            const ok = CLASSES.filter((c) => canEquip(item, c.id));
+            if (ok.length >= CLASSES.length) return "装備可能: 全職業";
+            return `装備可能: ${ok.map((c) => c.name).join(" / ")}`;
+          })()}
+        </p>
+
         <p className="mt-2 text-sm text-gray-200">{item.description}</p>
 
         {item.setId && getSetDef(item.setId) && (
           <div className="mt-3 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 p-2">
             <p className="text-[10px] font-bold text-fuchsia-300">
-              {getSetDef(item.setId)!.icon} {getSetDef(item.setId)!.name}セット
+              <GlyphText text={getSetDef(item.setId)!.icon} size={12} /> {getSetDef(item.setId)!.name}セット
             </p>
             <ul className="mt-1 space-y-0.5 text-[10px] text-fuchsia-100">
               {getSetDef(item.setId)!.bonuses.map((b) => (
@@ -372,9 +390,13 @@ function EquipmentDetailModal({
           <button
             onClick={onScrap}
             disabled={favorite}
-            className="h-12 flex-1 rounded-xl bg-amber-700/80 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
+            className="flex h-12 flex-1 items-center justify-center gap-1 rounded-xl bg-amber-700/80 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
           >
-            {favorite ? "🔒 ロック中" : `分解 +${SCRAP_VALUE[item.rarity]}`}
+            {favorite ? (
+              <><PixelGlyph kind="lock" size={14} /> ロック中</>
+            ) : (
+              <><PixelGlyph kind="material" size={14} /> 分解 +{SCRAP_VALUE[item.rarity]}</>
+            )}
           </button>
           <button
             onClick={onEquip}

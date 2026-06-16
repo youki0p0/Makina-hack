@@ -5,6 +5,7 @@ import { GACHA_COST, PREMIUM_COST, TARGETED_COST } from "@/lib/loot";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { rarityLabel, rarityStyle, slotLabel } from "@/lib/ui";
 import ItemIcon from "@/components/ItemIcon";
+import PixelGlyph from "@/components/PixelGlyph";
 import { useGameStore } from "@/store/gameStore";
 import type { EquipmentSlot } from "@/types/game";
 
@@ -22,8 +23,8 @@ export default function GachaPanel() {
   return (
     <div className="rounded-xl border border-purple-500/40 bg-purple-500/10 p-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-purple-200">🎰 装備ガチャ</h2>
-        <span className="text-xs text-purple-200">素材 {points}</span>
+        <h2 className="flex items-center gap-1 text-sm font-bold text-purple-200"><PixelGlyph kind="casino" size={16} /> 装備ガチャ</h2>
+        <span className="flex items-center gap-1 text-xs text-purple-200"><PixelGlyph kind="material" size={13} /> {points}</span>
       </div>
       <p className="mt-1 text-[10px] text-gray-400">
         不要装備を分解して素材に。限定装備も排出。
@@ -42,7 +43,7 @@ export default function GachaPanel() {
         disabled={points < PREMIUM_COST}
         className="mt-2 h-11 w-full rounded-xl bg-amber-600 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
       >
-        ✨ プレミアム（素材 {PREMIUM_COST}・高補正コモン/レア以上なし）
+        プレミアム（素材 {PREMIUM_COST}・高補正コモン/レア以上なし）
       </button>
 
       <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2">
@@ -65,7 +66,7 @@ export default function GachaPanel() {
           disabled={points < TARGETED_COST}
           className="mt-2 h-11 w-full rounded-xl bg-rose-600 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
         >
-          🎯 {slotLabel[slot]}指定ガチャ（素材 {TARGETED_COST}・レア以上保証）
+          {slotLabel[slot]}指定ガチャ（素材 {TARGETED_COST}・レア以上保証）
         </button>
       </div>
 

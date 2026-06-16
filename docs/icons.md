@@ -39,6 +39,22 @@ Modifier/Ancient/Mythic なし。
 seed は `templateId` から。形状: blob / beast / biped / winged / skull / serpent。
 クリーチャー配色を seed で選択。**ボスは王冠**、**★付き（強化敵）はオーラ**を追加。
 
+## UIグリフ（絵文字の置き換え）
+
+絵文字を使わず、UIの記号も同じピクセルアートで描く（`getGlyphIconDataUrl(kind)` /
+`PixelGlyph`）。対応グリフ: attack/defense/hp/dice/gold/material/soul/drop/fire/poison/stun/
+weaken/heal/shop/casino/codex/lock/unlock/ghost/ranking/home/help/crown/star/bag/rainbow。
+
+プレイヤーバー・敵カード・行動ボタン・リザルト・ショップ・ガチャ・装備画面・インベントリ・
+タイトル導線・図鑑・アーティファクト等のUI記号をこれに置換済み。
+（戦闘ログ文中の絵文字・カジノのゲーム牌・職業/消費アイテムのデータ用アイコンは別アイコン体系のため対象外。）
+
+## 背景（手続き生成・高品質）
+
+`getWorldBackground(world)`（`data/worlds.ts`）が**画像なし**で章ごとの高品質背景を合成:
+テーマSVGテクスチャ（草・鍾乳石・石壁・雪・残り火・星座・回路など）＋大気グラデ（上方アクセント光・
+下方ホライズン光）＋エッジヴィネット＋基底グラデ。戦闘画面・ショップに適用。
+
 ## 表示サイズ
 
 - インベントリ一覧: 32px

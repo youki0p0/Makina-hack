@@ -1,7 +1,8 @@
 "use client";
 
 import { getClass } from "@/data/classes";
-import { consumableIcon } from "@/data/consumables";
+import PixelGlyph from "@/components/PixelGlyph";
+import { classGlyphKind, consumableGlyphKind } from "@/lib/uiGlyphs";
 import { getTitle } from "@/data/titles";
 import { useDamageFx } from "@/hooks/useDamageFx";
 import { useGameStore } from "@/store/gameStore";
@@ -18,7 +19,8 @@ export default function PlayerBar() {
   const player = useGameStore((s) => s.player);
   const stats = useGameStore((s) => s.stats());
   const buffs = useGameStore((s) => s.activeBuffs);
-  const cls = getClass(useGameStore((s) => s.classId));
+  const classId = useGameStore((s) => s.classId);
+  const cls = getClass(classId);
   const title = getTitle(useGameStore((s) => s.titleId));
   const streak = useGameStore((s) => s.winStreak);
   const playerStatuses = useGameStore((s) => s.playerStatuses);
@@ -48,11 +50,19 @@ export default function PlayerBar() {
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between text-xs">
           <span className="truncate font-bold">
-            {title.id && <span className="text-amber-300">《{title.name}》</span>} {cls.icon} {cls.name} Lv{player.level}
+            {title.id && <span className="text-amber-300">《{title.name}》</span>} <PixelGlyph kind={classGlyphKind(classId)} size={13} /> {cls.name} Lv{player.level}
           </span>
           <span className="flex shrink-0 items-center gap-2">
-            {streak >= 2 && <span className="text-orange-300">🔥{streak}</span>}
-            <span className="text-amber-300">💰{player.gold}</span>
+            {streak >= 2 && (
+              <span className="flex items-center text-orange-300">
+                <PixelGlyph kind="fire" size={14} />
+                {streak}
+              </span>
+            )}
+            <span className="flex items-center text-amber-300">
+              <PixelGlyph kind="gold" size={14} />
+              {player.gold}
+            </span>
           </span>
         </div>
 
@@ -69,17 +79,21 @@ export default function PlayerBar() {
         </div>
 
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-300">
-          <span>⚔️{stats.attack}</span>
-          <span>🛡️{stats.defense}</span>
-          <span>🎲{stats.rerolls}</span>
+          <span className="flex items-center gap-0.5"><PixelGlyph kind="attack" size={14} />{stats.attack}</span>
+          <span className="flex items-center gap-0.5"><PixelGlyph kind="defense" size={14} />{stats.defense}</span>
+          <span className="flex items-center gap-0.5"><PixelGlyph kind="dice" size={14} />{stats.rerolls}</span>
           {buffs.map((b, i) => (
-            <span key={`${b.kind}-${i}`} className="text-emerald-300">
-              {consumableIcon[b.kind]}{BUFF_LABEL[b.kind]}
+            <span key={`${b.kind}-${i}`} className="flex items-center text-emerald-300">
+              <PixelGlyph kind={consumableGlyphKind(b.kind)} size={12} />{BUFF_LABEL[b.kind]}
               {b.kind === "luck" ? `≥${b.value}` : `+${b.value}`}
             </span>
           ))}
-          {poison > 0 && <span className="text-lime-300">☠️{poison}/T</span>}
-          {playerStunTurns > 0 && <span className="text-yellow-300">⚡スタン</span>}
+          {poison > 0 && (
+            <span className="flex items-center text-lime-300"><PixelGlyph kind="poison" size={14} />{poison}/T</span>
+          )}
+          {playerStunTurns > 0 && (
+            <span className="flex items-center text-yellow-300"><PixelGlyph kind="stun" size={14} />スタン</span>
+          )}
         </div>
       </div>
     </div>
