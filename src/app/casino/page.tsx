@@ -16,6 +16,8 @@ import {
 import { estimateTier } from "@/data/items";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { ENEMY_TEMPLATES, BOSS_TEMPLATES } from "@/data/enemies";
+import { getSlotIconDataUrl } from "@/lib/itemIcon";
+import { slotSfx } from "@/lib/audio";
 import EnemyIcon from "@/components/EnemyIcon";
 import PixelGlyph from "@/components/PixelGlyph";
 import { fmt } from "@/lib/ui";
@@ -124,28 +126,35 @@ function Dice({ value, big }: { value: number; big?: boolean }) {
 
 // ===== Slot (パチスロ4号機フレーバー) =====
 
-// Die face (1–9) → 絵柄. 7=BIG(→ダイスラッシュ) / BAR=REG / RP=リプレイ / 小役.
-const SLOT_ROLE: Record<number, { label: string; cls: string }> = {
-  7: { label: "7", cls: "text-red-400" }, // BIG → ダイスラッシュ(AT)
-  4: { label: "BAR", cls: "text-amber-300" }, // REG
-  1: { label: "RP", cls: "text-cyan-300" }, // replay
-  2: { label: "ベル", cls: "text-yellow-300" }, // bell
-  5: { label: "スイカ", cls: "text-green-400" }, // watermelon
-  9: { label: "🍒", cls: "text-pink-400" }, // cherry
-  3: { label: "3", cls: "text-gray-500" },
-  6: { label: "6", cls: "text-gray-500" },
-  8: { label: "8", cls: "text-gray-500" },
-};
+// 絵柄(出目1–9)は専用ピクセルスプライト: 7=BIG / BAR=REG / リプレイ / ベル /
+// スイカ / チェリー / それ以外はダイス数字(ハズレ目)。
+function SlotSym({ value, size = 48 }: { value: number; size?: number }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    setUrl(getSlotIconDataUrl(value));
+  }, [value]);
+  return url ? (
+    <img
+      src={url}
+      width={size}
+      height={size}
+      alt=""
+      draggable={false}
+      style={{ width: size, height: size, imageRendering: "pixelated" }}
+    />
+  ) : (
+    <span style={{ display: "block", width: size, height: size }} />
+  );
+}
 
 function SlotCell({ value, hot }: { value: number; hot?: boolean }) {
-  const r = SLOT_ROLE[value] ?? { label: String(value), cls: "text-gray-300" };
   return (
     <div
       className={`flex h-20 w-[4.5rem] items-center justify-center rounded-lg border-2 transition-colors ${
         hot ? "border-red-500 bg-red-500/15 animate-pulse" : "border-white/15 bg-black/50"
       }`}
     >
-      <span className={`text-2xl font-black ${r.cls}`}>{r.label}</span>
+      <SlotSym value={value} size={48} />
     </div>
   );
 }
@@ -154,7 +163,7 @@ function slotLabel(res: SlotSpinResult): { text: string; cls: string } {
   switch (res.outcome) {
     case "big":
       return {
-        text: `🎲 ダイスラッシュ!! ×${res.rush?.sets ?? 1}セット +🪙${res.payout}`,
+        text: `🎲 ダイスラッシュ!! ×${res.rush?.sets ?? 1}セット +${res.payout}枚`,
         cls: "text-red-400",
       };
     case "reg":
@@ -252,6 +261,7 @@ function Slots() {
       return;
     }
     spinningRef.current = true;
+    slotSfx("lever"); // レバーON
     setSpinning(true);
     setResult(null);
     setReachName(null);
@@ -271,6 +281,7 @@ function Slots() {
       timers.current.push(
         setTimeout(() => {
           lock.current[i] = true;
+          slotSfx("stop"); // リール停止音
           setReels((r) => {
             const n = [...r] as [number, number, number];
             n[i] = S[i];
@@ -287,12 +298,17 @@ function Slots() {
         setTimeout(() => {
           stopCycle();
           lock.current = [true, true, true];
+          slotSfx("stop"); // 第3リール停止
           setReels(S);
           setResult(res);
           setReachName(null);
           setFoe(null);
           spinningRef.current = false;
           setSpinning(false);
+          // 揃い/小役の当たり音
+          if (res.outcome === "big") slotSfx("bonusBig");
+          else if (res.outcome === "reg") slotSfx("bonus");
+          else if (res.outcome !== "miss") slotSfx("small");
           const gap = res.outcome === "big" || res.outcome === "reg" ? 1500 : 650;
           timers.current.push(
             setTimeout(() => {
@@ -310,6 +326,7 @@ function Slots() {
         setTimeout(() => {
           setReachName(res.reach!.name);
           setFoe(enemy);
+          slotSfx("reach"); // リーチ煽り
         }, 820),
       );
       reveal(820 + res.reach.ms);
@@ -331,7 +348,7 @@ function Slots() {
       {/* Coin bank + gold exchange */}
       <div className="flex items-center justify-between rounded-xl border border-amber-400/30 bg-black/30 px-3 py-2 text-xs">
         <span className="flex items-center gap-1 font-bold text-amber-200">
-          <PixelGlyph kind="casino" size={14} /> コイン {fmt(coins)}
+          <PixelGlyph kind="casino" size={14} /> カジノコイン {fmt(coins)}
         </span>
         <span className="flex items-center gap-1 text-gray-400">
           <PixelGlyph kind="gold" size={14} /> {fmt(gold)}
@@ -418,7 +435,7 @@ function Slots() {
           disabled={spinning || !canSpin}
           className="h-16 flex-[1.6] rounded-2xl bg-fuchsia-600 text-xl font-extrabold text-white shadow-lg active:scale-95 disabled:opacity-40"
         >
-          {spinning ? "回転中…" : replay ? "🔁 無料スピン" : `🎰 スピン（🪙${SLOT_BET}）`}
+          {spinning ? "回転中…" : replay ? "🔁 無料スピン" : `🎰 スピン（${SLOT_BET}枚）`}
         </button>
         <button
           onClick={() => setAuto((a) => !a)}
@@ -431,14 +448,14 @@ function Slots() {
       </div>
 
       {!canSpin && coins < cost && (
-        <p className="text-center text-[10px] text-red-300">コインが足りません。上で購入してください。</p>
+        <p className="text-center text-[10px] text-red-300">カジノコインが足りません。上で購入してください。</p>
       )}
 
       <div className="rounded-xl border border-white/10 bg-black/20 p-2 text-[10px] leading-relaxed text-gray-400">
         3枚掛け。<b className="text-red-300">7・7・7</b>で<b className="text-red-300">ダイスラッシュ</b>(AT)突入＝
         継続抽選で出玉が上乗せ（まれに大量出玉）。<b className="text-amber-300">BAR=REG</b> /
         <b className="text-cyan-300"> RP=リプレイ</b>（次回無料）/ ベル・スイカ・🍒で小役。
-        2つ揃うと<b className="text-red-300">リーチ</b>（演出が激アツなほど信頼度UP）。1コイン=💰{COIN_VALUE}。
+        2つ揃うと<b className="text-red-300">リーチ</b>（演出が激アツなほど信頼度UP）。1カジノコイン=💰{COIN_VALUE}。
       </div>
     </div>
   );
