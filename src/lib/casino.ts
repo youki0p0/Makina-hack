@@ -146,6 +146,8 @@ export interface ReachDef {
   ms: number;
   /** 熱さ 1(弱)〜5(激アツ). */
   tier: number;
+  /** 当たり確定のリーチ(画面が虹色に明滅する). tier5はガセに出ないので確定。 */
+  guaranteed?: boolean;
 }
 
 export const SLOT_REACHES: ReachDef[] = [
@@ -156,9 +158,9 @@ export const SLOT_REACHES: ReachDef[] = [
   { id: "long", name: "ロングリーチ", ms: 3400, tier: 3 },
   { id: "group", name: "群予告リーチ", ms: 3000, tier: 3 },
   { id: "cutin", name: "カットイン", ms: 3200, tier: 4 },
-  { id: "allspin", name: "全回転リーチ", ms: 3600, tier: 5 },
-  { id: "rainbow", name: "虹リーチ", ms: 3600, tier: 5 },
-  { id: "premium", name: "プレミアリーチ", ms: 3800, tier: 5 },
+  { id: "allspin", name: "全回転リーチ", ms: 3600, tier: 5, guaranteed: true },
+  { id: "rainbow", name: "虹リーチ", ms: 3600, tier: 5, guaranteed: true },
+  { id: "premium", name: "プレミアリーチ", ms: 3800, tier: 5, guaranteed: true },
 ];
 
 /**

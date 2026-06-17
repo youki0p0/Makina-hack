@@ -229,6 +229,7 @@ function Slots() {
   const [foe, setFoe] = useState<ReachFoe | null>(null);
   const [result, setResult] = useState<SlotSpinResult | null>(null);
   const [auto, setAuto] = useState(false);
+  const [flash, setFlash] = useState(false); // 確定当たりリーチの虹色明滅
 
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const cycle = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -270,6 +271,7 @@ function Slots() {
     setResult(null);
     setReachName(null);
     setFoe(null);
+    setFlash(false);
     lock.current = [false, false, false];
 
     cycle.current = setInterval(() => {
@@ -304,6 +306,7 @@ function Slots() {
           setResult(res);
           setReachName(null);
           setFoe(null);
+          setFlash(false);
           spinningRef.current = false;
           setSpinning(false);
 
@@ -348,6 +351,7 @@ function Slots() {
         setTimeout(() => {
           setReachName(res.reach!.name);
           setFoe(enemy);
+          if (res.reach!.guaranteed) setFlash(true); // 確定当たり → 虹色明滅
           slotSfx("reach"); // リーチ煽り
         }, 820),
       );
@@ -375,6 +379,9 @@ function Slots() {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* 確定当たりリーチ: 全画面が虹色に明滅 */}
+      {flash && <div className="rainbow-flash pointer-events-none fixed inset-0 z-50" />}
+
       {/* Coin bank + gold exchange */}
       <div className="flex items-center justify-between rounded-xl border border-amber-400/30 bg-black/30 px-3 py-2 text-xs">
         <span className="flex items-center gap-1 font-bold text-amber-200">
@@ -450,6 +457,9 @@ function Slots() {
             >
               🔥 {reachName}
             </p>
+            {flash && (
+              <p className="animate-pulse text-base font-black text-fuchsia-300">🌈 当たり確定！</p>
+            )}
             {foe && <p className="text-xs font-bold text-gray-200">{foe.label}</p>}
           </div>
         )}
