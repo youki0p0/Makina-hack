@@ -134,6 +134,107 @@ export const SET_DEFS: readonly SetDef[] = [
       { pieces: 6, desc: "ダイスを2個振り、高い方を使う", rollTwoDice: true },
     ],
   },
+  // ===== 追加10セット(シナジー多様化。火力偏重を避け防御/吸血/汎用に寄せる) =====
+  {
+    key: "fortress",
+    name: "鉄壁",
+    icon: "🏰",
+    bonuses: [
+      { pieces: 2, desc: "防御+10 / HP+30", defense: 10, maxHp: 30 },
+      { pieces: 4, desc: "HP+60", maxHp: 60 },
+      { pieces: 6, desc: "全ての攻撃が20%吸血", lifestealAllPct: 0.2 },
+    ],
+  },
+  {
+    key: "assassin",
+    name: "暗殺者",
+    icon: "🗡️",
+    bonuses: [
+      { pieces: 2, desc: "リロール +1", reroll: 1 },
+      { pieces: 4, desc: "攻撃時に追撃(+1ヒット)", extraHit: true },
+      { pieces: 6, desc: "敵HP18%以下を即死", executePct: 0.18 },
+    ],
+  },
+  {
+    key: "crusader",
+    name: "聖盾騎士",
+    icon: "✝️",
+    bonuses: [
+      { pieces: 2, desc: "防御+8 / HP+25", defense: 8, maxHp: 25 },
+      { pieces: 4, desc: "リロール時にHP回復(+10)", healOnReroll: 10 },
+      { pieces: 6, desc: "全ての攻撃が18%吸血", lifestealAllPct: 0.18 },
+    ],
+  },
+  {
+    key: "windrunner",
+    name: "疾風",
+    icon: "🌬️",
+    bonuses: [
+      { pieces: 2, desc: "リロール +1", reroll: 1 },
+      { pieces: 4, desc: "出目1が2(通常攻撃)になる", faceOneToTwo: true },
+      { pieces: 6, desc: "攻撃時に追撃(+1ヒット)", extraHit: true },
+    ],
+  },
+  {
+    key: "gravekeeper",
+    name: "墓守",
+    icon: "⚰️",
+    bonuses: [
+      { pieces: 2, desc: "HP+40", maxHp: 40 },
+      { pieces: 4, desc: "出目4以上で追加吸血(+20%)", lifestealHighFacePct: 0.2 },
+      { pieces: 6, desc: "全ての攻撃が25%吸血", lifestealAllPct: 0.25 },
+    ],
+  },
+  {
+    key: "arcanist",
+    name: "秘術士",
+    icon: "🔯",
+    bonuses: [
+      { pieces: 2, desc: "リロール時にHP回復(+6)", healOnReroll: 6 },
+      { pieces: 4, desc: "ダイスを2個振り、高い方を使う", rollTwoDice: true },
+      { pieces: 6, desc: "出目6の威力上昇(+70%)", sixDmgBonus: 0.7 },
+    ],
+  },
+  {
+    key: "doomherald",
+    name: "終焉の使徒",
+    icon: "☄️",
+    bonuses: [
+      { pieces: 2, desc: "出目6の威力上昇(+50%)", sixDmgBonus: 0.5 },
+      { pieces: 4, desc: "敵HP15%以下を即死", executePct: 0.15 },
+      { pieces: 6, desc: "出目6が2回発動する", sixDouble: true },
+    ],
+  },
+  {
+    key: "titanguard",
+    name: "巨盾兵",
+    icon: "🛡️",
+    bonuses: [
+      { pieces: 2, desc: "防御+12 / HP+40", defense: 12, maxHp: 40 },
+      { pieces: 4, desc: "HP+80", maxHp: 80 },
+      { pieces: 6, desc: "全ての攻撃が15%吸血", lifestealAllPct: 0.15 },
+    ],
+  },
+  {
+    key: "merchant",
+    name: "豪商",
+    icon: "💰",
+    bonuses: [
+      { pieces: 2, desc: "リロール +1", reroll: 1 },
+      { pieces: 4, desc: "攻撃 +10", attack: 10 },
+      { pieces: 6, desc: "出目1が2(通常攻撃)になる", faceOneToTwo: true },
+    ],
+  },
+  {
+    key: "warmonger",
+    name: "軍神の鎧",
+    icon: "⚔️",
+    bonuses: [
+      { pieces: 2, desc: "攻撃 +10", attack: 10 },
+      { pieces: 4, desc: "出目5・6の威力上昇(+30%)", highFaceDmgBonus: 0.3 },
+      { pieces: 6, desc: "攻撃時に追撃(+1ヒット)", extraHit: true },
+    ],
+  },
 ];
 
 const FIXED_BY_KEY: Record<string, SetDef> = Object.fromEntries(
@@ -227,6 +328,16 @@ export function availableSetKeys(floor: number): string[] {
     oracle: 120,
     revenant: 135,
     trickster: 150,
+    fortress: 165,
+    assassin: 180,
+    crusader: 195,
+    windrunner: 210,
+    gravekeeper: 225,
+    arcanist: 240,
+    doomherald: 255,
+    titanguard: 270,
+    merchant: 285,
+    warmonger: 300,
   };
   for (const s of SET_DEFS) if (floor >= (namedFloor[s.key] ?? 1)) keys.push(s.key);
   for (let n = 0; proceduralSetFloor(n) <= floor; n++) keys.push(`gset${n}`);
@@ -315,6 +426,81 @@ export const SYNERGIES: readonly Synergy[] = [
     desc: "戦士×賭博師4: 出目5・6の威力+30%",
     apply: (e) => {
       e.highFaceDmgBonus = Math.max(e.highFaceDmgBonus, 0.3);
+    },
+  },
+  // ===== 追加シナジー(新セット×職。上位職にも付与) =====
+  {
+    classId: "paladin",
+    setKey: "fortress",
+    minPieces: 4,
+    name: "不落の城",
+    desc: "聖騎士×鉄壁4: HP+80 / 防御+10",
+    apply: (e) => {
+      e.statBonus.maxHp += 80;
+      e.statBonus.defense += 10;
+    },
+  },
+  {
+    classId: "rogue",
+    setKey: "assassin",
+    minPieces: 4,
+    name: "影討ち",
+    desc: "盗賊×暗殺者4: 即死しきい値25%＆追撃",
+    apply: (e) => {
+      e.executePct = Math.max(e.executePct, 0.25);
+      e.extraHit = true;
+    },
+  },
+  {
+    classId: "archmage",
+    setKey: "arcanist",
+    minPieces: 4,
+    name: "万象の理",
+    desc: "大魔導×秘術4: 2個振り＆出目6+50%",
+    apply: (e) => {
+      e.rollTwoDice = true;
+      e.sixDmgBonus += 0.5;
+    },
+  },
+  {
+    classId: "berserker",
+    setKey: "doomherald",
+    minPieces: 6,
+    name: "破滅の咆哮",
+    desc: "狂戦士×終焉6: 即死しきい値22%",
+    apply: (e) => {
+      e.executePct = Math.max(e.executePct, 0.22);
+    },
+  },
+  {
+    classId: "warlord",
+    setKey: "warmonger",
+    minPieces: 4,
+    name: "覇王の進軍",
+    desc: "軍神×軍神の鎧4: 攻撃+20",
+    apply: (e) => {
+      e.statBonus.attack += 20;
+    },
+  },
+  {
+    classId: "hexer",
+    setKey: "gravekeeper",
+    minPieces: 4,
+    name: "呪詛吸命",
+    desc: "呪術師×墓守4: 全攻撃25%吸血",
+    apply: (e) => {
+      e.lifestealAllPct = Math.max(e.lifestealAllPct, 0.25);
+    },
+  },
+  {
+    classId: "celestial",
+    setKey: "crusader",
+    minPieces: 6,
+    name: "聖盾光臨",
+    desc: "白の天啓×聖盾騎士6: HP+100 / 防御+15",
+    apply: (e) => {
+      e.statBonus.maxHp += 100;
+      e.statBonus.defense += 15;
     },
   },
 ];

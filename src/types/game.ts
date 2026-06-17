@@ -284,6 +284,8 @@ export interface Enemy {
   charging: boolean;
   /** Boss gimmick: turns counted toward the next charge. */
   chargeCounter: number;
+  /** Boss DPS gate: turns elapsed; attack ramps after a threshold (倒せないと負ける). */
+  bossTurns?: number;
   /** Infinite ★ modifier tier (0 = none). Boosts HP/attack/drops. */
   modTier: number;
 }
