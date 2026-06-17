@@ -162,10 +162,11 @@ function SlotCell({ value, hot }: { value: number; hot?: boolean }) {
 function slotLabel(res: SlotSpinResult): { text: string; cls: string } {
   switch (res.outcome) {
     case "big":
-      return {
-        text: `🎲 ダイスラッシュ!! ×${res.rush?.sets ?? 1}セット +${res.payout}枚`,
-        cls: "text-red-400",
-      };
+      return { text: `🎲 ダイスラッシュ突入!! ${res.atRemaining}G`, cls: "text-red-400" };
+    case "at":
+      return res.atAdd > 0
+        ? { text: `🔥 上乗せ +${res.atAdd}G！ (+${res.payout}枚)`, cls: "text-red-400" }
+        : { text: `🎲 ダイスラッシュ +${res.payout}枚`, cls: "text-amber-200" };
     case "reg":
       return { text: `✨ REGULAR BONUS +${res.payout}`, cls: "text-amber-300" };
     case "replay":
@@ -217,6 +218,7 @@ function Slots() {
   const gold = useGameStore((s) => s.player.gold);
   const coins = useGameStore((s) => s.coins);
   const replay = useGameStore((s) => s.slotReplay);
+  const atGames = useGameStore((s) => s.atGames);
   const buyCoins = useGameStore((s) => s.buyCoins);
   const cashout = useGameStore((s) => s.cashoutCoins);
   const slotSpin = useGameStore((s) => s.slotSpin);
@@ -233,10 +235,10 @@ function Slots() {
   const lock = useRef<[boolean, boolean, boolean]>([false, false, false]);
   const spinningRef = useRef(false);
   const autoRef = useRef(false);
-  const rushBgm = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cost = replay ? 0 : SLOT_BET;
-  const canSpin = coins >= cost;
+  const atActive = atGames > 0;
+  const canSpin = coins >= cost && !atActive;
 
   const stopCycle = () => {
     if (cycle.current) {
@@ -248,10 +250,6 @@ function Slots() {
     timers.current.forEach(clearTimeout);
     timers.current = [];
     stopCycle();
-    if (rushBgm.current) {
-      clearTimeout(rushBgm.current);
-      rushBgm.current = null;
-    }
   };
   useEffect(() => () => clearAll(), []);
   useEffect(() => {
@@ -265,8 +263,9 @@ function Slots() {
       setAuto(false);
       return;
     }
+    const isAt = res.outcome === "at"; // free auto game inside ダイスラッシュ
     spinningRef.current = true;
-    slotSfx("lever"); // レバーON
+    if (!isAt) slotSfx("lever"); // レバーON (AT中は連打にならないよう省略)
     setSpinning(true);
     setResult(null);
     setReachName(null);
@@ -295,43 +294,55 @@ function Slots() {
         }, when),
       );
 
-    stop(0, 450);
-    stop(1, 800);
-
     const reveal = (when: number) =>
       timers.current.push(
         setTimeout(() => {
           stopCycle();
           lock.current = [true, true, true];
-          slotSfx("stop"); // 第3リール停止
+          slotSfx("stop"); // 最終リール停止
           setReels(S);
           setResult(res);
           setReachName(null);
           setFoe(null);
           spinningRef.current = false;
           setSpinning(false);
-          // 揃い/小役の当たり音
-          if (res.outcome === "big") {
-            slotSfx("bonusBig");
-            // BIG中(ダイスラッシュ)は専用BGM(idol)に切替、AT後にカジノ曲へ戻す。
-            setBgmTheme("idol");
-            if (rushBgm.current) clearTimeout(rushBgm.current);
-            const dur = Math.min(16000, Math.max(7000, (res.rush?.sets ?? 1) * 1300));
-            rushBgm.current = setTimeout(() => setBgmTheme("casino"), dur);
-          } else if (res.outcome === "reg") slotSfx("bonus");
+
+          const st = useGameStore.getState();
+          // BGM: BIGでidolへ突入、AT終了でカジノ曲へ復帰。
+          if (res.atStart) setBgmTheme("idol");
+          const atOver = isAt && st.atGames === 0;
+          if (atOver) setBgmTheme("casino");
+
+          // 当たり/小役/上乗せ音。
+          if (res.outcome === "big") slotSfx("bonusBig");
+          else if (res.outcome === "reg") slotSfx("bonus");
+          else if (res.outcome === "at") slotSfx(res.atAdd > 0 ? "bonusBig" : "small");
           else if (res.outcome !== "miss") slotSfx("small");
-          const gap = res.outcome === "big" || res.outcome === "reg" ? 1500 : 650;
+
+          // 次ゲーム: AT中は自動で回し続ける。通常はオート時のみ。
+          const gap = res.outcome === "big" ? 1400 : isAt ? 280 : 650;
           timers.current.push(
             setTimeout(() => {
-              const st = useGameStore.getState();
-              const c = st.slotReplay ? 0 : SLOT_BET;
-              if (autoRef.current && st.coins >= c) spin();
+              const s2 = useGameStore.getState();
+              if (s2.atGames > 0) {
+                spin();
+                return;
+              }
+              const c = s2.slotReplay ? 0 : SLOT_BET;
+              if (autoRef.current && s2.coins >= c) spin();
             }, gap),
           );
         }, when),
       );
 
-    if (res.reach) {
+    if (isAt) {
+      // AT中の無料ゲームはテンポよく(リーチ無し)。
+      stop(0, 140);
+      stop(1, 250);
+      reveal(380);
+    } else if (res.reach) {
+      stop(0, 450);
+      stop(1, 800);
       const enemy = reachFoe(res.reach.tier);
       timers.current.push(
         setTimeout(() => {
@@ -342,6 +353,8 @@ function Slots() {
       );
       reveal(820 + res.reach.ms);
     } else {
+      stop(0, 450);
+      stop(1, 800);
       reveal(1050);
     }
   };
@@ -351,6 +364,12 @@ function Slots() {
     if (auto && !spinningRef.current) spin();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auto]);
+
+  // Resume an in-progress ダイスラッシュ if we (re)mounted mid-AT.
+  useEffect(() => {
+    if (atGames > 0 && !spinningRef.current) spin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const reaching = reachName !== null;
 
@@ -389,14 +408,26 @@ function Slots() {
         </button>
       </div>
 
+      {/* ダイスラッシュ(AT) counter */}
+      {atActive && (
+        <div className="flex items-center justify-between rounded-xl border-2 border-red-500/70 bg-gradient-to-r from-red-600/30 to-amber-500/20 px-3 py-2">
+          <span className="text-sm font-black text-red-300 animate-pulse">🎲 ダイスラッシュ</span>
+          <span className="text-sm font-extrabold text-amber-200">
+            残り <span className="text-xl">{atGames}</span> G
+          </span>
+        </div>
+      )}
+
       {/* Reels */}
       <div
         className={`rounded-2xl border-2 p-4 text-center ${
-          result?.outcome === "big"
-            ? "border-red-500 bg-red-500/10"
-            : result?.outcome === "reg"
-              ? "border-amber-400 bg-amber-400/10"
-              : "border-white/10 bg-black/30"
+          atActive
+            ? "border-red-500 bg-gradient-to-b from-red-500/15 to-amber-500/10"
+            : result?.outcome === "big"
+              ? "border-red-500 bg-red-500/10"
+              : result?.outcome === "reg"
+                ? "border-amber-400 bg-amber-400/10"
+                : "border-white/10 bg-black/30"
         }`}
       >
         <div className="flex justify-center gap-2">
@@ -446,11 +477,18 @@ function Slots() {
           disabled={spinning || !canSpin}
           className="h-16 flex-[1.6] rounded-2xl bg-fuchsia-600 text-xl font-extrabold text-white shadow-lg active:scale-95 disabled:opacity-40"
         >
-          {spinning ? "回転中…" : replay ? "🔁 無料スピン" : `🎰 スピン（${SLOT_BET}枚）`}
+          {atActive
+            ? "🎲 ダイスラッシュ中"
+            : spinning
+              ? "回転中…"
+              : replay
+                ? "🔁 無料スピン"
+                : `🎰 スピン（${SLOT_BET}枚）`}
         </button>
         <button
           onClick={() => setAuto((a) => !a)}
-          className={`h-16 flex-1 rounded-2xl text-sm font-bold active:scale-95 ${
+          disabled={atActive}
+          className={`h-16 flex-1 rounded-2xl text-sm font-bold active:scale-95 disabled:opacity-40 ${
             auto ? "bg-amber-500 text-black" : "bg-white/10 text-gray-300"
           }`}
         >

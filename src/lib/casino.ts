@@ -22,12 +22,13 @@ export const COIN_VALUE = 20;
 export const SLOT_BET = 3;
 
 export type SlotOutcome =
-  | "big" // ビッグボーナス(7・7・7)
+  | "big" // ビッグボーナス(7・7・7) → ダイスラッシュ突入
   | "reg" // レギュラーボーナス
   | "replay" // リプレイ(次回無料)
   | "watermelon" // スイカ
   | "cherry" // チェリー
   | "bell" // ベル
+  | "at" // ダイスラッシュ(AT)中の無料ゲーム
   | "miss"; // ハズレ
 
 /** Which die face (1–9) represents each role on the reels. */
@@ -83,26 +84,26 @@ export function slotPayout(outcome: SlotOutcome): number {
 }
 
 // ===== ダイスラッシュ (AT) =====
-// 4号機AT機(獣王のサバンナチャンス)のゲームフロー参考。BIG成立で突入し、継続(ループ)
-// 抽選で上乗せ。継続率で枚数が伸びる(まれに大量出玉の夢)。テーマはダイス×RPG。
+// 4号機AT機(獣王のサバンナチャンス)のゲームフロー参考。BIG成立で突入し、約100G続く
+// AT(無料ゲーム)を消化しながら出玉が伸びる。AT中はまれに「上乗せ」で延長(夢)。
+// テーマはダイス×RPG。
 
-export interface RushResult {
-  /** Number of continued sets (1+). */
-  sets: number;
-  /** Total coins paid out by the AT. */
-  coins: number;
+/** Games (rotations) granted when a BIG kicks off ダイスラッシュ. */
+export const AT_GAMES = 100;
+
+/** Coins paid out by a single AT game (avg ≈ 3.6; rare big hits). */
+export function atSpinPayout(): number {
+  const r = Math.random();
+  if (r < 0.55) return 1 + Math.floor(Math.random() * 2); // 1–2
+  if (r < 0.85) return 3 + Math.floor(Math.random() * 3); // 3–5
+  if (r < 0.97) return 7 + Math.floor(Math.random() * 4); // 7–10
+  return 15 + Math.floor(Math.random() * 11); // 15–25 (big hit)
 }
 
-/** Continuation (ループ) rate of ダイスラッシュ. */
-export const RUSH_LOOP = 0.5;
-const RUSH_MAX_SETS = 12;
-
-export function rollRush(): RushResult {
-  let sets = 1;
-  while (sets < RUSH_MAX_SETS && Math.random() < RUSH_LOOP) sets++;
-  let coins = 0;
-  for (let i = 0; i < sets; i++) coins += 120 + Math.floor(Math.random() * 121); // 120–240/set
-  return { sets, coins };
+/** Chance per AT game of an 上乗せ (extra games). Returns the games added (0=none). */
+export const AT_RENSHO_CHANCE = 0.04;
+export function atRensho(): number {
+  return Math.random() < AT_RENSHO_CHANCE ? 20 + Math.floor(Math.random() * 31) : 0; // +20–50G
 }
 
 const MISS_POOL = [2, 3, 4, 5, 6, 8]; // excludes 7(seven) & 9(cherry) to avoid fake hits
