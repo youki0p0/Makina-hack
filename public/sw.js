@@ -5,7 +5,8 @@
 // referencing old (hashed) JS chunks that no longer exist — the app failed to
 // load ("重くてロードできない"). Network-first keeps the shell in sync with the
 // current chunks; immutable hashed assets stay cache-first for speed/offline.
-const CACHE = "dice-dungeon-v2";
+// Bump this to purge every older cache on activate (過去バージョンを一掃).
+const CACHE = "dice-dungeon-v3";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
