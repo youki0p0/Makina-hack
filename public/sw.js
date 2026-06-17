@@ -6,7 +6,7 @@
 // load ("重くてロードできない"). Network-first keeps the shell in sync with the
 // current chunks; immutable hashed assets stay cache-first for speed/offline.
 // Bump this to purge every older cache on activate (過去バージョンを一掃).
-const CACHE = "dice-dungeon-v3";
+const CACHE = "dice-dungeon-v4";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -28,6 +28,9 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+
+  // Version manifest: never cache — the version gate must always see the truth.
+  if (url.pathname === "/version.json") return;
 
   // HTML documents: always try the network first so the app shell matches the
   // latest deploy's chunks; fall back to cache only when offline.
