@@ -411,6 +411,8 @@ export interface SaveData {
   gachaPoints?: number;
   /** Rebirth currency (optional for old saves). */
   souls?: number;
+  /** Casino coins (medals) (optional for old saves). */
+  coins?: number;
   /** Permanent artifact levels carried across rebirths (optional for old saves). */
   artifacts?: ArtifactLevels;
   /** Current character class (optional for old saves). */

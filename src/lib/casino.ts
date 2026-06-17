@@ -11,34 +11,173 @@ export function randomCasinoPrize(): Equipment {
   return { ...pick };
 }
 
-// ===== dice slots =====
+// ===== 9-symbol dice slot (パチスロ4号機フレーバー) =====
+// 出目は 1〜9。内部抽選で結果を先に決め、リールはそれに合わせて止める（実機準拠）。
+// コイン(メダル)で回し、リプレイ・ベル等の小役、レギュラー/ビッグの当たり、
+// 約3秒のリーチ演出(信頼度差つき10種)を備える。
 
-export interface SlotResult {
-  reels: [DiceValue, DiceValue, DiceValue];
-  /** Gold payout (already net of the bet, i.e. winnings only). */
-  payout: number;
-  /** Whether a special prize item is awarded. */
-  prize: boolean;
-  label: string;
+/** Coin (medal) economy: 1 coin ⇄ this many gold. */
+export const COIN_VALUE = 20;
+/** Coins consumed per spin (3枚掛け). */
+export const SLOT_BET = 3;
+
+export type SlotOutcome =
+  | "big" // ビッグボーナス(7・7・7)
+  | "reg" // レギュラーボーナス
+  | "replay" // リプレイ(次回無料)
+  | "watermelon" // スイカ
+  | "cherry" // チェリー
+  | "bell" // ベル
+  | "miss"; // ハズレ
+
+/** Which die face (1–9) represents each role on the reels. */
+export const SLOT_SYMBOL: Record<string, number> = {
+  seven: 7, // BIG
+  bar: 4, // REGULAR
+  replay: 1,
+  bell: 2,
+  melon: 5,
+  cherry: 9,
+};
+
+// Per-spin odds tuned to a 4号機 feel (big≈1/240, reg≈1/360, replay≈1/7.3,
+// bell≈1/6 …). The remainder is a miss.
+const ODDS: { outcome: SlotOutcome; p: number }[] = [
+  { outcome: "big", p: 1 / 240 },
+  { outcome: "reg", p: 1 / 360 },
+  { outcome: "watermelon", p: 1 / 128 },
+  { outcome: "cherry", p: 1 / 51 },
+  { outcome: "replay", p: 1 / 7.3 },
+  { outcome: "bell", p: 1 / 6 },
+];
+
+export function drawSlotOutcome(): SlotOutcome {
+  const r = Math.random();
+  let acc = 0;
+  for (const o of ODDS) {
+    acc += o.p;
+    if (r < acc) return o.outcome;
+  }
+  return "miss";
 }
 
-export function spinSlots(bet: number): SlotResult {
-  const reels: [DiceValue, DiceValue, DiceValue] = [rollDice(), rollDice(), rollDice()];
-  const [a, b, c] = reels;
-  const allSame = a === b && b === c;
-  const pair = a === b || b === c || a === c;
-
-  if (allSame && a === 6) {
-    return { reels, payout: bet * 20, prize: true, label: "🎉 ジャックポット！" };
+/**
+ * Coin payout for an outcome (replay pays 0 — next spin is free instead).
+ * BIG pays 0 here: it triggers ダイスラッシュ (an AT), whose coins come from
+ * rollRush() instead — a looping, big-payout bonus (4号機 AT機のフロー参考)。
+ */
+export function slotPayout(outcome: SlotOutcome): number {
+  switch (outcome) {
+    case "reg":
+      return 60;
+    case "watermelon":
+      return 8;
+    case "bell":
+      return 5;
+    case "cherry":
+      return 1;
+    case "big":
+    default:
+      return 0;
   }
-  if (allSame) {
-    return { reels, payout: bet * 8, prize: false, label: "トリプル！" };
-  }
-  if (pair) {
-    return { reels, payout: bet * 2, prize: false, label: "ペア" };
-  }
-  return { reels, payout: 0, prize: false, label: "ハズレ" };
 }
+
+// ===== ダイスラッシュ (AT) =====
+// 4号機AT機(獣王のサバンナチャンス)のゲームフロー参考。BIG成立で突入し、継続(ループ)
+// 抽選で上乗せ。継続率で枚数が伸びる(まれに大量出玉の夢)。テーマはダイス×RPG。
+
+export interface RushResult {
+  /** Number of continued sets (1+). */
+  sets: number;
+  /** Total coins paid out by the AT. */
+  coins: number;
+}
+
+/** Continuation (ループ) rate of ダイスラッシュ. */
+export const RUSH_LOOP = 0.5;
+const RUSH_MAX_SETS = 12;
+
+export function rollRush(): RushResult {
+  let sets = 1;
+  while (sets < RUSH_MAX_SETS && Math.random() < RUSH_LOOP) sets++;
+  let coins = 0;
+  for (let i = 0; i < sets; i++) coins += 120 + Math.floor(Math.random() * 121); // 120–240/set
+  return { sets, coins };
+}
+
+const MISS_POOL = [2, 3, 4, 5, 6, 8]; // excludes 7(seven) & 9(cherry) to avoid fake hits
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/** The reel symbols (1–9) to display for an outcome. `reach` near-misses on 7. */
+export function slotReels(outcome: SlotOutcome, reach: boolean): [number, number, number] {
+  switch (outcome) {
+    case "big":
+      return [7, 7, 7];
+    case "reg":
+      return [4, 4, 4];
+    case "replay":
+      return [1, 1, 1];
+    case "bell":
+      return [2, 2, 2];
+    case "watermelon":
+      return [5, 5, 5];
+    case "cherry":
+      return [9, pick(MISS_POOL), pick(MISS_POOL)];
+    default: {
+      if (reach) return [7, 7, pick([3, 5, 6, 8, 9])]; // 7・7・? の煽り
+      let a = pick(MISS_POOL);
+      let b = pick(MISS_POOL);
+      let c = pick(MISS_POOL);
+      if (a === b && b === c) c = c === 8 ? 6 : 8; // never an accidental triple
+      return [a, b, c];
+    }
+  }
+}
+
+// ===== リーチ演出 (信頼度差つき) =====
+
+export interface ReachDef {
+  id: string;
+  name: string;
+  /** Animation length in ms (~3s). */
+  ms: number;
+  /** 熱さ 1(弱)〜5(激アツ). */
+  tier: number;
+}
+
+export const SLOT_REACHES: ReachDef[] = [
+  { id: "normal", name: "ノーマルリーチ", ms: 2200, tier: 1 },
+  { id: "slow", name: "スロウリーチ", ms: 2600, tier: 1 },
+  { id: "reverse", name: "逆回転リーチ", ms: 2800, tier: 2 },
+  { id: "double", name: "ダブルリーチ", ms: 3000, tier: 2 },
+  { id: "long", name: "ロングリーチ", ms: 3400, tier: 3 },
+  { id: "group", name: "群予告リーチ", ms: 3000, tier: 3 },
+  { id: "cutin", name: "カットイン", ms: 3200, tier: 4 },
+  { id: "allspin", name: "全回転リーチ", ms: 3600, tier: 5 },
+  { id: "rainbow", name: "虹リーチ", ms: 3600, tier: 5 },
+  { id: "premium", name: "プレミアリーチ", ms: 3800, tier: 5 },
+];
+
+/**
+ * Pick a reach pattern. Wins lean toward hotter (high-tier) reaches; gase (loss)
+ * reaches are limited to weak tiers — so a hot reach genuinely means higher 信頼度.
+ */
+export function pickReach(win: boolean): ReachDef {
+  const pool = win ? SLOT_REACHES : SLOT_REACHES.filter((r) => r.tier <= 3);
+  const weight = (t: number) => (win ? t * t : 4 - t); // win:1,4,9,16,25 / lose:3,2,1
+  const total = pool.reduce((s, r) => s + weight(r.tier), 0);
+  let r = Math.random() * total;
+  for (const def of pool) {
+    r -= weight(def.tier);
+    if (r < 0) return def;
+  }
+  return pool[0];
+}
+
+/** Chance a losing spin still shows a (gase) reach, for tension. */
+export const GASE_REACH_CHANCE = 0.1;
 
 // ===== 運命の大博打 (Fate gamble) =====
 // 期待値超低めの一撃必殺コンテンツ。ハズレ続きで、まれに「所持している★より2段階上」の

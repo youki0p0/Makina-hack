@@ -43,6 +43,7 @@ export interface LoadedState {
   currentFloor: number;
   gachaPoints: number;
   souls: number;
+  coins: number;
   artifacts: ArtifactLevels;
   classId: ClassId;
   winStreak: number;
@@ -76,6 +77,7 @@ function freshLoaded(equipped: EquippedItems, inventory: Equipment[]): LoadedSta
     currentFloor: 1,
     gachaPoints: 0,
     souls: 0,
+    coins: 0,
     artifacts: defaultArtifactLevels(),
     classId: normalizeClassId(undefined),
     winStreak: 0,
@@ -139,6 +141,7 @@ export function saveGame(state: LoadedState): void {
     currentFloor: state.currentFloor,
     gachaPoints: state.gachaPoints,
     souls: state.souls,
+    coins: state.coins,
     artifacts: state.artifacts,
     classId: state.classId,
     winStreak: state.winStreak,
@@ -189,6 +192,7 @@ export function loadGame(): LoadedState | null {
       currentFloor: data.currentFloor,
       gachaPoints: data.gachaPoints ?? 0,
       souls: data.souls ?? 0,
+      coins: data.coins ?? 0,
       artifacts: normalizeArtifacts(data.artifacts),
       classId: normalizeClassId(data.classId),
       winStreak: data.winStreak ?? 0,
