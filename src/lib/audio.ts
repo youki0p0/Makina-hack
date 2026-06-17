@@ -411,14 +411,16 @@ interface ThemeDef {
   prog: Chord[];
   metal?: boolean;
   idol?: boolean;
+  casino?: boolean;
 }
 const THEMES: Record<BgmTheme, ThemeDef> = {
   dungeon: { stepMs: 150, prog: PROG },
   world: { stepMs: 142, prog: PROG },
   boss: { stepMs: 124, prog: PROG },
-  casino: { stepMs: 132, prog: CASINO_PROG },
+  // 落ち着いた煌びやかなラウンジ。専用レンダラ casinoTick が担当(通常カジノBGM)。
+  casino: { stepMs: 162, prog: CASINO_PROG, casino: true },
   forge: { stepMs: 172, prog: FORGE_PROG, metal: true },
-  // BPM≈178 → 16分音符 ≈ 84ms。専用レンダラ idolTick が全パートを担当。
+  // BPM≈178 → 16分音符 ≈ 84ms。専用レンダラ idolTick(BIG中=ダイスラッシュ専用BGM)。
   idol: { stepMs: 84, prog: IDOL_PROG, idol: true },
 };
 let bgmTheme: BgmTheme = "dungeon";
@@ -492,8 +494,56 @@ function bgmTick(): void {
   const def = THEMES[bgmTheme];
   if (def.idol) idolTick();
   else if (def.metal) forgeTick();
+  else if (def.casino) casinoTick();
   else dungeonTick(); // dungeon / world / boss (variants inside)
   bgmStep = (bgmStep + 1) % (BAR * LOOP_BARS);
+}
+
+// ===== Casino renderer (落ち着いた煌びやかラウンジ) =====
+// 通常カジノBGM。柔らかいサイン/トライアングルのコードとパッド、低めの音量、
+// リバーブ＋ステレオの高域ベルで「煌びやか」、重いキックは無しで「落ち着いた」雰囲気。
+function casinoTick(): void {
+  const def = THEMES.casino;
+  const T = bgmTranspose;
+  const step = bgmStep;
+  const bar = Math.floor(step / BAR);
+  const inBar = step % BAR;
+  const full = sectionOf(bar) === "B";
+  const chord = def.prog[bar % def.prog.length];
+
+  // ふんわりパッド(root+5th)を左右に広げて残響で空気感。
+  if (inBar === 0) {
+    voice(chord.root * T, 2.0, "sine", 0.05, 0, -0.4, 0.35);
+    voice(chord.root * 1.005 * T, 2.0, "sine", 0.05, 0, 0.4, 0.35);
+    voice(chord.fifth * T, 2.0, "sine", 0.04, 0, 0.15, 0.4);
+  }
+
+  // 柔らかいベース(1拍目=ルート / 3拍目=5度)。
+  if (inBar === 0) voice(chord.root * 0.5 * T, 0.5, "triangle", 0.12);
+  if (inBar === 8) voice(chord.fifth * 0.5 * T, 0.4, "triangle", 0.1);
+
+  // エレピ風の和音を拍頭で軽くアルペジオ(グラス感)。
+  if (inBar % 4 === 0) {
+    for (let i = 0; i < 3; i++) {
+      voice(chord.arp[i] * T, 0.5, "triangle", 0.06, i * 0.04, (i - 1) * 0.4, 0.25);
+    }
+  }
+
+  // 煌びやか: 高域ベルをステレオ+残響で。サビは少し密に。
+  const bellOn = full ? inBar % 2 === 0 : inBar % 4 === 2;
+  if (bellOn) {
+    const note = chord.arp[(step >> 1) % chord.arp.length] * 2 * T;
+    const pan = (step >> 1) % 2 === 0 ? -0.6 : 0.6;
+    voice(note, 0.25, "sine", 0.05, 0, pan, 0.5);
+    voice(note, 0.2, "triangle", 0.03, 0.09, -pan, 0.5); // 反対側へキラッとエコー
+  }
+
+  // 控えめなブラシ・ハット(裏)とソフトな拍頭。重いキックは置かない。
+  if (inBar % 2 === 1) noise(0.02, 0.03);
+  if (inBar === 0) {
+    noise(0.03, 0.06);
+    voice(95 * T, 0.06, "sine", 0.1);
+  }
 }
 
 // ===== Dungeon / World / Boss renderer =====

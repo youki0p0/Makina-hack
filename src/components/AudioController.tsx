@@ -8,9 +8,9 @@ import { useGameStore } from "@/store/gameStore";
 
 /**
  * Starts audio on the first user gesture (browsers block autoplay) and switches
- * the BGM theme by location: casino (idol pop) / forge / dungeon, and on the
- * battle screen a per-50-floor "world" theme (pitch shifts deeper) or a tense
- * boss theme.
+ * the BGM theme by location: casino (calm glamorous lounge; BIG/ダイスラッシュ
+ * temporarily swaps to the idol theme) / forge / dungeon, and on the battle
+ * screen a per-50-floor "world" theme (pitch shifts deeper) or a tense boss theme.
  */
 export default function AudioController() {
   const pathname = usePathname();
@@ -26,7 +26,7 @@ export default function AudioController() {
   }, []);
 
   useEffect(() => {
-    if (pathname?.startsWith("/casino")) setBgmTheme("idol");
+    if (pathname?.startsWith("/casino")) setBgmTheme("casino");
     else if (pathname?.startsWith("/forge")) setBgmTheme("forge");
     else if (pathname?.startsWith("/battle")) {
       if (bossRank(floor) >= 2) {
