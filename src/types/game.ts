@@ -413,6 +413,8 @@ export interface SaveData {
   souls?: number;
   /** Casino coins (medals) (optional for old saves). */
   coins?: number;
+  /** 出禁: bossKills required before the casino reopens (optional for old saves). */
+  casinoBan?: number;
   /** Permanent artifact levels carried across rebirths (optional for old saves). */
   artifacts?: ArtifactLevels;
   /** Current character class (optional for old saves). */

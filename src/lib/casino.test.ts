@@ -11,6 +11,10 @@ import {
   AT_GAMES,
   SLOT_REACHES,
   SLOT_SYMBOL,
+  machineSettings,
+  settingMult,
+  ceilingSpins,
+  MACHINE_COUNT,
   type SlotOutcome,
 } from "@/lib/casino";
 
@@ -91,6 +95,36 @@ describe("slot machine (パチスロ4号機フレーバー)", () => {
     expect(hits).toBeGreaterThan(0); // 起こりうる
     expect(hits).toBeLessThan(5000 * 0.15); // でも稀
     expect(maxAdd).toBeGreaterThanOrEqual(20);
+  });
+
+  it("設定差: 4台の隠し設定(1-6)が6時間バケットで変わる", () => {
+    const a = machineSettings(100);
+    const b = machineSettings(101);
+    expect(a).toHaveLength(MACHINE_COUNT);
+    for (const s of a) {
+      expect(s).toBeGreaterThanOrEqual(1);
+      expect(s).toBeLessThanOrEqual(6);
+    }
+    // 同じバケットなら決定論的、別バケットでは(ほぼ)変わる。
+    expect(machineSettings(100)).toEqual(a);
+    expect(a.join() === b.join()).toBe(false);
+  });
+
+  it("高設定ほど機械割が良く天井が浅い", () => {
+    expect(settingMult(6)).toBeGreaterThan(settingMult(1));
+    expect(ceilingSpins(6)).toBeLessThan(ceilingSpins(1));
+  });
+
+  it("ボーナス倍率を上げるとBIG/REGが出やすくなる(連チャンゾーン/設定差)", () => {
+    const count = (mult: number) => {
+      let n = 0;
+      for (let i = 0; i < 6000; i++) {
+        const o = drawSlotOutcome(mult);
+        if (o === "big" || o === "reg") n++;
+      }
+      return n;
+    };
+    expect(count(6)).toBeGreaterThan(count(1));
   });
 
   it("losing reaches never use the hottest (premium-tier) productions", () => {

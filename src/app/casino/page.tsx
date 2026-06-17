@@ -11,9 +11,14 @@ import {
   fateCost,
   COIN_VALUE,
   SLOT_BET,
+  DAIPAN_LIMIT,
+  MACHINE_COUNT,
+  SET_WEAPON_COIN,
+  SOULS_COIN,
   type BjOutcome,
 } from "@/lib/casino";
 import { estimateTier } from "@/data/items";
+import { availableSetKeys, getSetDef } from "@/data/sets";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { ENEMY_TEMPLATES, BOSS_TEMPLATES } from "@/data/enemies";
 import { getSlotIconDataUrl } from "@/lib/itemIcon";
@@ -30,7 +35,14 @@ export default function CasinoPage() {
   const hydrate = useGameStore((s) => s.hydrate);
   const hydrated = useGameStore((s) => s.hydrated);
   const gold = useGameStore((s) => s.player.gold);
-  const [tab, setTab] = useState<"slots" | "bj" | "fate">("slots");
+  const banUntil = useGameStore((s) => s.casinoBan);
+  const bossKills = useGameStore((s) => s.progress.bossKills);
+  const atGames = useGameStore((s) => s.atGames);
+  const daiPan = useGameStore((s) => s.daiPan);
+  const [tab, setTab] = useState<"slots" | "bj" | "fate" | "shop">("slots");
+  const [shaking, setShaking] = useState(false);
+  const [panMsg, setPanMsg] = useState<string | null>(null);
+  const shakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     hydrate();
@@ -44,51 +56,99 @@ export default function CasinoPage() {
     );
   }
 
+  const banned = banUntil > 0 && bossKills < banUntil;
+  if (banned) {
+    return (
+      <main className="animate-shake flex min-h-dvh flex-col items-center justify-center gap-6 bg-red-950/40 p-6 text-center">
+        <h1 className="text-7xl font-black tracking-widest text-red-500 drop-shadow-[0_0_18px_rgba(239,68,68,0.7)]">
+          出禁
+        </h1>
+        <p className="text-base font-bold leading-relaxed text-gray-100">
+          お客様、スロット台が壊れます。
+          <br />
+          冒険に出て頭を冷やしてきてください。
+        </p>
+        <p className="text-xs text-gray-400">
+          再入店にはボスを<b className="text-amber-300"> {banUntil - bossKills} </b>体倒すこと。
+        </p>
+        <Link
+          href="/"
+          className="rounded-xl bg-red-600 px-6 py-3 text-sm font-extrabold text-white active:scale-95"
+        >
+          冒険に戻る →
+        </Link>
+      </main>
+    );
+  }
+
+  const onPan = () => {
+    const r = daiPan();
+    slotSfx("pan");
+    setShaking(true);
+    if (shakeTimer.current) clearTimeout(shakeTimer.current);
+    shakeTimer.current = setTimeout(() => setShaking(false), 450);
+    setPanMsg(r.banned ? "💢 出禁！" : `💢 台パン！(${r.count}/${DAIPAN_LIMIT}) ※${DAIPAN_LIMIT}回で出禁`);
+    setTimeout(() => setPanMsg(null), 1500);
+  };
+
   return (
-    <main className="flex min-h-dvh flex-col gap-3 p-3">
+    <main className={`relative flex min-h-dvh flex-col gap-3 p-3 ${shaking ? "animate-shake" : ""}`}>
+      {/* ダイスラッシュ(AT)中は外枠を虹色に光らせる */}
+      {atGames > 0 && <div className="at-frame pointer-events-none fixed inset-0 z-40" />}
+
       <div className="flex items-center justify-between">
         <Link href="/" className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">
           ← ホーム
         </Link>
-        <span className="text-xs text-amber-300">💰 {gold}</span>
+        <span className="text-xs text-amber-300">💰 {fmt(gold)}</span>
       </div>
 
       <div className="rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 p-3 text-center">
         <div className="text-3xl">🎰</div>
         <h1 className="font-bold text-fuchsia-200">カジノ</h1>
-        <p className="text-[10px] text-gray-400">ゴールドを賭けて遊ぶ。ジャックポットで特別景品。</p>
+        <p className="text-[10px] text-gray-400">カジノコインで遊ぶ。ダイスラッシュで一攫千金。</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <button
-          onClick={() => setTab("slots")}
-          className={`h-10 rounded-xl text-xs font-bold active:scale-95 ${
-            tab === "slots" ? "bg-fuchsia-600 text-white" : "bg-white/10 text-gray-300"
-          }`}
-        >
-          🎲 スロット
-        </button>
-        <button
-          onClick={() => setTab("bj")}
-          className={`h-10 rounded-xl text-xs font-bold active:scale-95 ${
-            tab === "bj" ? "bg-fuchsia-600 text-white" : "bg-white/10 text-gray-300"
-          }`}
-        >
-          🃏 BJ
-        </button>
-        <button
-          onClick={() => setTab("fate")}
-          className={`h-10 rounded-xl text-xs font-bold active:scale-95 ${
-            tab === "fate"
-              ? "bg-gradient-to-r from-amber-500 to-rose-600 text-white"
-              : "bg-white/10 text-gray-300"
-          }`}
-        >
-          🔮 運命
-        </button>
+      <div className="grid grid-cols-4 gap-2">
+        {([
+          ["slots", "🎲 スロット"],
+          ["bj", "🃏 BJ"],
+          ["fate", "🔮 運命"],
+          ["shop", "🪙 交換所"],
+        ] as const).map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={`h-10 rounded-xl text-[11px] font-bold active:scale-95 ${
+              tab === k ? "bg-fuchsia-600 text-white" : "bg-white/10 text-gray-300"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {tab === "slots" ? <Slots /> : tab === "bj" ? <Blackjack /> : <FatePanel />}
+      {tab === "slots" ? (
+        <Slots />
+      ) : tab === "bj" ? (
+        <Blackjack />
+      ) : tab === "fate" ? (
+        <FatePanel />
+      ) : (
+        <CoinShop />
+      )}
+
+      {/* 台パン: 見えづらい位置(右下の小さな半透明領域) */}
+      <button
+        onClick={onPan}
+        aria-label="台パン"
+        className="absolute bottom-1 right-1 h-10 w-10 rounded bg-white/[0.06] active:scale-90"
+      />
+      {panMsg && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-16 z-50 text-center">
+          <span className="rounded-full bg-black/70 px-4 py-1 text-sm font-bold text-red-300">{panMsg}</span>
+        </div>
+      )}
     </main>
   );
 }
@@ -219,6 +279,10 @@ function Slots() {
   const coins = useGameStore((s) => s.coins);
   const replay = useGameStore((s) => s.slotReplay);
   const atGames = useGameStore((s) => s.atGames);
+  const machine = useGameStore((s) => s.slotMachine);
+  const slotSpins = useGameStore((s) => s.slotSpins);
+  const slotZone = useGameStore((s) => s.slotZone);
+  const selectMachine = useGameStore((s) => s.selectMachine);
   const buyCoins = useGameStore((s) => s.buyCoins);
   const cashout = useGameStore((s) => s.cashoutCoins);
   const slotSpin = useGameStore((s) => s.slotSpin);
@@ -413,6 +477,28 @@ function Slots() {
         >
           換金
         </button>
+      </div>
+
+      {/* 台選択(設定は隠し・6時間ごとにシャッフル) + 天井/高確 */}
+      <div className="flex gap-1">
+        {Array.from({ length: MACHINE_COUNT }, (_, i) => (
+          <button
+            key={i}
+            onClick={() => selectMachine(i)}
+            disabled={spinning || atActive}
+            className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 disabled:opacity-40 ${
+              machine === i ? "bg-fuchsia-600 text-white" : "bg-white/10 text-gray-300"
+            }`}
+          >
+            台{i + 1}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-1 text-[10px] text-gray-400">
+        <span>
+          ハマり <b className="text-gray-200">{slotSpins}</b>G（天井 540〜840G・設定で変動）
+        </span>
+        {slotZone > 0 && <span className="font-bold text-red-300">🔥 高確 残り{slotZone}G</span>}
       </div>
 
       {/* ダイスラッシュ(AT) counter */}
@@ -665,6 +751,117 @@ function Blackjack() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ===== カジノコイン交換所 =====
+
+function CoinShop() {
+  const coins = useGameStore((s) => s.coins);
+  const souls = useGameStore((s) => s.souls);
+  const highest = useGameStore((s) => s.progress.highestFloorReached);
+  const buyWeapon = useGameStore((s) => s.coinBuySetWeapon);
+  const buySouls = useGameStore((s) => s.coinBuySouls);
+
+  const keys = useMemo(
+    () => availableSetKeys(highest).filter((k) => !getSetDef(k)?.procedural),
+    [highest],
+  );
+  const [sel, setSel] = useState(keys[0] ?? "gambler");
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const canWeapon = coins >= SET_WEAPON_COIN;
+  const canSoul = coins >= SOULS_COIN;
+
+  const doWeapon = () => {
+    const w = buyWeapon(sel);
+    if (w) {
+      setMsg(`⚔️ ${w.name} を交換！`);
+      setTimeout(() => setMsg(null), 2500);
+    }
+  };
+  const doSouls = (n: number) => {
+    if (coins < SOULS_COIN * n) return;
+    buySouls(n);
+    setMsg(`🔮 転生ポイント +${n}！`);
+    setTimeout(() => setMsg(null), 2500);
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between rounded-xl border border-amber-400/30 bg-black/30 px-3 py-2 text-xs">
+        <span className="flex items-center gap-1 font-bold text-amber-200">
+          <PixelGlyph kind="casino" size={14} /> カジノコイン {fmt(coins)}
+        </span>
+        <span className="flex items-center gap-1 text-fuchsia-200">
+          <PixelGlyph kind="soul" size={14} /> {fmt(souls)}
+        </span>
+      </div>
+
+      {msg && (
+        <div className="rounded-lg bg-emerald-500/15 px-3 py-2 text-center text-sm font-bold text-emerald-200">
+          {msg}
+        </div>
+      )}
+
+      {/* Set weapon exchange */}
+      <div className="rounded-2xl border border-fuchsia-500/40 bg-fuchsia-500/5 p-3">
+        <p className="flex items-center gap-1 text-sm font-bold text-fuchsia-200">
+          <PixelGlyph kind="drop" size={14} /> セット武器と交換
+        </p>
+        <p className="mt-0.5 text-[10px] text-gray-400">
+          所持装備に見合うティアのセット武器（ビルドの軸）を入手。
+        </p>
+        <select
+          value={sel}
+          onChange={(e) => setSel(e.target.value)}
+          className="mt-2 h-9 w-full rounded-lg bg-black/40 px-2 text-xs text-gray-100"
+        >
+          {keys.map((k) => (
+            <option key={k} value={k}>
+              {getSetDef(k)?.name ?? k} セット
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={doWeapon}
+          disabled={!canWeapon}
+          className="mt-2 h-12 w-full rounded-xl bg-fuchsia-600 text-sm font-extrabold text-white active:scale-95 disabled:opacity-40"
+        >
+          交換（🪙{fmt(SET_WEAPON_COIN)}）
+        </button>
+      </div>
+
+      {/* Souls exchange (pricier) */}
+      <div className="rounded-2xl border border-violet-500/40 bg-violet-500/5 p-3">
+        <p className="flex items-center gap-1 text-sm font-bold text-violet-200">
+          <PixelGlyph kind="soul" size={14} /> 転生ポイントと交換
+        </p>
+        <p className="mt-0.5 text-[10px] text-gray-400">
+          1ポイント = 🪙{fmt(SOULS_COIN)}（割高だが超貴重な転生通貨）。
+        </p>
+        <div className="mt-2 flex gap-2">
+          <button
+            onClick={() => doSouls(1)}
+            disabled={!canSoul}
+            className="h-12 flex-1 rounded-xl bg-violet-600 text-sm font-extrabold text-white active:scale-95 disabled:opacity-40"
+          >
+            +1（🪙{fmt(SOULS_COIN)}）
+          </button>
+          <button
+            onClick={() => doSouls(5)}
+            disabled={coins < SOULS_COIN * 5}
+            className="h-12 flex-1 rounded-xl bg-violet-600 text-sm font-extrabold text-white active:scale-95 disabled:opacity-40"
+          >
+            +5（🪙{fmt(SOULS_COIN * 5)}）
+          </button>
+        </div>
+      </div>
+
+      <p className="text-center text-[10px] text-gray-500">
+        カジノコインはスロットで稼ぐ。超高額なので一攫千金（ダイスラッシュ）が近道。
+      </p>
     </div>
   );
 }

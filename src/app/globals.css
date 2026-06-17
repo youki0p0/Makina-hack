@@ -96,6 +96,24 @@ button {
   animation: rainbowFlash 0.5s linear infinite;
 }
 
+/* ダイスラッシュ(AT)中: 外枠を虹色に光らせる。 */
+@keyframes atFrameHue {
+  from {
+    filter: hue-rotate(0deg);
+  }
+  to {
+    filter: hue-rotate(360deg);
+  }
+}
+.at-frame {
+  border: 5px solid transparent;
+  border-image: linear-gradient(120deg, #ff0040, #ff8a00, #ffe600, #00d4ff, #7a00ff, #ff00c8) 1;
+  box-shadow:
+    inset 0 0 24px rgba(255, 255, 255, 0.18),
+    0 0 18px rgba(255, 120, 0, 0.35);
+  animation: atFrameHue 2.4s linear infinite;
+}
+
 /* Fate gamble win reveal: a punchy pop-in. */
 @keyframes fatePop {
   0% {
