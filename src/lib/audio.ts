@@ -110,6 +110,134 @@ function slideTone(
   osc.stop(t + dur);
 }
 
+// ===== Spatial helpers (stereo pan + shared reverb send) =====
+// Used by the idol (casino) theme to give it width and air. A single convolver
+// with a synthesized impulse is shared by all reverb-sent voices.
+
+function clampPan(p: number): number {
+  return Math.max(-1, Math.min(1, p));
+}
+
+let reverbBus: GainNode | null = null;
+function makeImpulse(c: AudioContext, seconds: number, decay: number): AudioBuffer {
+  const rate = c.sampleRate;
+  const len = Math.max(1, Math.floor(rate * seconds));
+  const buf = c.createBuffer(2, len, rate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+  }
+  return buf;
+}
+function getReverbBus(): GainNode | null {
+  const c = getCtx();
+  if (!c || !master) return null;
+  if (reverbBus) return reverbBus;
+  const input = c.createGain();
+  const conv = c.createConvolver();
+  conv.buffer = makeImpulse(c, 1.5, 2.4);
+  const wet = c.createGain();
+  wet.gain.value = 0.85;
+  input.connect(conv);
+  conv.connect(wet);
+  wet.connect(master);
+  reverbBus = input;
+  return reverbBus;
+}
+
+/** Route a gain node to master, optionally stereo-panned and with a reverb send. */
+function connectOut(c: AudioContext, g: GainNode, pan: number, reverb: number): void {
+  let out: AudioNode = g;
+  if (pan !== 0 && typeof c.createStereoPanner === "function") {
+    const p = c.createStereoPanner();
+    p.pan.value = clampPan(pan);
+    g.connect(p);
+    out = p;
+  }
+  out.connect(master!);
+  if (reverb > 0) {
+    const bus = getReverbBus();
+    if (bus) {
+      const send = c.createGain();
+      send.gain.value = reverb;
+      out.connect(send);
+      send.connect(bus);
+    }
+  }
+}
+
+/** Like tone(), but with stereo pan + optional reverb send. */
+function voice(
+  freq: number,
+  dur: number,
+  type: OscillatorType,
+  vol: number,
+  when = 0,
+  pan = 0,
+  reverb = 0,
+): void {
+  const c = getCtx();
+  if (!c || !master || muted) return;
+  const t = c.currentTime + when;
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.connect(g);
+  connectOut(c, g, pan, reverb);
+  osc.start(t);
+  osc.stop(t + dur);
+}
+
+/** Portamento voice with pan + reverb (for the spacious vocal lead). */
+function slideVoice(
+  f0: number,
+  f1: number,
+  dur: number,
+  type: OscillatorType,
+  vol: number,
+  when = 0,
+  glide = dur,
+  pan = 0,
+  reverb = 0,
+): void {
+  const c = getCtx();
+  if (!c || !master || muted) return;
+  const t = c.currentTime + when;
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(f0, t);
+  osc.frequency.linearRampToValueAtTime(Math.max(1, f1), t + Math.min(glide, dur));
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.connect(g);
+  connectOut(c, g, pan, reverb);
+  osc.start(t);
+  osc.stop(t + dur);
+}
+
+/** Panned noise burst with optional reverb (stereo claps / spacious risers). */
+function noisePan(dur: number, vol: number, pan = 0, reverb = 0): void {
+  const c = getCtx();
+  if (!c || !master || muted) return;
+  const t = c.currentTime;
+  const len = Math.max(1, Math.floor(c.sampleRate * dur));
+  const buffer = c.createBuffer(1, len, c.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = c.createBufferSource();
+  src.buffer = buffer;
+  const g = c.createGain();
+  g.gain.value = vol;
+  src.connect(g);
+  connectOut(c, g, pan, reverb);
+  src.start(t);
+  src.stop(t + dur);
+}
+
 export type Sfx =
   | "hit"
   | "hurt"
@@ -464,7 +592,8 @@ function forgeTick(): void {
 
 // ===== Idol theme renderer =====
 // 王道進行のアイドルポップを 16bit ゲーム音源風に。A(Aメロ)→A2(Bメロ/ビルドアップ)
-// →B(サビ)→A'(間奏) の起伏を、各パートの ON/OFF と音量で表現する。
+// →B(サビ)→A'(間奏) の起伏を表現。ステレオパン+共有リバーブで空間の広がりを、
+// クラップ/キラキラ上昇/ワイドstab/高域シマーで特殊アクセントを加えている。
 function idolTick(): void {
   if (muted) return;
   const def = THEMES.idol;
@@ -475,6 +604,7 @@ function idolTick(): void {
   const mode = sectionOf(bar);
   const chord = def.prog[bar % def.prog.length];
   const secPos = bar % 8; // 0..7 — どのセクションも8小節構成
+  const stepSec = def.stepMs / 1000;
 
   const isVerse = mode === "A";
   const isBuild = mode === "A2";
@@ -485,77 +615,110 @@ function idolTick(): void {
   const snareStep = inBar === 4 || inBar === 12;
 
   // ---- ① ドラム ----
-  // キック: ノイズの急速減衰 + ピッチフォール(100→40Hz)で重低音。A2は抜く(解放感)。
+  // キック: 重低音は定位センターで芯を保つ。A2は抜く(解放感)。
   if (!isBuild && kickStep) {
     noise(0.05, 0.2);
     slideTone(100 * T, 40 * T, 0.12, "sine", 0.22);
   }
-  // ハット: 極短ノイズの裏打ち。
-  if (hatStep) noise(0.03, isChorus ? 0.09 : 0.06);
-  // スネア: ノイズ + 180Hz の胴鳴り。
-  if (!isBuild && snareStep) {
-    noise(0.15, 0.16);
-    tone(180 * T, 0.12, "triangle", 0.12);
+  // ハット: 裏打ちを左右に振って横の広がりを出す。
+  if (hatStep) {
+    const hatPan = (inBar / 2) % 2 === 0 ? -0.55 : 0.55;
+    noisePan(0.03, isChorus ? 0.09 : 0.06, hatPan, 0.08);
   }
-  // A2 ビルドアップ: 後半2小節でスネアロール + 上昇スイープ(しょわ〜)。
+  // スネア: ノイズ + 180Hz の胴鳴り。軽くリバーブ。
+  if (!isBuild && snareStep) {
+    noisePan(0.15, 0.16, 0, 0.16);
+    voice(180 * T, 0.12, "triangle", 0.12, 0, 0, 0.1);
+  }
+  // サビのバックビートにステレオ・ハンドクラップを重ねる(特殊アクセント)。
+  if (isChorus && snareStep) {
+    noisePan(0.05, 0.12, -0.4, 0.2); // 左クラップ
+    noisePan(0.05, 0.1, 0.4, 0.2); // 右クラップ
+    noisePan(0.04, 0.06, 0, 0.25); // センターの残響成分
+  }
+  // A2 ビルドアップ: 後半2小節でスネアロール + 上昇スイープ(しょわ〜、リバーブで奥行き)。
   if (isBuild) {
     const build = secPos / 7; // 0→1
     if (secPos >= 6) {
-      noise(0.04, 0.05 + build * 0.22); // 16分スネアロール(音量上昇)
+      noisePan(0.04, 0.05 + build * 0.22, 0, 0.2 + build * 0.3); // 16分ロール
       slideTone(400 * T, 1600 * T, 0.08, "sawtooth", 0.04 + build * 0.05); // riser
     } else if (kickStep) {
-      noise(0.03, 0.05 + build * 0.06); // 拍を保つ軽いパルス
+      noise(0.03, 0.05 + build * 0.06);
     }
   }
 
-  // ---- ② ベース(オクターブ奏法) ----
-  // 偶数=ルート低音 / 奇数=1オクターブ上、頭に square のアタックを重ねる。
+  // ---- ② ベース(オクターブ奏法) ---- センター・芯はドライに。
   const bassVol = isChorus ? 0.22 : isVerse ? 0.16 : 0.18;
   const bf = (inBar % 2 === 0 ? chord.root : chord.root * 2) * T;
   tone(bf, 0.13, "sawtooth", bassVol);
   tone(bf, 0.02, "square", bassVol * 0.6); // ポコッとしたアタック
 
-  // ---- ③ バッキング(デチューンsaw和音) + 擬似サイドチェイン ----
-  // Aメロは半分の密度。サビはキック位置で発音をスキップしてダッキング(ポンプ感)。
+  // ---- ③ バッキング(デチューンsaw和音) ---- 2声を左右に開いて横幅+軽リバーブ。
   if (!isVerse || inBar % 2 === 0) {
-    const duck = isChorus && kickStep; // サビはキックで完全に抜く
+    const duck = isChorus && kickStep; // サビはキックで完全に抜く(ポンプ感)
     if (!duck) {
       const base = isChorus ? 0.07 : isBuild ? 0.04 + (secPos / 7) * 0.04 : 0.045;
-      const bv = base * (kickStep ? 0.5 : 1); // サビ以外も拍頭は軽く下げる
+      const bv = base * (kickStep ? 0.5 : 1);
       for (let i = 0; i < 3; i++) {
         const f = chord.arp[i] * T;
-        tone(f, 0.1, "sawtooth", bv);
-        tone(f * 1.005, 0.1, "sawtooth", bv); // ~5Hzデチューンで厚み
+        voice(f, 0.1, "sawtooth", bv, 0, -0.55, 0.12); // 左
+        voice(f * 1.005, 0.1, "sawtooth", bv, 0, 0.55, 0.12); // 右(デチューン)
       }
     }
   }
 
-  // ---- ④ キラキラ(超高速アルペジオ + エコー) サビのみ ----
+  // ---- ④ キラキラ(超高速アルペジオ) ---- 4音を左右にパンしてピンポン・エコー。
   if (isChorus) {
-    const stepSec = def.stepMs / 1000;
     for (let i = 0; i < 4; i++) {
-      const f = chord.arp[i] * 2 * T; // 1オクターブ上のトライアド
-      const when = (i / 4) * stepSec; // 1ステップに4音を詰める
-      tone(f, 0.05, "square", 0.05, when);
-      tone(f, 0.05, "square", 0.025, when + 0.02); // ディレイ(エコー)
+      const f = chord.arp[i] * 2 * T;
+      const when = (i / 4) * stepSec;
+      const pan = -0.7 + i * 0.47; // L→R へ流す
+      voice(f, 0.05, "square", 0.05, when, pan, 0.18);
+      voice(f, 0.05, "square", 0.025, when + 0.02, -pan, 0.3); // 反対側へエコー
     }
   }
 
-  // ---- ⑤ 金コン(カウベル) セクション切替直前に「ピーン！」 ----
-  if (secPos === 7 && inBar === 15) {
-    tone(800 * T, 0.35, "sine", 0.16);
-    tone(1230 * T, 0.35, "sine", 0.12); // 不協和な超高音アクセント
+  // ---- 特殊アクセント A: サビ各小節頭の「キラキラ上昇フレーズ」(ステレオ掃引) ----
+  if (isChorus && inBar === 0) {
+    const run = [chord.arp[0], chord.arp[1], chord.arp[2], chord.arp[0] * 2, chord.arp[1] * 2, chord.arp[2] * 2];
+    for (let i = 0; i < run.length; i++) {
+      const when = (i / run.length) * stepSec * 1.5; // 1.5ステップに渡って駆け上がる
+      const pan = -0.85 + (i / (run.length - 1)) * 1.7; // L→R
+      voice(run[i] * T, 0.12, "square", 0.05, when, pan, 0.4);
+    }
   }
 
-  // ---- 主旋律(ボーカル): square + ポルタメントの「うねり」 ----
-  // サビ全開、Bメロ後半から歌い出す。
+  // ---- 特殊アクセント B: サビ突入(セクション頭)のワイドなシンセ・ブラスstab ----
+  if (isChorus && secPos === 0 && inBar === 0) {
+    for (let i = 0; i < 3; i++) {
+      const f = chord.arp[i] * T;
+      voice(f, 0.22, "sawtooth", 0.08, 0, -0.6, 0.2);
+      voice(f * 1.007, 0.22, "sawtooth", 0.08, 0, 0.6, 0.2);
+    }
+  }
+
+  // ---- 特殊アクセント C: サビ/ビルド中の高域シマー・パッド(空気感) ----
+  if ((isChorus || (isBuild && secPos >= 4)) && inBar === 0) {
+    voice(chord.root * 4 * T, 1.7, "triangle", 0.022, 0, -0.65, 0.35);
+    voice(chord.root * 4 * 1.01 * T, 1.7, "triangle", 0.022, 0, 0.65, 0.35);
+  }
+
+  // ---- ⑤ 金コン(カウベル) セクション切替直前に「ピーン！」(左右+残響) ----
+  if (secPos === 7 && inBar === 15) {
+    voice(800 * T, 0.4, "sine", 0.16, 0, -0.5, 0.45);
+    voice(1230 * T, 0.4, "sine", 0.12, 0, 0.5, 0.45);
+  }
+
+  // ---- 主旋律(ボーカル): ステレオ・ダブリング + ポルタメント + 残響で前に出す ----
   const leadOn = isChorus || (isBuild && secPos >= 4);
   if (leadOn) {
     const phraseStep = (bar % 4) * BAR + inBar;
     const note = IDOL_LEAD[phraseStep];
     if (note) {
-      const lv = isChorus ? 0.14 : 0.09;
-      slideTone(note * 0.985 * T, note * T, 0.26, "square", lv, 0, 0.04); // しゃくり
+      const lv = isChorus ? 0.13 : 0.085;
+      // 主声(やや左) + わずかにデチューンした副声(やや右)で厚みと幅。
+      slideVoice(note * 0.985 * T, note * T, 0.26, "square", lv, 0, 0.04, -0.22, 0.3);
+      slideVoice(note * 0.985 * 1.006 * T, note * 1.006 * T, 0.26, "square", lv * 0.6, 0.012, 0.04, 0.22, 0.35);
     }
   }
 }
