@@ -84,20 +84,22 @@ describe("slot machine (パチスロ4号機フレーバー)", () => {
     expect(avg).toBeLessThan(6);
   });
 
-  it("AT上乗せ(atRensho) is occasional and adds a chunk of games", () => {
+  it("AT上乗せ(atRensho)は稀で、期待値はゲーム消化(-1G)を下回る→ATは必ず収束", () => {
     let hits = 0;
-    let maxAdd = 0;
-    for (let i = 0; i < 5000; i++) {
+    let total = 0;
+    const N = 100000;
+    for (let i = 0; i < N; i++) {
       const a = atRensho();
       if (a > 0) {
         hits++;
-        expect(a).toBeGreaterThanOrEqual(20);
-        maxAdd = Math.max(maxAdd, a);
+        expect(a).toBeGreaterThanOrEqual(10);
       }
+      total += a;
     }
+    // 1ゲームあたりの期待上乗せ < 1 でないとATが発散して「終わらない」。
+    expect(total / N).toBeLessThan(1);
     expect(hits).toBeGreaterThan(0); // 起こりうる
-    expect(hits).toBeLessThan(5000 * 0.15); // でも稀
-    expect(maxAdd).toBeGreaterThanOrEqual(20);
+    expect(hits).toBeLessThan(N * 0.05); // でも稀
   });
 
   it("設定差: 4台の隠し設定(1-6)が6時間バケットで変わる", () => {
