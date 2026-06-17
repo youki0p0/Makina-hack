@@ -15,6 +15,9 @@ import {
 } from "@/lib/casino";
 import { estimateTier } from "@/data/items";
 import { EQUIP_SLOTS } from "@/lib/battle";
+import { ENEMY_TEMPLATES, BOSS_TEMPLATES } from "@/data/enemies";
+import EnemyIcon from "@/components/EnemyIcon";
+import PixelGlyph from "@/components/PixelGlyph";
 import { fmt } from "@/lib/ui";
 import { useGameStore, type FateResult, type SlotSpinResult } from "@/store/gameStore";
 
@@ -171,6 +174,36 @@ function slotLabel(res: SlotSpinResult): { text: string; cls: string } {
 
 const rndSym = () => 1 + Math.floor(Math.random() * 9);
 
+interface ReachFoe {
+  templateId: string;
+  isBoss: boolean;
+  modTier: number;
+  label: string;
+}
+
+// Reach productions feature an actual game enemy (existing pixel art). Hotter
+// reaches summon stronger foes — a weak reach shows a weak enemy, a 激アツ reach
+// a ★-aura boss. Enemy templates are ordered weak→strong, so slice by tier.
+function pickEnemyTemplate(loFrac: number, hiFrac: number) {
+  const n = ENEMY_TEMPLATES.length;
+  const lo = Math.floor(n * loFrac);
+  const hi = Math.max(lo + 1, Math.floor(n * hiFrac));
+  return ENEMY_TEMPLATES[Math.min(n - 1, lo + Math.floor(Math.random() * (hi - lo)))];
+}
+function reachFoe(tier: number): ReachFoe {
+  if (tier >= 5) {
+    const b = BOSS_TEMPLATES[Math.floor(Math.random() * BOSS_TEMPLATES.length)];
+    return { templateId: b.id, isBoss: true, modTier: 2, label: "⚠️ ボス出現！" };
+  }
+  if (tier === 4) {
+    const b = BOSS_TEMPLATES[Math.floor(Math.random() * BOSS_TEMPLATES.length)];
+    return { templateId: b.id, isBoss: true, modTier: 0, label: "ボスの気配…！" };
+  }
+  if (tier === 3) return { templateId: pickEnemyTemplate(0.6, 1).id, isBoss: false, modTier: 1, label: "強敵が現れた！" };
+  if (tier === 2) return { templateId: pickEnemyTemplate(0.3, 0.6).id, isBoss: false, modTier: 0, label: "敵が現れた" };
+  return { templateId: pickEnemyTemplate(0, 0.3).id, isBoss: false, modTier: 0, label: "雑魚が現れた…" };
+}
+
 function Slots() {
   const gold = useGameStore((s) => s.player.gold);
   const coins = useGameStore((s) => s.coins);
@@ -182,6 +215,7 @@ function Slots() {
   const [reels, setReels] = useState<[number, number, number]>([7, 7, 7]);
   const [spinning, setSpinning] = useState(false);
   const [reachName, setReachName] = useState<string | null>(null);
+  const [foe, setFoe] = useState<ReachFoe | null>(null);
   const [result, setResult] = useState<SlotSpinResult | null>(null);
   const [auto, setAuto] = useState(false);
 
@@ -221,6 +255,7 @@ function Slots() {
     setSpinning(true);
     setResult(null);
     setReachName(null);
+    setFoe(null);
     lock.current = [false, false, false];
 
     cycle.current = setInterval(() => {
@@ -255,6 +290,7 @@ function Slots() {
           setReels(S);
           setResult(res);
           setReachName(null);
+          setFoe(null);
           spinningRef.current = false;
           setSpinning(false);
           const gap = res.outcome === "big" || res.outcome === "reg" ? 1500 : 650;
@@ -269,7 +305,13 @@ function Slots() {
       );
 
     if (res.reach) {
-      timers.current.push(setTimeout(() => setReachName(res.reach!.name), 820));
+      const enemy = reachFoe(res.reach.tier);
+      timers.current.push(
+        setTimeout(() => {
+          setReachName(res.reach!.name);
+          setFoe(enemy);
+        }, 820),
+      );
       reveal(820 + res.reach.ms);
     } else {
       reveal(1050);
@@ -288,8 +330,12 @@ function Slots() {
     <div className="flex flex-col gap-3">
       {/* Coin bank + gold exchange */}
       <div className="flex items-center justify-between rounded-xl border border-amber-400/30 bg-black/30 px-3 py-2 text-xs">
-        <span className="font-bold text-amber-200">🪙 コイン {fmt(coins)}</span>
-        <span className="text-gray-400">💰 {fmt(gold)}</span>
+        <span className="flex items-center gap-1 font-bold text-amber-200">
+          <PixelGlyph kind="casino" size={14} /> コイン {fmt(coins)}
+        </span>
+        <span className="flex items-center gap-1 text-gray-400">
+          <PixelGlyph kind="gold" size={14} /> {fmt(gold)}
+        </span>
       </div>
       <div className="flex gap-2">
         <button
@@ -332,9 +378,21 @@ function Slots() {
         </div>
 
         {reaching && (
-          <p className="mt-3 animate-pulse text-lg font-extrabold text-red-300">
-            🔥 {reachName}！
-          </p>
+          <div className="mt-3 flex flex-col items-center gap-1">
+            {foe && (
+              <div className={`fate-pop ${foe.isBoss ? "animate-pulse" : ""}`}>
+                <EnemyIcon enemy={foe} size={foe.isBoss ? 72 : 56} />
+              </div>
+            )}
+            <p
+              className={`animate-pulse text-lg font-extrabold ${
+                foe?.isBoss ? "text-red-400" : "text-amber-300"
+              }`}
+            >
+              🔥 {reachName}
+            </p>
+            {foe && <p className="text-xs font-bold text-gray-200">{foe.label}</p>}
+          </div>
         )}
 
         {result && !spinning && !reaching && (
