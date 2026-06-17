@@ -823,6 +823,20 @@ function CoinShop() {
     setTimeout(() => setMsg(null), 2500);
   };
 
+  // カジノコイン0枚では交換所に入れない(冷やかし防止 / フリーズ回避)。
+  if (coins <= 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <div className="w-full max-w-xs animate-pop rounded-2xl border border-fuchsia-500/40 bg-[#15131f] p-6 text-center shadow-lg">
+          <div className="text-4xl">🪙</div>
+          <p className="mt-3 text-base font-extrabold text-fuchsia-200">カジノコイン持っていないよ。</p>
+          <p className="mt-1 text-sm text-gray-300">冷やかしはやめよう。</p>
+          <p className="mt-3 text-[10px] text-gray-500">スロットでカジノコインを稼いでから来てね。</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between rounded-xl border border-amber-400/30 bg-black/30 px-3 py-2 text-xs">
