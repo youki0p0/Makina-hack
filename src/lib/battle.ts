@@ -348,7 +348,10 @@ export function resolveBossTurn(
   guard: number,
 ): BossTurnResult {
   const weaken = enemy.weakenTurns > 0 ? enemy.weakenAmount : 0;
-  const eatk = Math.max(1, Math.round(enemy.attack * (enemy.enraged ? 1.5 : 1)) - weaken);
+  // DPS関門: 8ターンを超えると攻撃が毎ターン+30%加速。規定ターン内に倒せない
+  // (=火力不足)と必ず力尽きるので、ボス前で武器集め/強化フェーズが強制される。
+  const ramp = 1 + Math.max(0, (enemy.bossTurns ?? 0) - 8) * 0.3;
+  const eatk = Math.max(1, Math.round(enemy.attack * (enemy.enraged ? 1.5 : 1) * ramp) - weaken);
 
   // Unleash the charged attack.
   if (enemy.charging) {

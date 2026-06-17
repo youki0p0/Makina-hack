@@ -184,8 +184,23 @@ export function generateEnemy(floor: number, scale: EnemyScale = DEFAULT_SCALE):
   const rankMult = rank >= 3 ? 1.45 : rank === 2 ? 1.22 : 1;
   const m = scale.enemyMult;
 
-  const maxHp = Math.round((template.baseHp * hpScale + (isBossFloor ? tier * 30 : 0)) * rankMult * m);
-  const attack = Math.round((template.baseAttack * atkScale + (isBossFloor ? tier * 3 : 0)) * rankMult * m);
+  // 深層ボス関門: floor≥500 のボスは「その階の通常最強格(baseHp=261)」を下回らない
+  // ように床を設け、さらに600超で非線形に硬くする(rank差つき)。これで突き抜けた
+  // プレイヤーでもボスでは立ち止まり、武器集め/強化が必要になる。floor<500は不変。
+  const gate = isBossFloor && floor >= 500;
+  const peerHp = (16 + 49 * 5) * hpScale; // 通常テンプレ最強相当
+  const peerAtk = (3 + Math.round(49 * 0.9)) * atkScale;
+  const deep = Math.max(0, floor - 600) / 100;
+  const wall = gate ? 1 + deep * (rank >= 3 ? 0.5 : rank === 2 ? 0.3 : 0.15) : 1;
+  const baseHpScaled = gate
+    ? Math.max(template.baseHp * hpScale, peerHp)
+    : template.baseHp * hpScale;
+  const baseAtkScaled = gate
+    ? Math.max(template.baseAttack * atkScale, peerAtk * 0.8)
+    : template.baseAttack * atkScale;
+
+  const maxHp = Math.round((baseHpScaled + (isBossFloor ? tier * 30 : 0)) * rankMult * wall * m);
+  const attack = Math.round((baseAtkScaled + (isBossFloor ? tier * 3 : 0)) * rankMult * m);
   const defense = Math.round(template.baseDefense * defScale);
   const exp = Math.round(template.baseExp * (1 + floor * 0.2) * rankMult);
   const gold = Math.round(template.baseGold * (1 + floor * 0.2) * rankMult);
@@ -213,6 +228,7 @@ export function generateEnemy(floor: number, scale: EnemyScale = DEFAULT_SCALE):
     enraged: false,
     charging: false,
     chargeCounter: 0,
+    bossTurns: 0,
     modTier: 0,
   };
 

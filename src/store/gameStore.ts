@@ -448,7 +448,28 @@ interface GameState {
 let logCounter = 0;
 
 export const useGameStore = create<GameState>((set, get) => {
+  // Saves are DEBOUNCED: writing the whole state (toSavedItem over 150 items +
+  // JSON.stringify + synchronous localStorage) every turn was the main cause of
+  // auto-battle jank / "重い". We coalesce writes (~1.2s) and flush on tab hide.
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  function cancelSave(): void {
+    if (saveTimer != null) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+  }
   function persist(): void {
+    if (saveTimer != null) return; // a write is already scheduled
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      writeSaveNow();
+    }, 1200);
+  }
+  function flushSave(): void {
+    cancelSave();
+    writeSaveNow();
+  }
+  function writeSaveNow(): void {
     const s = get();
     saveGame({
       player: s.player,
@@ -711,6 +732,7 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     newGame: () => {
+      cancelSave();
       clearSave();
       const starter = getItemById("rusty_sword");
       set({
@@ -1027,7 +1049,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
       // Next turn: fresh roll + rerolls.
       set({
-        currentEnemy: { ...enemy, hp: enemyHp, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns, enraged, charging, chargeCounter },
+        currentEnemy: { ...enemy, hp: enemyHp, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns, enraged, charging, chargeCounter, bossTurns: (enemy.bossTurns ?? 0) + 1 },
         player: { ...state.player, hp: playerHp },
         diceValue: rollWithLuck(),
         rerollsLeft: nextRerolls,
@@ -1421,9 +1443,13 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
-    exportSaveData: () => exportSave(),
+    exportSaveData: () => {
+      flushSave(); // ensure any pending debounced write is on disk first
+      return exportSave();
+    },
 
     importSaveData: (code: string) => {
+      cancelSave(); // don't let a pending write clobber the imported save
       if (!importSave(code)) return false;
       const loaded = loadGame();
       if (!loaded) return false;
@@ -2196,41 +2222,17 @@ export const useGameStore = create<GameState>((set, get) => {
     };
   }
 
-  function persistFromSnapshot(snap: Snapshot): void {
-    const s = get();
-    saveGame({
-      player: snap.player ?? s.player,
-      equipped: snap.equipped ?? s.equipped,
-      inventory: snap.inventory ?? s.inventory,
-      currentFloor: snap.currentFloor ?? s.currentFloor,
-      gachaPoints: snap.gachaPoints ?? s.gachaPoints,
-      souls: snap.souls ?? s.souls,
-      coins: s.coins,
-      casinoBan: s.casinoBan,
-      slot: {
-        machine: s.slotMachine,
-        bucket: s.slotBucket,
-        total: s.slotTotal,
-        hamari: s.slotSpins,
-        zone: s.slotZone,
-        at: s.atGames,
-        big: s.slotBig,
-        reg: s.slotReg,
-        maxHamari: s.slotMaxHamari,
-        hits: s.slotHits,
-      },
-      artifacts: snap.artifacts ?? s.artifacts,
-      classId: snap.classId ?? s.classId,
-      winStreak: snap.winStreak ?? s.winStreak,
-      progress: snap.progress ?? s.progress,
-      favorites: snap.favorites ?? s.favorites,
-      seenHelp: snap.seenHelp ?? s.seenHelp,
-      titleId: snap.titleId ?? s.titleId,
-      difficulty: snap.difficulty ?? s.difficulty,
-      handedness: snap.handedness ?? s.handedness,
-      checkpoint: snap.checkpoint ?? s.checkpoint,
-      tapToBuy: snap.tapToBuy ?? s.tapToBuy,
-      startFloorPref: snap.startFloorPref ?? s.startFloorPref,
+  // Callers always set() the snapshot into state BEFORE calling this, so the
+  // debounced persist() (which reads get()) already captures it.
+  function persistFromSnapshot(_snap: Snapshot): void {
+    persist();
+  }
+
+  // Flush any pending save when the tab is hidden/closed so progress isn't lost.
+  if (typeof window !== "undefined") {
+    window.addEventListener("pagehide", flushSave);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) flushSave();
     });
   }
 });

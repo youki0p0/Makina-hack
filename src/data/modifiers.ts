@@ -80,7 +80,10 @@ export function applyEnemyModifier(
   bonusPerStar: number = ENEMY_MOD_BONUS_PER_STAR,
 ): Enemy {
   if (tier <= 0) return { ...enemy, modTier: 0 };
-  const mult = 1 + bonusPerStar * Math.max(0, tier);
+  // 深層(★9以降=floor450+)は加算率を逓増させ、プレイヤーの乗算成長に追従させる。
+  // ★8以下は据え置きで序盤〜中盤の体感は不変。
+  const ramp = tier <= 8 ? bonusPerStar : bonusPerStar + (tier - 8) * 0.02;
+  const mult = 1 + ramp * Math.max(0, tier);
   const hp = Math.round(enemy.maxHp * mult);
   return {
     ...enemy,
