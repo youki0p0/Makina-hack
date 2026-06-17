@@ -6,7 +6,9 @@ import {
   slotPayout,
   slotReels,
   pickReach,
-  rollRush,
+  atSpinPayout,
+  atRensho,
+  AT_GAMES,
   SLOT_REACHES,
   SLOT_SYMBOL,
   type SlotOutcome,
@@ -61,15 +63,34 @@ describe("slot machine (パチスロ4号機フレーバー)", () => {
     expect(slotPayout("watermelon")).toBeGreaterThan(slotPayout("cherry"));
   });
 
-  it("ダイスラッシュ(AT) always pays at least one set and can loop", () => {
-    let maxSets = 0;
-    for (let i = 0; i < 400; i++) {
-      const r = rollRush();
-      expect(r.sets).toBeGreaterThanOrEqual(1);
-      expect(r.coins).toBeGreaterThanOrEqual(120);
-      maxSets = Math.max(maxSets, r.sets);
+  it("ダイスラッシュ(AT) grants a long run and pays modestly per game", () => {
+    expect(AT_GAMES).toBeGreaterThanOrEqual(80); // ~100回転のATタイム
+    let total = 0;
+    const N = 4000;
+    for (let i = 0; i < N; i++) {
+      const p = atSpinPayout();
+      expect(p).toBeGreaterThanOrEqual(1);
+      total += p;
     }
-    expect(maxSets).toBeGreaterThan(1); // continuation happens
+    const avg = total / N;
+    expect(avg).toBeGreaterThan(2); // 平均は控えめ(出玉が無限に増えない)
+    expect(avg).toBeLessThan(6);
+  });
+
+  it("AT上乗せ(atRensho) is occasional and adds a chunk of games", () => {
+    let hits = 0;
+    let maxAdd = 0;
+    for (let i = 0; i < 5000; i++) {
+      const a = atRensho();
+      if (a > 0) {
+        hits++;
+        expect(a).toBeGreaterThanOrEqual(20);
+        maxAdd = Math.max(maxAdd, a);
+      }
+    }
+    expect(hits).toBeGreaterThan(0); // 起こりうる
+    expect(hits).toBeLessThan(5000 * 0.15); // でも稀
+    expect(maxAdd).toBeGreaterThanOrEqual(20);
   });
 
   it("losing reaches never use the hottest (premium-tier) productions", () => {

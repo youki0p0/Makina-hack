@@ -68,11 +68,12 @@ import {
   slotPayout,
   slotReels,
   pickReach,
-  rollRush,
+  atSpinPayout,
+  atRensho,
+  AT_GAMES,
   randomCasinoPrize,
   type ReachDef,
   type SlotOutcome,
-  type RushResult,
 } from "@/lib/casino";
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState } from "@/lib/save";
@@ -225,8 +226,12 @@ export interface SlotSpinResult {
   replayNext: boolean;
   /** Big-bonus item prize, if any. */
   prize: Equipment | null;
-  /** ダイスラッシュ (AT) result on a BIG, else null. */
-  rush: RushResult | null;
+  /** ダイスラッシュ(AT) games remaining after this spin (0 = not in AT). */
+  atRemaining: number;
+  /** This spin started the AT (BIG成立). */
+  atStart: boolean;
+  /** 上乗せ games added by this AT spin (0 = none). */
+  atAdd: number;
   /** Coin balance after the spin. */
   coins: number;
 }
@@ -262,6 +267,8 @@ interface GameState {
   coins: number;
   /** Whether the next slot spin is a free replay (transient). */
   slotReplay: boolean;
+  /** ダイスラッシュ(AT) games remaining (0 = not in AT; transient). */
+  atGames: number;
   /** Permanent artifact levels (persist across rebirths). */
   artifacts: ArtifactLevels;
   /** Current character class. */
@@ -519,6 +526,7 @@ export const useGameStore = create<GameState>((set, get) => {
       souls: loaded.souls,
       coins: loaded.coins,
       slotReplay: false,
+      atGames: 0,
       artifacts: loaded.artifacts,
       classId: loaded.classId,
       winStreak: loaded.winStreak,
@@ -567,6 +575,7 @@ export const useGameStore = create<GameState>((set, get) => {
     souls: 0,
     coins: 0,
     slotReplay: false,
+    atGames: 0,
     artifacts: defaultArtifactLevels(),
     classId: DEFAULT_CLASS_ID,
     winStreak: 0,
@@ -1529,6 +1538,30 @@ export const useGameStore = create<GameState>((set, get) => {
 
     slotSpin: (): SlotSpinResult | null => {
       const state = get();
+
+      // ---- ダイスラッシュ(AT) free spin ----
+      if (state.atGames > 0) {
+        const pay = atSpinPayout();
+        const add = atRensho();
+        const remaining = state.atGames - 1 + add;
+        const coins = state.coins + pay;
+        set({ coins, atGames: remaining });
+        persist();
+        return {
+          outcome: "at",
+          reels: add > 0 ? [7, 7, 7] : [2, 2, 2],
+          reach: null,
+          payout: pay,
+          free: true,
+          replayNext: false,
+          prize: null,
+          atRemaining: remaining,
+          atStart: false,
+          atAdd: add,
+          coins,
+        };
+      }
+
       const free = state.slotReplay;
       const cost = free ? 0 : SLOT_BET;
       if (state.coins < cost) return null;
@@ -1546,13 +1579,12 @@ export const useGameStore = create<GameState>((set, get) => {
       let gachaPoints = state.gachaPoints;
       let progress = state.progress;
       let prize: Equipment | null = null;
-      let rush: RushResult | null = null;
+      let atGames = 0;
 
-      // BIG → ダイスラッシュ(AT): coins come from the looping AT, not slotPayout.
-      let payout = slotPayout(outcome);
+      const payout = slotPayout(outcome);
+      // BIG → ダイスラッシュ(AT)突入: 出玉はAT中の無料ゲームで伸びる(即時配当なし)。
       if (outcome === "big") {
-        rush = rollRush();
-        payout = rush.coins;
+        atGames = AT_GAMES;
         progress = { ...progress, jackpots: progress.jackpots + 1 };
         // Half of BIGs also drop a casino-exclusive prize item.
         if (Math.random() < 0.5) {
@@ -1565,7 +1597,7 @@ export const useGameStore = create<GameState>((set, get) => {
       }
 
       const coins = state.coins - cost + payout;
-      set({ coins, slotReplay: outcome === "replay", inventory, gachaPoints, progress });
+      set({ coins, slotReplay: outcome === "replay", atGames, inventory, gachaPoints, progress });
       persist();
       return {
         outcome,
@@ -1575,7 +1607,9 @@ export const useGameStore = create<GameState>((set, get) => {
         free,
         replayNext: outcome === "replay",
         prize,
-        rush,
+        atRemaining: atGames,
+        atStart: outcome === "big",
+        atAdd: 0,
         coins,
       };
     },
