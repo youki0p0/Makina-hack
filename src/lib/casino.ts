@@ -34,6 +34,14 @@ export function coinBuyCost(amount: number, held: number): number {
   return Math.ceil(Math.max(0, amount) * COIN_VALUE * mult);
 }
 
+/** Max coins buyable for `gold`, at the current (held-scaled) price. */
+export function coinBuyMax(gold: number, held: number): number {
+  const unit = COIN_VALUE * (1 + Math.max(0, held) / COIN_BUY_SCALE);
+  let amt = Math.floor(Math.max(0, gold) / unit);
+  while (amt > 0 && coinBuyCost(amt, held) > gold) amt--; // guard ceil rounding
+  return Math.max(0, amt);
+}
+
 export type SlotOutcome =
   | "big" // ビッグボーナス(7・7・7) → ダイスラッシュ突入
   | "reg" // レギュラーボーナス

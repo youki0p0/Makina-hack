@@ -84,6 +84,7 @@ import {
   settingMult,
   ceilingSpins,
   coinBuyCost,
+  coinBuyMax,
   randomCasinoPrize,
   type ReachDef,
   type SlotOutcome,
@@ -419,8 +420,10 @@ interface GameState {
   casinoSettle: (goldDelta: number, prize?: Equipment | null) => void;
   /** 運命の大博打: spend gold for a tiny chance at huge reward (★+2 gear or souls). */
   fateGamble: () => FateResult;
-  /** Buy slot coins with gold (1 coin = COIN_VALUE gold). */
+  /** Buy slot coins with gold (price scales with held coins). */
   buyCoins: (coinAmount: number) => void;
+  /** Buy as many coins as the current gold allows (全購入). */
+  buyCoinsAll: () => void;
   /** Cash all slot coins back into gold. */
   cashoutCoins: () => void;
   /** Spin the slot. Returns the resolved result, or null if coins are short. */
@@ -590,13 +593,14 @@ export const useGameStore = create<GameState>((set, get) => {
         return {
           slotMachine: sl.machine,
           slotSpins: reset ? 0 : sl.hamari,
-          slotZone: reset ? 0 : sl.zone,
-          atGames: reset ? 0 : sl.at,
+          slotZone: reset ? 0 : Math.min(sl.zone, ZONE_SPINS),
+          // 旧バージョンで発散した巨大なAT残りでソフトロックしないよう上限を固定。
+          atGames: reset ? 0 : Math.min(Math.max(0, sl.at), AT_GAMES),
           slotTotal: reset ? 0 : sl.total,
           slotBig: reset ? 0 : sl.big,
           slotReg: reset ? 0 : sl.reg,
           slotMaxHamari: reset ? 0 : sl.maxHamari,
-          slotHits: reset ? [] : sl.hits,
+          slotHits: reset ? [] : (Array.isArray(sl.hits) ? sl.hits.slice(-200) : []),
           slotBucket: cur,
         };
       })(),
@@ -1612,6 +1616,15 @@ export const useGameStore = create<GameState>((set, get) => {
       // 価格は所持カジノコインに応じて上昇(買いづらく)。
       const cost = coinBuyCost(amt, s.coins);
       if (amt <= 0 || s.player.gold < cost) return;
+      set({ player: { ...s.player, gold: s.player.gold - cost }, coins: s.coins + amt });
+      persist();
+    },
+
+    buyCoinsAll: () => {
+      const s = get();
+      const amt = coinBuyMax(s.player.gold, s.coins);
+      if (amt <= 0) return;
+      const cost = coinBuyCost(amt, s.coins);
       set({ player: { ...s.player, gold: s.player.gold - cost }, coins: s.coins + amt });
       persist();
     },

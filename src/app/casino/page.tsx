@@ -17,6 +17,7 @@ import {
   SOULS_COIN,
   HIT_WINDOW_MS,
   coinBuyCost,
+  coinBuyMax,
   type BjOutcome,
 } from "@/lib/casino";
 import { estimateTier } from "@/data/items";
@@ -285,6 +286,7 @@ function Slots({ onPan }: { onPan: () => void }) {
   const slotHits = useGameStore((s) => s.slotHits);
   const selectMachine = useGameStore((s) => s.selectMachine);
   const buyCoins = useGameStore((s) => s.buyCoins);
+  const buyCoinsAll = useGameStore((s) => s.buyCoinsAll);
   const cashout = useGameStore((s) => s.cashoutCoins);
   const slotSpin = useGameStore((s) => s.slotSpin);
 
@@ -460,21 +462,28 @@ function Slots({ onPan }: { onPan: () => void }) {
         <button
           onClick={() => buyCoins(50)}
           disabled={spinning || gold < coinBuyCost(50, coins)}
-          className="h-9 flex-1 rounded-lg bg-amber-600/80 text-xs font-bold text-white active:scale-95 disabled:opacity-30"
+          className="h-9 flex-1 rounded-lg bg-amber-600/80 text-[11px] font-bold text-white active:scale-95 disabled:opacity-30"
         >
-          +50枚（💰{fmt(coinBuyCost(50, coins))}）
+          +50（💰{fmt(coinBuyCost(50, coins))}）
         </button>
         <button
           onClick={() => buyCoins(200)}
           disabled={spinning || gold < coinBuyCost(200, coins)}
-          className="h-9 flex-1 rounded-lg bg-amber-600/80 text-xs font-bold text-white active:scale-95 disabled:opacity-30"
+          className="h-9 flex-1 rounded-lg bg-amber-600/80 text-[11px] font-bold text-white active:scale-95 disabled:opacity-30"
         >
-          +200枚（💰{fmt(coinBuyCost(200, coins))}）
+          +200（💰{fmt(coinBuyCost(200, coins))}）
+        </button>
+        <button
+          onClick={buyCoinsAll}
+          disabled={spinning || coinBuyMax(gold, coins) <= 0}
+          className="h-9 flex-1 rounded-lg bg-amber-500 text-[11px] font-extrabold text-black active:scale-95 disabled:opacity-30"
+        >
+          全購入（+{fmt(coinBuyMax(gold, coins))}）
         </button>
         <button
           onClick={cashout}
           disabled={spinning || coins <= 0}
-          className="h-9 flex-1 rounded-lg bg-white/10 text-xs font-bold text-gray-200 active:scale-95 disabled:opacity-30"
+          className="h-9 flex-1 rounded-lg bg-white/10 text-[11px] font-bold text-gray-200 active:scale-95 disabled:opacity-30"
         >
           換金
         </button>

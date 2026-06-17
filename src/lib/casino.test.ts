@@ -17,6 +17,7 @@ import {
   MACHINE_COUNT,
   SLOT_LUCK,
   coinBuyCost,
+  coinBuyMax,
   COIN_VALUE,
   type SlotOutcome,
 } from "@/lib/casino";
@@ -121,6 +122,16 @@ describe("slot machine (パチスロ4号機フレーバー)", () => {
     expect(coinBuyCost(50, 400)).toBeGreaterThan(coinBuyCost(50, 0));
     // 換金(COIN_VALUE)より買値の単価が常に高い→裁定取引にならない。
     expect(coinBuyCost(100, 100) / 100).toBeGreaterThanOrEqual(COIN_VALUE);
+  });
+
+  it("全購入(coinBuyMax)は所持ゴールドで買える最大枚数を返す(超過しない)", () => {
+    expect(coinBuyMax(0, 0)).toBe(0);
+    const n = coinBuyMax(100000, 0);
+    expect(n).toBeGreaterThan(0);
+    expect(coinBuyCost(n, 0)).toBeLessThanOrEqual(100000); // 予算超過しない
+    expect(coinBuyCost(n + 1, 0)).toBeGreaterThan(100000); // これ以上は買えない
+    // 所持が多いほど割高 → 同じゴールドで買える枚数は減る。
+    expect(coinBuyMax(100000, 1000)).toBeLessThan(coinBuyMax(100000, 0));
   });
 
   it("当たりを約1.3倍出やすくする係数(SLOT_LUCK)", () => {
