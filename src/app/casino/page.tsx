@@ -9,15 +9,14 @@ import {
   doubleUp,
   drawDie,
   fateCost,
-  randomCasinoPrize,
-  spinSlots,
+  COIN_VALUE,
+  SLOT_BET,
   type BjOutcome,
-  type SlotResult,
 } from "@/lib/casino";
 import { estimateTier } from "@/data/items";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { fmt } from "@/lib/ui";
-import { useGameStore, type FateResult } from "@/store/gameStore";
+import { useGameStore, type FateResult, type SlotSpinResult } from "@/store/gameStore";
 
 const PIPS = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 const BETS = [10, 50, 100];
@@ -120,72 +119,269 @@ function Dice({ value, big }: { value: number; big?: boolean }) {
   return <span className={big ? "text-5xl" : "text-3xl"}>{PIPS[value]}</span>;
 }
 
-// ===== Slots =====
+// ===== Slot (パチスロ4号機フレーバー) =====
+
+// Die face (1–9) → 絵柄. 7=BIG(→ダイスラッシュ) / BAR=REG / RP=リプレイ / 小役.
+const SLOT_ROLE: Record<number, { label: string; cls: string }> = {
+  7: { label: "7", cls: "text-red-400" }, // BIG → ダイスラッシュ(AT)
+  4: { label: "BAR", cls: "text-amber-300" }, // REG
+  1: { label: "RP", cls: "text-cyan-300" }, // replay
+  2: { label: "ベル", cls: "text-yellow-300" }, // bell
+  5: { label: "スイカ", cls: "text-green-400" }, // watermelon
+  9: { label: "🍒", cls: "text-pink-400" }, // cherry
+  3: { label: "3", cls: "text-gray-500" },
+  6: { label: "6", cls: "text-gray-500" },
+  8: { label: "8", cls: "text-gray-500" },
+};
+
+function SlotCell({ value, hot }: { value: number; hot?: boolean }) {
+  const r = SLOT_ROLE[value] ?? { label: String(value), cls: "text-gray-300" };
+  return (
+    <div
+      className={`flex h-20 w-[4.5rem] items-center justify-center rounded-lg border-2 transition-colors ${
+        hot ? "border-red-500 bg-red-500/15 animate-pulse" : "border-white/15 bg-black/50"
+      }`}
+    >
+      <span className={`text-2xl font-black ${r.cls}`}>{r.label}</span>
+    </div>
+  );
+}
+
+function slotLabel(res: SlotSpinResult): { text: string; cls: string } {
+  switch (res.outcome) {
+    case "big":
+      return {
+        text: `🎲 ダイスラッシュ!! ×${res.rush?.sets ?? 1}セット +🪙${res.payout}`,
+        cls: "text-red-400",
+      };
+    case "reg":
+      return { text: `✨ REGULAR BONUS +${res.payout}`, cls: "text-amber-300" };
+    case "replay":
+      return { text: "🔁 リプレイ（次回無料）", cls: "text-cyan-300" };
+    case "bell":
+      return { text: `🔔 ベル +${res.payout}`, cls: "text-yellow-300" };
+    case "watermelon":
+      return { text: `🍉 スイカ +${res.payout}`, cls: "text-green-300" };
+    case "cherry":
+      return { text: `🍒 チェリー +${res.payout}`, cls: "text-pink-300" };
+    default:
+      return { text: "ハズレ", cls: "text-gray-500" };
+  }
+}
+
+const rndSym = () => 1 + Math.floor(Math.random() * 9);
 
 function Slots() {
   const gold = useGameStore((s) => s.player.gold);
-  const settle = useGameStore((s) => s.casinoSettle);
-  const [bet, setBet] = useState(10);
-  const [result, setResult] = useState<SlotResult | null>(null);
-  const [prizeName, setPrizeName] = useState<string | null>(null);
+  const coins = useGameStore((s) => s.coins);
+  const replay = useGameStore((s) => s.slotReplay);
+  const buyCoins = useGameStore((s) => s.buyCoins);
+  const cashout = useGameStore((s) => s.cashoutCoins);
+  const slotSpin = useGameStore((s) => s.slotSpin);
+
+  const [reels, setReels] = useState<[number, number, number]>([7, 7, 7]);
+  const [spinning, setSpinning] = useState(false);
+  const [reachName, setReachName] = useState<string | null>(null);
+  const [result, setResult] = useState<SlotSpinResult | null>(null);
+  const [auto, setAuto] = useState(false);
+
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const cycle = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lock = useRef<[boolean, boolean, boolean]>([false, false, false]);
+  const spinningRef = useRef(false);
+  const autoRef = useRef(false);
+
+  const cost = replay ? 0 : SLOT_BET;
+  const canSpin = coins >= cost;
+
+  const stopCycle = () => {
+    if (cycle.current) {
+      clearInterval(cycle.current);
+      cycle.current = null;
+    }
+  };
+  const clearAll = () => {
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+    stopCycle();
+  };
+  useEffect(() => () => clearAll(), []);
+  useEffect(() => {
+    autoRef.current = auto;
+  }, [auto]);
 
   const spin = () => {
-    if (gold < bet) return;
-    const r = spinSlots(bet);
-    let prize = null;
-    let name: string | null = null;
-    if (r.prize) {
-      prize = randomCasinoPrize();
-      name = prize.name;
+    if (spinningRef.current) return;
+    const res = slotSpin();
+    if (!res) {
+      setAuto(false);
+      return;
     }
-    settle(r.payout - bet, prize);
-    setResult(r);
-    setPrizeName(name);
+    spinningRef.current = true;
+    setSpinning(true);
+    setResult(null);
+    setReachName(null);
+    lock.current = [false, false, false];
+
+    cycle.current = setInterval(() => {
+      setReels((r) => [
+        lock.current[0] ? r[0] : rndSym(),
+        lock.current[1] ? r[1] : rndSym(),
+        lock.current[2] ? r[2] : rndSym(),
+      ]);
+    }, 70);
+
+    const S = res.reels;
+    const stop = (i: number, when: number) =>
+      timers.current.push(
+        setTimeout(() => {
+          lock.current[i] = true;
+          setReels((r) => {
+            const n = [...r] as [number, number, number];
+            n[i] = S[i];
+            return n;
+          });
+        }, when),
+      );
+
+    stop(0, 450);
+    stop(1, 800);
+
+    const reveal = (when: number) =>
+      timers.current.push(
+        setTimeout(() => {
+          stopCycle();
+          lock.current = [true, true, true];
+          setReels(S);
+          setResult(res);
+          setReachName(null);
+          spinningRef.current = false;
+          setSpinning(false);
+          const gap = res.outcome === "big" || res.outcome === "reg" ? 1500 : 650;
+          timers.current.push(
+            setTimeout(() => {
+              const st = useGameStore.getState();
+              const c = st.slotReplay ? 0 : SLOT_BET;
+              if (autoRef.current && st.coins >= c) spin();
+            }, gap),
+          );
+        }, when),
+      );
+
+    if (res.reach) {
+      timers.current.push(setTimeout(() => setReachName(res.reach!.name), 820));
+      reveal(820 + res.reach.ms);
+    } else {
+      reveal(1050);
+    }
   };
+
+  // Kick off the first auto spin when toggled on at rest.
+  useEffect(() => {
+    if (auto && !spinningRef.current) spin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto]);
+
+  const reaching = reachName !== null;
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-center">
-        <div className="flex justify-center gap-3">
-          {result ? (
-            result.reels.map((r, i) => <Dice key={i} value={r} big />)
-          ) : (
-            <>
-              <Dice value={1} big />
-              <Dice value={1} big />
-              <Dice value={1} big />
-            </>
-          )}
+      {/* Coin bank + gold exchange */}
+      <div className="flex items-center justify-between rounded-xl border border-amber-400/30 bg-black/30 px-3 py-2 text-xs">
+        <span className="font-bold text-amber-200">🪙 コイン {fmt(coins)}</span>
+        <span className="text-gray-400">💰 {fmt(gold)}</span>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => buyCoins(50)}
+          disabled={spinning || gold < 50 * COIN_VALUE}
+          className="h-9 flex-1 rounded-lg bg-amber-600/80 text-xs font-bold text-white active:scale-95 disabled:opacity-30"
+        >
+          +50枚（💰{fmt(50 * COIN_VALUE)}）
+        </button>
+        <button
+          onClick={() => buyCoins(200)}
+          disabled={spinning || gold < 200 * COIN_VALUE}
+          className="h-9 flex-1 rounded-lg bg-amber-600/80 text-xs font-bold text-white active:scale-95 disabled:opacity-30"
+        >
+          +200枚（💰{fmt(200 * COIN_VALUE)}）
+        </button>
+        <button
+          onClick={cashout}
+          disabled={spinning || coins <= 0}
+          className="h-9 flex-1 rounded-lg bg-white/10 text-xs font-bold text-gray-200 active:scale-95 disabled:opacity-30"
+        >
+          換金
+        </button>
+      </div>
+
+      {/* Reels */}
+      <div
+        className={`rounded-2xl border-2 p-4 text-center ${
+          result?.outcome === "big"
+            ? "border-red-500 bg-red-500/10"
+            : result?.outcome === "reg"
+              ? "border-amber-400 bg-amber-400/10"
+              : "border-white/10 bg-black/30"
+        }`}
+      >
+        <div className="flex justify-center gap-2">
+          <SlotCell value={reels[0]} hot={reaching} />
+          <SlotCell value={reels[1]} hot={reaching} />
+          <SlotCell value={reels[2]} hot={reaching && !lock.current[2]} />
         </div>
-        {result && (
-          <div className="mt-2">
-            <p
-              className={`text-lg font-extrabold ${
-                result.payout > 0 ? "text-emerald-300" : "text-gray-400"
-              }`}
-            >
-              {result.label}
-              {result.payout > 0 && ` +💰${result.payout}`}
-            </p>
-            {prizeName && (
-              <p className="mt-1 text-sm font-bold text-amber-300">🎁 {prizeName} を獲得！</p>
+
+        {reaching && (
+          <p className="mt-3 animate-pulse text-lg font-extrabold text-red-300">
+            🔥 {reachName}！
+          </p>
+        )}
+
+        {result && !spinning && !reaching && (
+          <div className="mt-3">
+            <p className={`text-lg font-extrabold ${slotLabel(result).cls}`}>{slotLabel(result).text}</p>
+            {result.prize && (
+              <p className="mt-1 text-sm font-bold text-amber-300">🎁 {result.prize.name} を獲得！</p>
             )}
           </div>
         )}
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-black/20 p-2 text-[10px] text-gray-400">
-        ⚅⚅⚅ ジャックポット(×20+景品) / ゾロ目 ×8 / ペア ×2
+      {replay && !spinning && (
+        <div className="rounded-lg bg-cyan-500/15 px-3 py-1 text-center text-xs font-bold text-cyan-200">
+          🔁 リプレイ：次のスピンは無料
+        </div>
+      )}
+
+      {/* Spin + auto */}
+      <div className="flex gap-2">
+        <button
+          onClick={spin}
+          disabled={spinning || !canSpin}
+          className="h-16 flex-[1.6] rounded-2xl bg-fuchsia-600 text-xl font-extrabold text-white shadow-lg active:scale-95 disabled:opacity-40"
+        >
+          {spinning ? "回転中…" : replay ? "🔁 無料スピン" : `🎰 スピン（🪙${SLOT_BET}）`}
+        </button>
+        <button
+          onClick={() => setAuto((a) => !a)}
+          className={`h-16 flex-1 rounded-2xl text-sm font-bold active:scale-95 ${
+            auto ? "bg-amber-500 text-black" : "bg-white/10 text-gray-300"
+          }`}
+        >
+          {auto ? "⏹ オート停止" : "⏩ オート"}
+        </button>
       </div>
 
-      <BetSelector bet={bet} setBet={setBet} gold={gold} />
-      <button
-        onClick={spin}
-        disabled={gold < bet}
-        className="h-16 rounded-2xl bg-fuchsia-600 text-xl font-extrabold text-white shadow-lg active:scale-95 disabled:opacity-40"
-      >
-        🎲 スピン（💰{bet}）
-      </button>
+      {!canSpin && coins < cost && (
+        <p className="text-center text-[10px] text-red-300">コインが足りません。上で購入してください。</p>
+      )}
+
+      <div className="rounded-xl border border-white/10 bg-black/20 p-2 text-[10px] leading-relaxed text-gray-400">
+        3枚掛け。<b className="text-red-300">7・7・7</b>で<b className="text-red-300">ダイスラッシュ</b>(AT)突入＝
+        継続抽選で出玉が上乗せ（まれに大量出玉）。<b className="text-amber-300">BAR=REG</b> /
+        <b className="text-cyan-300"> RP=リプレイ</b>（次回無料）/ ベル・スイカ・🍒で小役。
+        2つ揃うと<b className="text-red-300">リーチ</b>（演出が激アツなほど信頼度UP）。1コイン=💰{COIN_VALUE}。
+      </div>
     </div>
   );
 }

@@ -58,7 +58,22 @@ import {
   rollLoot,
   SCRAP_VALUE,
 } from "@/lib/loot";
-import { FATE_WIN_CHANCE, fateCost } from "@/lib/casino";
+import {
+  FATE_WIN_CHANCE,
+  fateCost,
+  COIN_VALUE,
+  SLOT_BET,
+  GASE_REACH_CHANCE,
+  drawSlotOutcome,
+  slotPayout,
+  slotReels,
+  pickReach,
+  rollRush,
+  randomCasinoPrize,
+  type ReachDef,
+  type SlotOutcome,
+  type RushResult,
+} from "@/lib/casino";
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState } from "@/lib/save";
 import { itemKey, rarityRank } from "@/lib/ui";
@@ -196,6 +211,26 @@ export type FateResult =
   | { kind: "item"; cost: number; item: Equipment }
   | { kind: "souls"; cost: number; souls: number };
 
+/** Result of one slot spin (the RNG is resolved up-front; the UI animates it). */
+export interface SlotSpinResult {
+  outcome: SlotOutcome;
+  reels: [number, number, number];
+  /** Reach production to play (~3s) before the reveal, or null for a quick spin. */
+  reach: ReachDef | null;
+  /** Coins won this spin. */
+  payout: number;
+  /** This spin was free (consumed a pending replay). */
+  free: boolean;
+  /** The next spin is free (this spin hit リプレイ). */
+  replayNext: boolean;
+  /** Big-bonus item prize, if any. */
+  prize: Equipment | null;
+  /** ダイスラッシュ (AT) result on a BIG, else null. */
+  rush: RushResult | null;
+  /** Coin balance after the spin. */
+  coins: number;
+}
+
 interface GameState {
   hydrated: boolean;
   player: Player;
@@ -223,6 +258,10 @@ interface GameState {
   lastForge: { kind: ForgeKind; from: number; to: number } | null;
   /** Rebirth currency. */
   souls: number;
+  /** Casino coins (medals) for the slot machine. */
+  coins: number;
+  /** Whether the next slot spin is a free replay (transient). */
+  slotReplay: boolean;
   /** Permanent artifact levels (persist across rebirths). */
   artifacts: ArtifactLevels;
   /** Current character class. */
@@ -339,6 +378,12 @@ interface GameState {
   casinoSettle: (goldDelta: number, prize?: Equipment | null) => void;
   /** 運命の大博打: spend gold for a tiny chance at huge reward (★+2 gear or souls). */
   fateGamble: () => FateResult;
+  /** Buy slot coins with gold (1 coin = COIN_VALUE gold). */
+  buyCoins: (coinAmount: number) => void;
+  /** Cash all slot coins back into gold. */
+  cashoutCoins: () => void;
+  /** Spin the slot. Returns the resolved result, or null if coins are short. */
+  slotSpin: () => SlotSpinResult | null;
 
   // artifacts / rebirth
   upgradeArtifact: (id: ArtifactId) => void;
@@ -360,6 +405,7 @@ export const useGameStore = create<GameState>((set, get) => {
       currentFloor: s.currentFloor,
       gachaPoints: s.gachaPoints,
       souls: s.souls,
+      coins: s.coins,
       artifacts: s.artifacts,
       classId: s.classId,
       winStreak: s.winStreak,
@@ -471,6 +517,8 @@ export const useGameStore = create<GameState>((set, get) => {
       currentFloor: loaded.currentFloor,
       gachaPoints: loaded.gachaPoints,
       souls: loaded.souls,
+      coins: loaded.coins,
+      slotReplay: false,
       artifacts: loaded.artifacts,
       classId: loaded.classId,
       winStreak: loaded.winStreak,
@@ -517,6 +565,8 @@ export const useGameStore = create<GameState>((set, get) => {
     lastPull: null,
     lastForge: null,
     souls: 0,
+    coins: 0,
+    slotReplay: false,
     artifacts: defaultArtifactLevels(),
     classId: DEFAULT_CLASS_ID,
     winStreak: 0,
@@ -1461,6 +1511,75 @@ export const useGameStore = create<GameState>((set, get) => {
       return { kind: "souls", cost, souls };
     },
 
+    buyCoins: (coinAmount: number) => {
+      const s = get();
+      const amt = Math.max(0, Math.floor(coinAmount));
+      const cost = amt * COIN_VALUE;
+      if (amt <= 0 || s.player.gold < cost) return;
+      set({ player: { ...s.player, gold: s.player.gold - cost }, coins: s.coins + amt });
+      persist();
+    },
+
+    cashoutCoins: () => {
+      const s = get();
+      if (s.coins <= 0) return;
+      set({ player: { ...s.player, gold: s.player.gold + s.coins * COIN_VALUE }, coins: 0, slotReplay: false });
+      persist();
+    },
+
+    slotSpin: (): SlotSpinResult | null => {
+      const state = get();
+      const free = state.slotReplay;
+      const cost = free ? 0 : SLOT_BET;
+      if (state.coins < cost) return null;
+
+      const outcome: SlotOutcome = drawSlotOutcome();
+      const win = outcome === "big" || outcome === "reg";
+      // Reach: always on a bonus; otherwise a rare gase (losing) reach for tension.
+      const reach: ReachDef | null = win
+        ? pickReach(true)
+        : outcome === "miss" && Math.random() < GASE_REACH_CHANCE
+          ? pickReach(false)
+          : null;
+      const reels = slotReels(outcome, reach !== null);
+      let inventory = state.inventory;
+      let gachaPoints = state.gachaPoints;
+      let progress = state.progress;
+      let prize: Equipment | null = null;
+      let rush: RushResult | null = null;
+
+      // BIG → ダイスラッシュ(AT): coins come from the looping AT, not slotPayout.
+      let payout = slotPayout(outcome);
+      if (outcome === "big") {
+        rush = rollRush();
+        payout = rush.coins;
+        progress = { ...progress, jackpots: progress.jackpots + 1 };
+        // Half of BIGs also drop a casino-exclusive prize item.
+        if (Math.random() < 0.5) {
+          prize = randomCasinoPrize();
+          const capped = capInventory([...inventory, { ...prize }], state.favorites);
+          inventory = capped.kept;
+          gachaPoints += capped.material;
+          progress = { ...progress, discoveredItems: discover(progress.discoveredItems, prize.id) };
+        }
+      }
+
+      const coins = state.coins - cost + payout;
+      set({ coins, slotReplay: outcome === "replay", inventory, gachaPoints, progress });
+      persist();
+      return {
+        outcome,
+        reels,
+        reach,
+        payout,
+        free,
+        replayNext: outcome === "replay",
+        prize,
+        rush,
+        coins,
+      };
+    },
+
     upgradeArtifact: (id: ArtifactId) => {
       const state = get();
       const level = state.artifacts[id] ?? 0;
@@ -1832,6 +1951,7 @@ export const useGameStore = create<GameState>((set, get) => {
       currentFloor: snap.currentFloor ?? s.currentFloor,
       gachaPoints: snap.gachaPoints ?? s.gachaPoints,
       souls: snap.souls ?? s.souls,
+      coins: s.coins,
       artifacts: snap.artifacts ?? s.artifacts,
       classId: snap.classId ?? s.classId,
       winStreak: snap.winStreak ?? s.winStreak,
