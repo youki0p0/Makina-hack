@@ -129,7 +129,7 @@ export default function CasinoPage() {
       </div>
 
       {tab === "slots" ? (
-        <Slots />
+        <Slots onPan={onPan} />
       ) : tab === "bj" ? (
         <Blackjack />
       ) : tab === "fate" ? (
@@ -138,12 +138,6 @@ export default function CasinoPage() {
         <CoinShop />
       )}
 
-      {/* 台パン: 見えづらい位置(右下の小さな半透明領域) */}
-      <button
-        onClick={onPan}
-        aria-label="台パン"
-        className="absolute bottom-1 right-1 h-10 w-10 rounded bg-white/[0.06] active:scale-90"
-      />
       {panMsg && (
         <div className="pointer-events-none fixed inset-x-0 bottom-16 z-50 text-center">
           <span className="rounded-full bg-black/70 px-4 py-1 text-sm font-bold text-red-300">{panMsg}</span>
@@ -274,7 +268,7 @@ function reachFoe(tier: number): ReachFoe {
   return { templateId: pickEnemyTemplate(0, 0.3).id, isBoss: false, modTier: 0, label: "雑魚が現れた…" };
 }
 
-function Slots() {
+function Slots({ onPan }: { onPan: () => void }) {
   const gold = useGameStore((s) => s.player.gold);
   const coins = useGameStore((s) => s.coins);
   const replay = useGameStore((s) => s.slotReplay);
@@ -497,6 +491,9 @@ function Slots() {
       <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-1 text-[10px] text-gray-400">
         <span>
           ハマり <b className="text-gray-200">{slotSpins}</b>G（天井 540〜840G・設定で変動）
+          <button onClick={onPan} className="ml-2 text-gray-600 active:text-red-400">
+            台パン
+          </button>
         </span>
         {slotZone > 0 && <span className="font-bold text-red-300">🔥 高確 残り{slotZone}G</span>}
       </div>
