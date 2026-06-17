@@ -590,13 +590,14 @@ export const useGameStore = create<GameState>((set, get) => {
         return {
           slotMachine: sl.machine,
           slotSpins: reset ? 0 : sl.hamari,
-          slotZone: reset ? 0 : sl.zone,
-          atGames: reset ? 0 : sl.at,
+          slotZone: reset ? 0 : Math.min(sl.zone, ZONE_SPINS),
+          // 旧バージョンで発散した巨大なAT残りでソフトロックしないよう上限を固定。
+          atGames: reset ? 0 : Math.min(Math.max(0, sl.at), AT_GAMES),
           slotTotal: reset ? 0 : sl.total,
           slotBig: reset ? 0 : sl.big,
           slotReg: reset ? 0 : sl.reg,
           slotMaxHamari: reset ? 0 : sl.maxHamari,
-          slotHits: reset ? [] : sl.hits,
+          slotHits: reset ? [] : (Array.isArray(sl.hits) ? sl.hits.slice(-200) : []),
           slotBucket: cur,
         };
       })(),
