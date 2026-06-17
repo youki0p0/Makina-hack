@@ -69,6 +69,33 @@ button {
   animation: legendaryHue 6s linear infinite;
 }
 
+/* 確定当たりリーチ: 全画面が虹色に光って明滅する。 */
+@keyframes rainbowFlash {
+  0% {
+    opacity: 0;
+    filter: hue-rotate(0deg);
+  }
+  20% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.18;
+    filter: hue-rotate(180deg);
+  }
+  80% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+    filter: hue-rotate(360deg);
+  }
+}
+
+.rainbow-flash {
+  background: linear-gradient(120deg, #ff0040, #ff8a00, #ffe600, #00d4ff, #7a00ff, #ff00c8);
+  animation: rainbowFlash 0.5s linear infinite;
+}
+
 /* Fate gamble win reveal: a punchy pop-in. */
 @keyframes fatePop {
   0% {
