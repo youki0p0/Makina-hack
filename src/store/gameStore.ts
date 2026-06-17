@@ -75,6 +75,7 @@ import {
   ZONE_MULT,
   DAIPAN_LIMIT,
   BAN_BOSSES,
+  HIT_WINDOW_MS,
   MACHINE_COUNT,
   SET_WEAPON_COIN,
   SOULS_COIN,
@@ -280,12 +281,23 @@ interface GameState {
   slotReplay: boolean;
   /** ダイスラッシュ(AT) games remaining (0 = not in AT; transient). */
   atGames: number;
-  /** Selected slot machine index (0..MACHINE_COUNT-1; transient). */
+  /** Selected slot machine index (0..MACHINE_COUNT-1; persisted). */
   slotMachine: number;
-  /** Spins since the last BIG on this machine (天井 counter; transient). */
+  /** Spins since the last BIG on this machine (天井 counter; persisted). */
   slotSpins: number;
-  /** 連チャンゾーン spins remaining (post-AT high-prob; transient). */
+  /** 連チャンゾーン spins remaining (post-AT high-prob; persisted). */
   slotZone: number;
+  /** 6h setting bucket the slot state belongs to (reset when it changes). */
+  slotBucket: number;
+  /** 総回転数 (data counter). */
+  slotTotal: number;
+  /** BIG回数 / REG回数 (data counters). */
+  slotBig: number;
+  slotReg: number;
+  /** 最大ハマり (data counter). */
+  slotMaxHamari: number;
+  /** Timestamps(ms) of recent bonuses, for the 直近の当たり回数 counter. */
+  slotHits: number[];
   /** 台パン count this session (transient; resets on ban). */
   daiPanCount: number;
   /** 出禁: bossKills required before the casino reopens (0 = not banned; persisted). */
@@ -443,6 +455,18 @@ export const useGameStore = create<GameState>((set, get) => {
       souls: s.souls,
       coins: s.coins,
       casinoBan: s.casinoBan,
+      slot: {
+        machine: s.slotMachine,
+        bucket: s.slotBucket,
+        total: s.slotTotal,
+        hamari: s.slotSpins,
+        zone: s.slotZone,
+        at: s.atGames,
+        big: s.slotBig,
+        reg: s.slotReg,
+        maxHamari: s.slotMaxHamari,
+        hits: s.slotHits,
+      },
       artifacts: s.artifacts,
       classId: s.classId,
       winStreak: s.winStreak,
@@ -556,10 +580,25 @@ export const useGameStore = create<GameState>((set, get) => {
       souls: loaded.souls,
       coins: loaded.coins,
       slotReplay: false,
-      atGames: 0,
-      slotMachine: 0,
-      slotSpins: 0,
-      slotZone: 0,
+      // Slot state survives reload, but RESETS when the 6h setting bucket changes
+      // (settings reshuffled → fresh 天井/ゾーン/カウンタ).
+      ...(() => {
+        const cur = settingBucket();
+        const sl = loaded.slot;
+        const reset = sl.bucket !== cur;
+        return {
+          slotMachine: sl.machine,
+          slotSpins: reset ? 0 : sl.hamari,
+          slotZone: reset ? 0 : sl.zone,
+          atGames: reset ? 0 : sl.at,
+          slotTotal: reset ? 0 : sl.total,
+          slotBig: reset ? 0 : sl.big,
+          slotReg: reset ? 0 : sl.reg,
+          slotMaxHamari: reset ? 0 : sl.maxHamari,
+          slotHits: reset ? [] : sl.hits,
+          slotBucket: cur,
+        };
+      })(),
       daiPanCount: 0,
       casinoBan: loaded.casinoBan,
       artifacts: loaded.artifacts,
@@ -614,6 +653,12 @@ export const useGameStore = create<GameState>((set, get) => {
     slotMachine: 0,
     slotSpins: 0,
     slotZone: 0,
+    slotBucket: 0,
+    slotTotal: 0,
+    slotBig: 0,
+    slotReg: 0,
+    slotMaxHamari: 0,
+    slotHits: [],
     daiPanCount: 0,
     casinoBan: 0,
     artifacts: defaultArtifactLevels(),
@@ -1578,16 +1623,40 @@ export const useGameStore = create<GameState>((set, get) => {
 
     slotSpin: (): SlotSpinResult | null => {
       const state = get();
+      // 6時間の設定シャッフルを跨いだら、台の天井/ゾーン/カウンタをリセット。
+      const bucket = settingBucket();
+      const reset = bucket !== state.slotBucket;
+      const cur = {
+        spins: reset ? 0 : state.slotSpins,
+        zone: reset ? 0 : state.slotZone,
+        at: reset ? 0 : state.atGames,
+        total: reset ? 0 : state.slotTotal,
+        big: reset ? 0 : state.slotBig,
+        reg: reset ? 0 : state.slotReg,
+        maxHamari: reset ? 0 : state.slotMaxHamari,
+        hits: reset ? [] : state.slotHits,
+      };
 
       // ---- ダイスラッシュ(AT) free spin ----
-      if (state.atGames > 0) {
+      if (cur.at > 0) {
         const pay = atSpinPayout();
         const add = atRensho();
-        const remaining = state.atGames - 1 + add;
+        const remaining = cur.at - 1 + add;
         const coins = state.coins + pay;
         // AT終了時は連チャンゾーン(高確)へ → ストック機的な連チャンの波。
-        const slotZone = remaining <= 0 ? ZONE_SPINS : state.slotZone;
-        set({ coins, atGames: remaining, slotZone });
+        const slotZone = remaining <= 0 ? ZONE_SPINS : cur.zone;
+        set({
+          coins,
+          atGames: remaining,
+          slotZone,
+          slotBucket: bucket,
+          slotTotal: cur.total + 1,
+          slotSpins: cur.spins,
+          slotBig: cur.big,
+          slotReg: cur.reg,
+          slotMaxHamari: cur.maxHamari,
+          slotHits: cur.hits,
+        });
         persist();
         return {
           outcome: "at",
@@ -1609,14 +1678,13 @@ export const useGameStore = create<GameState>((set, get) => {
       if (state.coins < cost) return null;
 
       // 設定差(隠し設定1-6) × 連チャンゾーン でBIG/REG確率を底上げ。
-      const setting = machineSettings(settingBucket())[state.slotMachine] ?? 1;
-      const inZone = state.slotZone > 0;
+      const setting = machineSettings(bucket)[state.slotMachine] ?? 1;
+      const inZone = cur.zone > 0;
       const bonusMult = settingMult(setting) * (inZone ? ZONE_MULT : 1);
       // 天井: ハマるほど近づく救済(設定で天井Gが変動)。到達でBIG確定。
-      const atCeiling = state.slotSpins + 1 >= ceilingSpins(setting);
+      const atCeiling = cur.spins + 1 >= ceilingSpins(setting);
       const outcome: SlotOutcome = atCeiling ? "big" : drawSlotOutcome(bonusMult);
       const win = outcome === "big" || outcome === "reg";
-      // Reach: always on a bonus; otherwise a rare gase (losing) reach for tension.
       const reach: ReachDef | null = win
         ? pickReach(true)
         : outcome === "miss" && Math.random() < GASE_REACH_CHANCE
@@ -1630,11 +1698,9 @@ export const useGameStore = create<GameState>((set, get) => {
       let atGames = 0;
 
       const payout = slotPayout(outcome);
-      // BIG → ダイスラッシュ(AT)突入: 出玉はAT中の無料ゲームで伸びる(即時配当なし)。
       if (outcome === "big") {
         atGames = AT_GAMES;
         progress = { ...progress, jackpots: progress.jackpots + 1 };
-        // Half of BIGs also drop a casino-exclusive prize item.
         if (Math.random() < 0.5) {
           prize = randomCasinoPrize();
           const capped = capInventory([...inventory, { ...prize }], state.favorites);
@@ -1645,15 +1711,26 @@ export const useGameStore = create<GameState>((set, get) => {
       }
 
       const coins = state.coins - cost + payout;
-      // 天井カウンタ: BIGで0リセット、それ以外は+1。連チャンゾーンは消化で減る。
-      const slotSpins = outcome === "big" ? 0 : state.slotSpins + 1;
-      const slotZone = outcome === "big" ? 0 : Math.max(0, state.slotZone - 1);
+      // データカウンタ: 総回転/BIG/REG/最大ハマり/直近の当たり履歴。
+      const reachedHamari = outcome === "big" ? cur.spins : cur.spins + 1;
+      const isBonus = outcome === "big" || outcome === "reg";
+      const now = Date.now();
+      const slotHits = isBonus
+        ? [...cur.hits, now].filter((t) => now - t <= HIT_WINDOW_MS)
+        : cur.hits.filter((t) => now - t <= HIT_WINDOW_MS);
       set({
         coins,
         slotReplay: outcome === "replay",
         atGames,
-        slotSpins,
-        slotZone,
+        // 天井カウンタ: BIGで0リセット、それ以外は+1。連チャンゾーンは消化で減る。
+        slotSpins: outcome === "big" ? 0 : cur.spins + 1,
+        slotZone: outcome === "big" ? 0 : Math.max(0, cur.zone - 1),
+        slotBucket: bucket,
+        slotTotal: cur.total + 1,
+        slotBig: cur.big + (outcome === "big" ? 1 : 0),
+        slotReg: cur.reg + (outcome === "reg" ? 1 : 0),
+        slotMaxHamari: Math.max(cur.maxHamari, reachedHamari),
+        slotHits,
         inventory,
         gachaPoints,
         progress,
@@ -1676,8 +1753,20 @@ export const useGameStore = create<GameState>((set, get) => {
 
     selectMachine: (i: number) => {
       const idx = Math.max(0, Math.min(MACHINE_COUNT - 1, Math.floor(i)));
-      // 新しい台に座る = その台の天井/ゾーンは別管理(ここではリセット)。
-      set({ slotMachine: idx, slotSpins: 0, slotZone: 0 });
+      // 別の台に座る = データカウンタ・天井・ゾーンをリセット(新しい台)。
+      set({
+        slotMachine: idx,
+        slotSpins: 0,
+        slotZone: 0,
+        atGames: 0,
+        slotBucket: settingBucket(),
+        slotTotal: 0,
+        slotBig: 0,
+        slotReg: 0,
+        slotMaxHamari: 0,
+        slotHits: [],
+      });
+      persist();
     },
 
     daiPan: () => {
@@ -2102,6 +2191,18 @@ export const useGameStore = create<GameState>((set, get) => {
       souls: snap.souls ?? s.souls,
       coins: s.coins,
       casinoBan: s.casinoBan,
+      slot: {
+        machine: s.slotMachine,
+        bucket: s.slotBucket,
+        total: s.slotTotal,
+        hamari: s.slotSpins,
+        zone: s.slotZone,
+        at: s.atGames,
+        big: s.slotBig,
+        reg: s.slotReg,
+        maxHamari: s.slotMaxHamari,
+        hits: s.slotHits,
+      },
       artifacts: snap.artifacts ?? s.artifacts,
       classId: snap.classId ?? s.classId,
       winStreak: snap.winStreak ?? s.winStreak,

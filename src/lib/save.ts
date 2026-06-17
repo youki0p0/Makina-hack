@@ -13,7 +13,13 @@ import type {
   Progress,
   SavedItem,
   SaveData,
+  SlotSave,
 } from "@/types/game";
+
+/** Empty slot state (no bonuses, fresh counters). */
+export function emptySlot(): SlotSave {
+  return { machine: 0, bucket: 0, total: 0, hamari: 0, zone: 0, at: 0, big: 0, reg: 0, maxHamari: 0, hits: [] };
+}
 
 /**
  * Bump this whenever the save shape changes incompatibly. During the debug era
@@ -45,6 +51,7 @@ export interface LoadedState {
   souls: number;
   coins: number;
   casinoBan: number;
+  slot: SlotSave;
   artifacts: ArtifactLevels;
   classId: ClassId;
   winStreak: number;
@@ -80,6 +87,7 @@ function freshLoaded(equipped: EquippedItems, inventory: Equipment[]): LoadedSta
     souls: 0,
     coins: 0,
     casinoBan: 0,
+    slot: emptySlot(),
     artifacts: defaultArtifactLevels(),
     classId: normalizeClassId(undefined),
     winStreak: 0,
@@ -145,6 +153,7 @@ export function saveGame(state: LoadedState): void {
     souls: state.souls,
     coins: state.coins,
     casinoBan: state.casinoBan,
+    slot: state.slot,
     artifacts: state.artifacts,
     classId: state.classId,
     winStreak: state.winStreak,
@@ -197,6 +206,7 @@ export function loadGame(): LoadedState | null {
       souls: data.souls ?? 0,
       coins: data.coins ?? 0,
       casinoBan: data.casinoBan ?? 0,
+      slot: data.slot ? { ...emptySlot(), ...data.slot, hits: Array.isArray(data.slot.hits) ? data.slot.hits : [] } : emptySlot(),
       artifacts: normalizeArtifacts(data.artifacts),
       classId: normalizeClassId(data.classId),
       winStreak: data.winStreak ?? 0,

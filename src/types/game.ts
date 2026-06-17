@@ -396,6 +396,21 @@ export interface SavedItem {
   forgeStreak?: number;
 }
 
+/** Persisted slot-machine state + real-machine-style data counters. */
+export interface SlotSave {
+  machine: number;
+  /** 6-hour setting bucket this state belongs to (reset when it changes). */
+  bucket: number;
+  total: number; // 総回転数
+  hamari: number; // 現在ハマり (spins since last BIG)
+  zone: number; // 連チャンゾーン残り
+  at: number; // ダイスラッシュ残りG
+  big: number; // BIG回数
+  reg: number; // REG回数
+  maxHamari: number; // 最大ハマり
+  hits: number[]; // 当たりのタイムスタンプ(ms) — 直近Nh集計用
+}
+
 export interface SaveData {
   /** Schema version. Mismatched versions are discarded (debug-era reset). */
   saveVersion?: number;
@@ -415,6 +430,8 @@ export interface SaveData {
   coins?: number;
   /** 出禁: bossKills required before the casino reopens (optional for old saves). */
   casinoBan?: number;
+  /** Slot machine state + data counters (optional for old saves). */
+  slot?: SlotSave;
   /** Permanent artifact levels carried across rebirths (optional for old saves). */
   artifacts?: ArtifactLevels;
   /** Current character class (optional for old saves). */

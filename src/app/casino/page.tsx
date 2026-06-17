@@ -15,6 +15,7 @@ import {
   MACHINE_COUNT,
   SET_WEAPON_COIN,
   SOULS_COIN,
+  HIT_WINDOW_MS,
   type BjOutcome,
 } from "@/lib/casino";
 import { estimateTier } from "@/data/items";
@@ -276,6 +277,11 @@ function Slots({ onPan }: { onPan: () => void }) {
   const machine = useGameStore((s) => s.slotMachine);
   const slotSpins = useGameStore((s) => s.slotSpins);
   const slotZone = useGameStore((s) => s.slotZone);
+  const slotTotal = useGameStore((s) => s.slotTotal);
+  const slotBig = useGameStore((s) => s.slotBig);
+  const slotReg = useGameStore((s) => s.slotReg);
+  const slotMaxHamari = useGameStore((s) => s.slotMaxHamari);
+  const slotHits = useGameStore((s) => s.slotHits);
   const selectMachine = useGameStore((s) => s.selectMachine);
   const buyCoins = useGameStore((s) => s.buyCoins);
   const cashout = useGameStore((s) => s.cashoutCoins);
@@ -497,6 +503,36 @@ function Slots({ onPan }: { onPan: () => void }) {
         </span>
         {slotZone > 0 && <span className="font-bold text-red-300">🔥 高確 残り{slotZone}G</span>}
       </div>
+
+      {/* データカウンター(プルダウン) */}
+      <details className="rounded-lg border border-white/10 bg-black/30 text-[11px]">
+        <summary className="cursor-pointer select-none px-3 py-1.5 font-bold text-gray-300">
+          📊 データカウンター
+        </summary>
+        {(() => {
+          const bonus = slotBig + slotReg;
+          const rate = bonus > 0 ? Math.round(slotTotal / bonus) : 0;
+          const now = Date.now();
+          const recent = slotHits.filter((t) => now - t <= HIT_WINDOW_MS).length;
+          const Row = ({ k, v }: { k: string; v: string }) => (
+            <div className="flex justify-between px-3 py-1">
+              <span className="text-gray-400">{k}</span>
+              <span className="font-bold text-gray-100">{v}</span>
+            </div>
+          );
+          return (
+            <div className="divide-y divide-white/5 border-t border-white/10 pb-1">
+              <Row k="総回転数" v={`${fmt(slotTotal)} G`} />
+              <Row k="BIG回数" v={`${slotBig}`} />
+              <Row k="REG回数" v={`${slotReg}`} />
+              <Row k="合算確率" v={bonus > 0 ? `1/${rate}` : "—"} />
+              <Row k="現在ハマり" v={`${slotSpins} G`} />
+              <Row k="最大ハマり" v={`${slotMaxHamari} G`} />
+              <Row k="直近4hの当たり" v={`${recent} 回`} />
+            </div>
+          );
+        })()}
+      </details>
 
       {/* ダイスラッシュ(AT) counter */}
       {atActive && (

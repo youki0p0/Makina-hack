@@ -45,9 +45,12 @@ export const SLOT_SYMBOL: Record<string, number> = {
 // bell≈1/6 …). The remainder is a miss. `bonusMult` boosts BIG/REG odds — used by
 // 設定差 (machine setting) and 連チャンゾーン (post-AT high-prob), both deliberately
 // addictive 4号機-era mechanics.
+/** Global luck factor on BIG/REG base odds (≈1.3× easier to hit). */
+export const SLOT_LUCK = 1.3;
+
 export function drawSlotOutcome(bonusMult = 1): SlotOutcome {
-  const big = Math.min(0.45, (1 / 240) * bonusMult);
-  const reg = Math.min(0.45, (1 / 360) * bonusMult);
+  const big = Math.min(0.45, (SLOT_LUCK / 240) * bonusMult);
+  const reg = Math.min(0.45, (SLOT_LUCK / 360) * bonusMult);
   const odds: { outcome: SlotOutcome; p: number }[] = [
     { outcome: "big", p: big },
     { outcome: "reg", p: reg },
@@ -102,6 +105,9 @@ export function ceilingSpins(setting: number): number {
 /** 連チャンゾーン: length and BIG/REG odds boost right after an AT ends. */
 export const ZONE_SPINS = 32;
 export const ZONE_MULT = 6;
+
+/** Rolling window for the "直近の当たり回数" data counter. */
+export const HIT_WINDOW_MS = 4 * 60 * 60 * 1000; // 4時間
 
 /** 台パン: how many hits before being thrown out + banned. */
 export const DAIPAN_LIMIT = 10;
