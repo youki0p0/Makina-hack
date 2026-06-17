@@ -1643,7 +1643,8 @@ export const useGameStore = create<GameState>((set, get) => {
       if (cur.at > 0) {
         const pay = atSpinPayout();
         const add = atRensho();
-        const remaining = cur.at - 1 + add;
+        // 安全弁: 万一の発散を防ぐためAT残りに上限。
+        const remaining = Math.min(2000, cur.at - 1 + add);
         const coins = state.coins + pay;
         // AT終了時は連チャンゾーン(高確)へ → ストック機的な連チャンの波。
         const slotZone = remaining <= 0 ? ZONE_SPINS : cur.zone;

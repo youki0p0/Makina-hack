@@ -115,9 +115,10 @@ export function ceilingSpins(setting: number): number {
   return 900 - Math.max(1, Math.min(6, setting)) * 60; // 1→840 … 6→540
 }
 
-/** 連チャンゾーン: length and BIG/REG odds boost right after an AT ends. */
-export const ZONE_SPINS = 32;
-export const ZONE_MULT = 6;
+/** 連チャンゾーン: length and BIG/REG odds boost right after an AT ends.
+ * 連チャン率は控えめに(倍率・長さを下げた)。 */
+export const ZONE_SPINS = 24;
+export const ZONE_MULT = 3;
 
 /** Rolling window for the "直近の当たり回数" data counter. */
 export const HIT_WINDOW_MS = 4 * 60 * 60 * 1000; // 4時間
@@ -172,10 +173,14 @@ export function atSpinPayout(): number {
   return 15 + Math.floor(Math.random() * 11); // 15–25 (big hit)
 }
 
-/** Chance per AT game of an 上乗せ (extra games). Returns the games added (0=none). */
-export const AT_RENSHO_CHANCE = 0.04;
+/**
+ * Chance per AT game of an 上乗せ (extra games). Returns the games added (0=none).
+ * 重要: 1ゲームの期待上乗せが消化(-1G)を下回るようにしないとATが発散して「終わらない」。
+ * ここでは 0.01 × 平均≈22 = 約0.22G/G ＜ 1 なので、ATは平均130G前後で必ず収束する。
+ */
+export const AT_RENSHO_CHANCE = 0.01;
 export function atRensho(): number {
-  return Math.random() < AT_RENSHO_CHANCE ? 20 + Math.floor(Math.random() * 31) : 0; // +20–50G
+  return Math.random() < AT_RENSHO_CHANCE ? 10 + Math.floor(Math.random() * 26) : 0; // +10–35G
 }
 
 const MISS_POOL = [2, 3, 4, 5, 6, 8]; // excludes 7(seven) & 9(cherry) to avoid fake hits
