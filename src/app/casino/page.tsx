@@ -16,6 +16,7 @@ import {
   SET_WEAPON_COIN,
   SOULS_COIN,
   HIT_WINDOW_MS,
+  coinBuyCost,
   type BjOutcome,
 } from "@/lib/casino";
 import { estimateTier } from "@/data/items";
@@ -458,17 +459,17 @@ function Slots({ onPan }: { onPan: () => void }) {
       <div className="flex gap-2">
         <button
           onClick={() => buyCoins(50)}
-          disabled={spinning || gold < 50 * COIN_VALUE}
+          disabled={spinning || gold < coinBuyCost(50, coins)}
           className="h-9 flex-1 rounded-lg bg-amber-600/80 text-xs font-bold text-white active:scale-95 disabled:opacity-30"
         >
-          +50枚（💰{fmt(50 * COIN_VALUE)}）
+          +50枚（💰{fmt(coinBuyCost(50, coins))}）
         </button>
         <button
           onClick={() => buyCoins(200)}
-          disabled={spinning || gold < 200 * COIN_VALUE}
+          disabled={spinning || gold < coinBuyCost(200, coins)}
           className="h-9 flex-1 rounded-lg bg-amber-600/80 text-xs font-bold text-white active:scale-95 disabled:opacity-30"
         >
-          +200枚（💰{fmt(200 * COIN_VALUE)}）
+          +200枚（💰{fmt(coinBuyCost(200, coins))}）
         </button>
         <button
           onClick={cashout}
@@ -633,7 +634,8 @@ function Slots({ onPan }: { onPan: () => void }) {
         3枚掛け。<b className="text-red-300">7・7・7</b>で<b className="text-red-300">ダイスラッシュ</b>(AT)突入＝
         継続抽選で出玉が上乗せ（まれに大量出玉）。<b className="text-amber-300">BAR=REG</b> /
         <b className="text-cyan-300"> RP=リプレイ</b>（次回無料）/ ベル・スイカ・🍒で小役。
-        2つ揃うと<b className="text-red-300">リーチ</b>（演出が激アツなほど信頼度UP）。1カジノコイン=💰{COIN_VALUE}。
+        2つ揃うと<b className="text-red-300">リーチ</b>（演出が激アツなほど信頼度UP）。換金は1枚=💰{COIN_VALUE}、
+        買値は<b className="text-amber-200">所持枚数が多いほど割高</b>（買いづらい）。
       </div>
     </div>
   );

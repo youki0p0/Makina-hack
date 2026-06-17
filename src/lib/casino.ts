@@ -16,10 +16,23 @@ export function randomCasinoPrize(): Equipment {
 // コイン(メダル)で回し、リプレイ・ベル等の小役、レギュラー/ビッグの当たり、
 // 約3秒のリーチ演出(信頼度差つき10種)を備える。
 
-/** Coin (medal) economy: 1 coin ⇄ this many gold. */
+/** Coin (medal) economy: cash OUT rate (1 coin → this many gold). */
 export const COIN_VALUE = 20;
 /** Coins consumed per spin (3枚掛け). */
 export const SLOT_BET = 3;
+
+/** How many held coins doubles the buy price (買いづらさのスケール). */
+export const COIN_BUY_SCALE = 200;
+
+/**
+ * Gold cost to BUY `amount` coins. Deliberately gets pricier the more coins you
+ * already hold, so you can't cheaply stockpile — slotで稼ぐのが本筋(買いづらく)。
+ * 単価 = COIN_VALUE × (1 + 所持コイン / COIN_BUY_SCALE)。
+ */
+export function coinBuyCost(amount: number, held: number): number {
+  const mult = 1 + Math.max(0, held) / COIN_BUY_SCALE;
+  return Math.ceil(Math.max(0, amount) * COIN_VALUE * mult);
+}
 
 export type SlotOutcome =
   | "big" // ビッグボーナス(7・7・7) → ダイスラッシュ突入

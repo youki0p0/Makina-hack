@@ -83,6 +83,7 @@ import {
   machineSettings,
   settingMult,
   ceilingSpins,
+  coinBuyCost,
   randomCasinoPrize,
   type ReachDef,
   type SlotOutcome,
@@ -1608,7 +1609,8 @@ export const useGameStore = create<GameState>((set, get) => {
     buyCoins: (coinAmount: number) => {
       const s = get();
       const amt = Math.max(0, Math.floor(coinAmount));
-      const cost = amt * COIN_VALUE;
+      // 価格は所持カジノコインに応じて上昇(買いづらく)。
+      const cost = coinBuyCost(amt, s.coins);
       if (amt <= 0 || s.player.gold < cost) return;
       set({ player: { ...s.player, gold: s.player.gold - cost }, coins: s.coins + amt });
       persist();

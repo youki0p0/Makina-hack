@@ -16,6 +16,8 @@ import {
   ceilingSpins,
   MACHINE_COUNT,
   SLOT_LUCK,
+  coinBuyCost,
+  COIN_VALUE,
   type SlotOutcome,
 } from "@/lib/casino";
 
@@ -109,6 +111,14 @@ describe("slot machine (パチスロ4号機フレーバー)", () => {
     // 同じバケットなら決定論的、別バケットでは(ほぼ)変わる。
     expect(machineSettings(100)).toEqual(a);
     expect(a.join() === b.join()).toBe(false);
+  });
+
+  it("カジノコインの買値は所持枚数が多いほど割高(買いづらく)", () => {
+    // 0枚のときは基本レート、保有が増えるほど単価が上がる。
+    expect(coinBuyCost(50, 0)).toBe(50 * COIN_VALUE);
+    expect(coinBuyCost(50, 400)).toBeGreaterThan(coinBuyCost(50, 0));
+    // 換金(COIN_VALUE)より買値の単価が常に高い→裁定取引にならない。
+    expect(coinBuyCost(100, 100) / 100).toBeGreaterThanOrEqual(COIN_VALUE);
   });
 
   it("当たりを約1.3倍出やすくする係数(SLOT_LUCK)", () => {
