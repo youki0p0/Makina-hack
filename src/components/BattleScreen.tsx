@@ -14,7 +14,6 @@ import { rarityStyle } from "@/lib/ui";
 import { fmt } from "@/lib/ui";
 import ItemIcon from "@/components/ItemIcon";
 import PixelGlyph from "@/components/PixelGlyph";
-import { bossRank } from "@/data/enemies";
 import { getWorld, getWorldBackground, FINAL_FLOOR } from "@/data/worlds";
 import { ENDING_STAFF_ROLL, ENDING_PROMPT, NG_PLUS_SEQUENCE } from "@/data/lore";
 import { useGameStore } from "@/store/gameStore";
@@ -55,12 +54,6 @@ export default function BattleScreen() {
         s.leaveShop();
       } else if (s.battleState === "won") {
         if (s.pendingEnding || s.endlessMessage || s.worldCleared !== null) return; // wait for the overlay
-        // ボス階を突破したら必ずオート停止 → 武器集め/強化フェーズを促す。
-        // (finishVictoryでcurrentFloorは次階に進むので、直前=現floor-1がボスか判定)
-        if (bossRank(s.currentFloor - 1) > 0) {
-          setAuto(0);
-          return;
-        }
         s.enterCurrentFloor();
       } else if (s.battleState === "lost") {
         setAuto(0);
