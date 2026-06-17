@@ -42,25 +42,78 @@ export const SLOT_SYMBOL: Record<string, number> = {
 };
 
 // Per-spin odds tuned to a 4号機 feel (big≈1/240, reg≈1/360, replay≈1/7.3,
-// bell≈1/6 …). The remainder is a miss.
-const ODDS: { outcome: SlotOutcome; p: number }[] = [
-  { outcome: "big", p: 1 / 240 },
-  { outcome: "reg", p: 1 / 360 },
-  { outcome: "watermelon", p: 1 / 128 },
-  { outcome: "cherry", p: 1 / 51 },
-  { outcome: "replay", p: 1 / 7.3 },
-  { outcome: "bell", p: 1 / 6 },
-];
-
-export function drawSlotOutcome(): SlotOutcome {
+// bell≈1/6 …). The remainder is a miss. `bonusMult` boosts BIG/REG odds — used by
+// 設定差 (machine setting) and 連チャンゾーン (post-AT high-prob), both deliberately
+// addictive 4号機-era mechanics.
+export function drawSlotOutcome(bonusMult = 1): SlotOutcome {
+  const big = Math.min(0.45, (1 / 240) * bonusMult);
+  const reg = Math.min(0.45, (1 / 360) * bonusMult);
+  const odds: { outcome: SlotOutcome; p: number }[] = [
+    { outcome: "big", p: big },
+    { outcome: "reg", p: reg },
+    { outcome: "watermelon", p: 1 / 128 },
+    { outcome: "cherry", p: 1 / 51 },
+    { outcome: "replay", p: 1 / 7.3 },
+    { outcome: "bell", p: 1 / 6 },
+  ];
   const r = Math.random();
   let acc = 0;
-  for (const o of ODDS) {
+  for (const o of odds) {
     acc += o.p;
     if (r < acc) return o.outcome;
   }
   return "miss";
 }
+
+// ===== 設定差・台・天井・連チャンゾーン (4号機の"中毒"システム) =====
+// 現代の規則で禁止/規制された射幸性の高い仕組みを再現:
+//  - 設定差: 台ごとに隠し設定(1-6)で機械割が変わる(設定看破の沼)。
+//  - 天井: ハマるほど近づく救済 → 天井狙いの中毒。
+//  - 連チャンゾーン: AT後の高確率で連チャン(ストック機的な出玉の波)。
+//  - 青天井AT: 出玉上限なし(コンプリート機能なし)。
+export const MACHINE_COUNT = 4;
+export const SHUFFLE_MS = 6 * 60 * 60 * 1000; // 設定は6時間ごとにシャッフル
+
+/** Current 6-hour bucket (machine settings reshuffle each bucket). */
+export function settingBucket(now = Date.now()): number {
+  return Math.floor(now / SHUFFLE_MS);
+}
+
+/** Deterministic hidden settings (1–6) for the 4 machines, per time bucket. */
+export function machineSettings(bucket: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < MACHINE_COUNT; i++) {
+    const h = Math.abs(Math.sin((bucket + 1) * 12.9898 + (i + 1) * 78.233) * 43758.5453);
+    out.push(1 + Math.floor((h % 1) * 6)); // 1..6
+  }
+  return out;
+}
+
+/** Bonus-odds multiplier for a setting (higher setting ⇒ better machine割). */
+export function settingMult(setting: number): number {
+  return 0.8 + Math.max(1, Math.min(6, setting)) * 0.08; // 1→0.88 … 6→1.28
+}
+
+/** 天井: a BIG is forced after this many spins without one (lower at high設定). */
+export function ceilingSpins(setting: number): number {
+  return 900 - Math.max(1, Math.min(6, setting)) * 60; // 1→840 … 6→540
+}
+
+/** 連チャンゾーン: length and BIG/REG odds boost right after an AT ends. */
+export const ZONE_SPINS = 32;
+export const ZONE_MULT = 6;
+
+/** 台パン: how many hits before being thrown out + banned. */
+export const DAIPAN_LIMIT = 10;
+/** 出禁: bosses you must defeat to be allowed back into the casino. */
+export const BAN_BOSSES = 10;
+
+// ===== カジノコイン交換所 =====
+// 超高額のカジノコインで強力なセット武器・転生ポイントと交換できる(射幸性の出口)。
+/** Coins to exchange for one set-piece weapon. */
+export const SET_WEAPON_COIN = 8000;
+/** Coins per 転生ポイント (deliberately pricier). */
+export const SOULS_COIN = 3000;
 
 /**
  * Coin payout for an outcome (replay pays 0 — next spin is free instead).

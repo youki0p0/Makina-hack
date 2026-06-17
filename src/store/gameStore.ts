@@ -18,10 +18,10 @@ import {
   isClassUnlocked,
 } from "@/data/classes";
 import { generateEnemy } from "@/data/enemies";
-import { estimateTier, genItem, getItemById, getItemInstance, makeMakina, MAKINA_ID } from "@/data/items";
+import { estimateTier, genItem, genSetItem, getItemById, getItemInstance, makeMakina, MAKINA_ID } from "@/data/items";
 import { forgeCost, rollForge, starInjectCost, FORGE_MAX, type ForgeKind } from "@/data/forge";
 import { applyModifier, modTierForFloor, rollDropModTier } from "@/data/modifiers";
-import { computeSetEffects } from "@/data/sets";
+import { computeSetEffects, getSetDef } from "@/data/sets";
 import { jobAttackMult } from "@/data/jobBalance";
 import {
   crossedMilestones,
@@ -71,6 +71,17 @@ import {
   atSpinPayout,
   atRensho,
   AT_GAMES,
+  ZONE_SPINS,
+  ZONE_MULT,
+  DAIPAN_LIMIT,
+  BAN_BOSSES,
+  MACHINE_COUNT,
+  SET_WEAPON_COIN,
+  SOULS_COIN,
+  settingBucket,
+  machineSettings,
+  settingMult,
+  ceilingSpins,
   randomCasinoPrize,
   type ReachDef,
   type SlotOutcome,
@@ -269,6 +280,16 @@ interface GameState {
   slotReplay: boolean;
   /** ダイスラッシュ(AT) games remaining (0 = not in AT; transient). */
   atGames: number;
+  /** Selected slot machine index (0..MACHINE_COUNT-1; transient). */
+  slotMachine: number;
+  /** Spins since the last BIG on this machine (天井 counter; transient). */
+  slotSpins: number;
+  /** 連チャンゾーン spins remaining (post-AT high-prob; transient). */
+  slotZone: number;
+  /** 台パン count this session (transient; resets on ban). */
+  daiPanCount: number;
+  /** 出禁: bossKills required before the casino reopens (0 = not banned; persisted). */
+  casinoBan: number;
   /** Permanent artifact levels (persist across rebirths). */
   artifacts: ArtifactLevels;
   /** Current character class. */
@@ -391,6 +412,14 @@ interface GameState {
   cashoutCoins: () => void;
   /** Spin the slot. Returns the resolved result, or null if coins are short. */
   slotSpin: () => SlotSpinResult | null;
+  /** Sit at a different slot machine (resets 天井/ゾーン for that 台). */
+  selectMachine: (i: number) => void;
+  /** 台パン: hit the cabinet. Returns the new count and whether it triggered 出禁. */
+  daiPan: () => { count: number; banned: boolean };
+  /** カジノコイン交換所: spend coins for a set-piece weapon. Returns it or null. */
+  coinBuySetWeapon: (setKey: string) => Equipment | null;
+  /** カジノコイン交換所: spend coins for 転生ポイント (souls). */
+  coinBuySouls: (n: number) => void;
 
   // artifacts / rebirth
   upgradeArtifact: (id: ArtifactId) => void;
@@ -413,6 +442,7 @@ export const useGameStore = create<GameState>((set, get) => {
       gachaPoints: s.gachaPoints,
       souls: s.souls,
       coins: s.coins,
+      casinoBan: s.casinoBan,
       artifacts: s.artifacts,
       classId: s.classId,
       winStreak: s.winStreak,
@@ -527,6 +557,11 @@ export const useGameStore = create<GameState>((set, get) => {
       coins: loaded.coins,
       slotReplay: false,
       atGames: 0,
+      slotMachine: 0,
+      slotSpins: 0,
+      slotZone: 0,
+      daiPanCount: 0,
+      casinoBan: loaded.casinoBan,
       artifacts: loaded.artifacts,
       classId: loaded.classId,
       winStreak: loaded.winStreak,
@@ -576,6 +611,11 @@ export const useGameStore = create<GameState>((set, get) => {
     coins: 0,
     slotReplay: false,
     atGames: 0,
+    slotMachine: 0,
+    slotSpins: 0,
+    slotZone: 0,
+    daiPanCount: 0,
+    casinoBan: 0,
     artifacts: defaultArtifactLevels(),
     classId: DEFAULT_CLASS_ID,
     winStreak: 0,
@@ -1545,7 +1585,9 @@ export const useGameStore = create<GameState>((set, get) => {
         const add = atRensho();
         const remaining = state.atGames - 1 + add;
         const coins = state.coins + pay;
-        set({ coins, atGames: remaining });
+        // AT終了時は連チャンゾーン(高確)へ → ストック機的な連チャンの波。
+        const slotZone = remaining <= 0 ? ZONE_SPINS : state.slotZone;
+        set({ coins, atGames: remaining, slotZone });
         persist();
         return {
           outcome: "at",
@@ -1566,7 +1608,13 @@ export const useGameStore = create<GameState>((set, get) => {
       const cost = free ? 0 : SLOT_BET;
       if (state.coins < cost) return null;
 
-      const outcome: SlotOutcome = drawSlotOutcome();
+      // 設定差(隠し設定1-6) × 連チャンゾーン でBIG/REG確率を底上げ。
+      const setting = machineSettings(settingBucket())[state.slotMachine] ?? 1;
+      const inZone = state.slotZone > 0;
+      const bonusMult = settingMult(setting) * (inZone ? ZONE_MULT : 1);
+      // 天井: ハマるほど近づく救済(設定で天井Gが変動)。到達でBIG確定。
+      const atCeiling = state.slotSpins + 1 >= ceilingSpins(setting);
+      const outcome: SlotOutcome = atCeiling ? "big" : drawSlotOutcome(bonusMult);
       const win = outcome === "big" || outcome === "reg";
       // Reach: always on a bonus; otherwise a rare gase (losing) reach for tension.
       const reach: ReachDef | null = win
@@ -1597,7 +1645,19 @@ export const useGameStore = create<GameState>((set, get) => {
       }
 
       const coins = state.coins - cost + payout;
-      set({ coins, slotReplay: outcome === "replay", atGames, inventory, gachaPoints, progress });
+      // 天井カウンタ: BIGで0リセット、それ以外は+1。連チャンゾーンは消化で減る。
+      const slotSpins = outcome === "big" ? 0 : state.slotSpins + 1;
+      const slotZone = outcome === "big" ? 0 : Math.max(0, state.slotZone - 1);
+      set({
+        coins,
+        slotReplay: outcome === "replay",
+        atGames,
+        slotSpins,
+        slotZone,
+        inventory,
+        gachaPoints,
+        progress,
+      });
       persist();
       return {
         outcome,
@@ -1612,6 +1672,61 @@ export const useGameStore = create<GameState>((set, get) => {
         atAdd: 0,
         coins,
       };
+    },
+
+    selectMachine: (i: number) => {
+      const idx = Math.max(0, Math.min(MACHINE_COUNT - 1, Math.floor(i)));
+      // 新しい台に座る = その台の天井/ゾーンは別管理(ここではリセット)。
+      set({ slotMachine: idx, slotSpins: 0, slotZone: 0 });
+    },
+
+    daiPan: () => {
+      const s = get();
+      const count = s.daiPanCount + 1;
+      if (count >= DAIPAN_LIMIT) {
+        // 出禁: ボスを BAN_BOSSES 体倒すまでカジノ入店禁止。
+        set({ daiPanCount: 0, casinoBan: s.progress.bossKills + BAN_BOSSES });
+        persist();
+        return { count, banned: true };
+      }
+      set({ daiPanCount: count });
+      return { count, banned: false };
+    },
+
+    coinBuySetWeapon: (setKey: string): Equipment | null => {
+      const state = get();
+      if (state.coins < SET_WEAPON_COIN) return null;
+      if (!getSetDef(setKey)) return null;
+      // Tier scales to the player's best owned gear, so it's relevant late-game.
+      let refTier = 0;
+      let refMod = 0;
+      const consider = (it: Equipment | null) => {
+        if (!it) return;
+        refTier = Math.max(refTier, estimateTier(it));
+        refMod = Math.max(refMod, it.modTier ?? 0);
+      };
+      for (const slot of EQUIP_SLOTS) consider(state.equipped[slot]);
+      for (const it of state.inventory) consider(it);
+      const weapon = applyModifier(genSetItem(setKey, "weapon", Math.max(refTier, 30)), refMod);
+      const capped = capInventory([...state.inventory, weapon], state.favorites);
+      set({
+        coins: state.coins - SET_WEAPON_COIN,
+        inventory: capped.kept,
+        gachaPoints: state.gachaPoints + capped.material,
+        lastPull: weapon,
+        progress: { ...state.progress, discoveredItems: discover(state.progress.discoveredItems, weapon.id) },
+      });
+      persist();
+      return weapon;
+    },
+
+    coinBuySouls: (n: number) => {
+      const state = get();
+      const amt = Math.max(1, Math.floor(n));
+      const cost = amt * SOULS_COIN;
+      if (state.coins < cost) return;
+      set({ coins: state.coins - cost, souls: state.souls + amt });
+      persist();
     },
 
     upgradeArtifact: (id: ArtifactId) => {
@@ -1986,6 +2101,7 @@ export const useGameStore = create<GameState>((set, get) => {
       gachaPoints: snap.gachaPoints ?? s.gachaPoints,
       souls: snap.souls ?? s.souls,
       coins: s.coins,
+      casinoBan: s.casinoBan,
       artifacts: snap.artifacts ?? s.artifacts,
       classId: snap.classId ?? s.classId,
       winStreak: snap.winStreak ?? s.winStreak,

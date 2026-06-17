@@ -289,10 +289,15 @@ export function sfx(kind: Sfx): void {
 
 // ===== Slot (パチスロ) SFX =====
 // レバーON / リール停止 / 小役 / リーチ / ボーナス揃い。tone/noise/slideTone で合成。
-export type SlotSfx = "lever" | "stop" | "small" | "reach" | "bonus" | "bonusBig";
+export type SlotSfx = "lever" | "stop" | "small" | "reach" | "bonus" | "bonusBig" | "pan";
 
 export function slotSfx(kind: SlotSfx): void {
   switch (kind) {
+    case "pan": // 台パン: 筐体を殴る鈍い衝撃音
+      noise(0.12, 0.4);
+      slideTone(160, 50, 0.18, "square", 0.3);
+      tone(60, 0.14, "sine", 0.3, 0.01);
+      break;
     case "lever": // レバーを下げた「ガコッ」
       noise(0.05, 0.2);
       slideTone(240, 90, 0.13, "square", 0.26);
