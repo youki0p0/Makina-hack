@@ -17,7 +17,7 @@ import { estimateTier } from "@/data/items";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { ENEMY_TEMPLATES, BOSS_TEMPLATES } from "@/data/enemies";
 import { getSlotIconDataUrl } from "@/lib/itemIcon";
-import { slotSfx } from "@/lib/audio";
+import { slotSfx, setBgmTheme } from "@/lib/audio";
 import EnemyIcon from "@/components/EnemyIcon";
 import PixelGlyph from "@/components/PixelGlyph";
 import { fmt } from "@/lib/ui";
@@ -233,6 +233,7 @@ function Slots() {
   const lock = useRef<[boolean, boolean, boolean]>([false, false, false]);
   const spinningRef = useRef(false);
   const autoRef = useRef(false);
+  const rushBgm = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cost = replay ? 0 : SLOT_BET;
   const canSpin = coins >= cost;
@@ -247,6 +248,10 @@ function Slots() {
     timers.current.forEach(clearTimeout);
     timers.current = [];
     stopCycle();
+    if (rushBgm.current) {
+      clearTimeout(rushBgm.current);
+      rushBgm.current = null;
+    }
   };
   useEffect(() => () => clearAll(), []);
   useEffect(() => {
@@ -306,8 +311,14 @@ function Slots() {
           spinningRef.current = false;
           setSpinning(false);
           // 揃い/小役の当たり音
-          if (res.outcome === "big") slotSfx("bonusBig");
-          else if (res.outcome === "reg") slotSfx("bonus");
+          if (res.outcome === "big") {
+            slotSfx("bonusBig");
+            // BIG中(ダイスラッシュ)は専用BGM(idol)に切替、AT後にカジノ曲へ戻す。
+            setBgmTheme("idol");
+            if (rushBgm.current) clearTimeout(rushBgm.current);
+            const dur = Math.min(16000, Math.max(7000, (res.rush?.sets ?? 1) * 1300));
+            rushBgm.current = setTimeout(() => setBgmTheme("casino"), dur);
+          } else if (res.outcome === "reg") slotSfx("bonus");
           else if (res.outcome !== "miss") slotSfx("small");
           const gap = res.outcome === "big" || res.outcome === "reg" ? 1500 : 650;
           timers.current.push(
