@@ -15,6 +15,7 @@ import {
   settingMult,
   ceilingSpins,
   MACHINE_COUNT,
+  SLOT_LUCK,
   type SlotOutcome,
 } from "@/lib/casino";
 
@@ -108,6 +109,19 @@ describe("slot machine (パチスロ4号機フレーバー)", () => {
     // 同じバケットなら決定論的、別バケットでは(ほぼ)変わる。
     expect(machineSettings(100)).toEqual(a);
     expect(a.join() === b.join()).toBe(false);
+  });
+
+  it("当たりを約1.3倍出やすくする係数(SLOT_LUCK)", () => {
+    expect(SLOT_LUCK).toBeCloseTo(1.3, 2);
+    // ベース確率に1.3倍が乗るので、当たり率はおよそ 1/185 程度に上がる。
+    let bonus = 0;
+    const N = 60000;
+    for (let i = 0; i < N; i++) {
+      const o = drawSlotOutcome(1);
+      if (o === "big" || o === "reg") bonus++;
+    }
+    const rate = N / bonus;
+    expect(rate).toBeLessThan(240); // 1.3倍前(約1/144合算)より明確に出やすい
   });
 
   it("高設定ほど機械割が良く天井が浅い", () => {
