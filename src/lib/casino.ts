@@ -183,12 +183,18 @@ export function atSpinPayout(): number {
 
 /**
  * Chance per AT game of an 上乗せ (extra games). Returns the games added (0=none).
- * 重要: 1ゲームの期待上乗せが消化(-1G)を下回るようにしないとATが発散して「終わらない」。
- * ここでは 0.01 × 平均≈22 = 約0.22G/G ＜ 1 なので、ATは平均130G前後で必ず収束する。
+ * 重要: 1ゲームの期待上乗せが消化(-1G)を下回らないとATが発散して「終わらない」。
+ * 通常上乗せ 2%×平均10 + 特大上乗せ 0.05%×平均475 = 約0.44G/G ＜ 1 なので必ず収束。
+ * ただし特大上乗せ(+350〜600G)は約1割のATで降ってくるので、運がいいと700G級まで伸びる。
  */
-export const AT_RENSHO_CHANCE = 0.01;
+export const AT_RENSHO_CHANCE = 0.02;
+/** 特大上乗せ(運がいいと700G級)の発生率。 */
+export const AT_JACKPOT_CHANCE = 0.0005;
 export function atRensho(): number {
-  return Math.random() < AT_RENSHO_CHANCE ? 10 + Math.floor(Math.random() * 26) : 0; // +10–35G
+  const r = Math.random();
+  if (r < AT_JACKPOT_CHANCE) return 350 + Math.floor(Math.random() * 251); // +350–600G(特大)
+  if (r < AT_JACKPOT_CHANCE + AT_RENSHO_CHANCE) return 5 + Math.floor(Math.random() * 11); // +5–15G
+  return 0;
 }
 
 const MISS_POOL = [2, 3, 4, 5, 6, 8]; // excludes 7(seven) & 9(cherry) to avoid fake hits
