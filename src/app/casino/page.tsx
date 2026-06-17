@@ -37,6 +37,7 @@ export default function CasinoPage() {
   const gold = useGameStore((s) => s.player.gold);
   const banUntil = useGameStore((s) => s.casinoBan);
   const bossKills = useGameStore((s) => s.progress.bossKills);
+  const atGames = useGameStore((s) => s.atGames);
   const daiPan = useGameStore((s) => s.daiPan);
   const [tab, setTab] = useState<"slots" | "bj" | "fate" | "shop">("slots");
   const [shaking, setShaking] = useState(false);
@@ -58,16 +59,23 @@ export default function CasinoPage() {
   const banned = banUntil > 0 && bossKills < banUntil;
   if (banned) {
     return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
-        <div className="text-5xl">🚫</div>
-        <h1 className="text-xl font-black text-red-400">出入り禁止</h1>
-        <p className="text-sm text-gray-300">
-          台パンのしすぎでカジノを追い出された。
+      <main className="animate-shake flex min-h-dvh flex-col items-center justify-center gap-6 bg-red-950/40 p-6 text-center">
+        <h1 className="text-7xl font-black tracking-widest text-red-500 drop-shadow-[0_0_18px_rgba(239,68,68,0.7)]">
+          出禁
+        </h1>
+        <p className="text-base font-bold leading-relaxed text-gray-100">
+          お客様、スロット台が壊れます。
           <br />
-          ボスを<b className="text-amber-300"> {banUntil - bossKills} </b>体倒せば再入店できる。
+          冒険に出て頭を冷やしてきてください。
         </p>
-        <Link href="/" className="rounded-xl bg-white/10 px-5 py-3 text-sm font-bold active:scale-95">
-          ← ホームへ
+        <p className="text-xs text-gray-400">
+          再入店にはボスを<b className="text-amber-300"> {banUntil - bossKills} </b>体倒すこと。
+        </p>
+        <Link
+          href="/"
+          className="rounded-xl bg-red-600 px-6 py-3 text-sm font-extrabold text-white active:scale-95"
+        >
+          冒険に戻る →
         </Link>
       </main>
     );
@@ -85,6 +93,9 @@ export default function CasinoPage() {
 
   return (
     <main className={`relative flex min-h-dvh flex-col gap-3 p-3 ${shaking ? "animate-shake" : ""}`}>
+      {/* ダイスラッシュ(AT)中は外枠を虹色に光らせる */}
+      {atGames > 0 && <div className="at-frame pointer-events-none fixed inset-0 z-40" />}
+
       <div className="flex items-center justify-between">
         <Link href="/" className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">
           ← ホーム
