@@ -39,6 +39,7 @@ import {
   expForLevel,
   luckFloor,
   resolveBossTurn,
+  resolveFinalBossTurn,
   resolveEnemyTurn,
   resolvePlayerAction,
   tickBuffs,
@@ -964,14 +965,27 @@ export const useGameStore = create<GameState>((set, get) => {
         stunTurns -= 1;
         log = pushLogs(log, [{ text: `${enemy.name} はスタンして動けない！`, tone: "good" }]);
       } else if (enemy.isBoss) {
-        // Boss-specific gimmick turn (enrage + charge cycle + heal).
-        const turn = resolveBossTurn({ ...enemy, enraged, weakenAmount, weakenTurns }, stats, action.guard);
+        // Boss-specific gimmick turn. 1000F final boss uses a JRPG "last boss"
+        // pattern (phases / multi-action / charged ultimate); others use the
+        // standard enrage + charge cycle + heal.
+        const turn =
+          enemy.templateId === "deus"
+            ? resolveFinalBossTurn({ ...enemy, hp: enemyHp, enraged, weakenAmount, weakenTurns }, stats, action.guard)
+            : resolveBossTurn({ ...enemy, enraged, weakenAmount, weakenTurns }, stats, action.guard);
         if (turn.enemyHeal > 0) enemyHp = Math.min(enemy.maxHp, enemyHp + turn.enemyHeal);
         charging = turn.charging;
         chargeCounter = turn.chargeCounter;
         decayWeaken();
         playerHp -= turn.playerDamage;
         log = pushLogs(log, turn.logs.map((text) => ({ text, tone: "bad" as const })));
+        // Final boss can disrupt the player's dice (lose rerolls), mitigated by stun-resist gear.
+        if (turn.playerStun && turn.playerStun > 0) {
+          if (Math.random() < equippedResist(state.equipped).stun) {
+            log = pushLogs(log, [{ text: "出目の乱れを耐えた！", tone: "good" }]);
+          } else {
+            playerStunTurns += turn.playerStun;
+          }
+        }
 
         if (playerHp <= 0) {
           const lost = finishDefeat(

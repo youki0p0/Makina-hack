@@ -7,6 +7,7 @@ import {
   expForLevel,
   luckFloor,
   resolveEnemyTurn,
+  resolveFinalBossTurn,
   resolvePlayerAction,
   tickEnemyStatuses,
 } from "@/lib/battle";
@@ -125,6 +126,36 @@ describe("resolveEnemyTurn player statuses", () => {
     const t = resolveEnemyTurn(enemy, stats, 0);
     expect(t.playerPoison).toBe(0);
     expect(t.playerStun).toBe(0);
+  });
+});
+
+describe("resolveFinalBossTurn (1000F last boss)", () => {
+  const stats = computeStats(basePlayer(), emptyEquip);
+  const deus = () => ({ ...generateEnemy(1000), charging: false, chargeCounter: 0 });
+
+  it("unleashes a big hit when charging", () => {
+    const t = resolveFinalBossTurn({ ...deus(), charging: true }, stats, 0);
+    expect(t.playerDamage).toBeGreaterThan(0);
+    expect(t.charging).toBe(false);
+    expect(t.logs.join("")).toContain("終焉のサイコロ");
+  });
+
+  it("telegraphs a charge after a few turns", () => {
+    const t = resolveFinalBossTurn({ ...deus(), chargeCounter: 3 }, stats, 0);
+    expect(t.charging).toBe(true);
+  });
+
+  it("can act twice and disrupt dice in the final phase (low HP)", () => {
+    const low = { ...deus(), hp: 1 }; // phase 3
+    let sawStun = false;
+    let multiActionLogs = 0;
+    for (let i = 0; i < 200; i++) {
+      const t = resolveFinalBossTurn({ ...low, chargeCounter: 0 }, stats, 0);
+      if (t.playerStun && t.playerStun > 0) sawStun = true;
+      if (!t.charging && t.logs.length >= 2) multiActionLogs++;
+    }
+    expect(sawStun).toBe(true);
+    expect(multiActionLogs).toBeGreaterThan(0);
   });
 });
 
