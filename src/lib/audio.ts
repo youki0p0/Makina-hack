@@ -796,8 +796,9 @@ function finalIntroTick(i: number): void {
   }
   if (introBar === 1 && inBar % 2 === 1) noise(0.02, 0.05);
 
-  // ★ the 7-note main melody, foregrounded (brass + smooth sine + octave sparkle)
-  const note = LEAD_PHRASE[i];
+  // ★ 主旋律の出だしを提示。イントロでは末尾の C-A-G(step20/24/28)は鳴らさず、
+  //   A-C-E-D の4音だけにする(本編クライマックスでは全音そのまま)。
+  const note = i < 20 ? LEAD_PHRASE[i] : 0;
   if (note) {
     echoTone(note, 0.3, "sawtooth", 0.14, 0, 1, 0.12, 0.4);
     voice(note, 0.34, "sine", 0.06, 0, 0, 0.4);
