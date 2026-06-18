@@ -255,12 +255,22 @@ export const SLOT_REACHES: ReachDef[] = [
 ];
 
 /**
+ * Per-tier weight for gase (losing) reaches. Tapers steeply but reaches tier4 —
+ * so カットイン rarely fires on a loss, landing its 信頼度 around 57% instead of a
+ * dead 100%. tier5 (guaranteed) は除外され確定枠のまま。
+ * 結果の信頼度ラダー: t1≈0.4% / t2≈2.6% / t3≈19% / t4(カットイン)≈57% / t5=確定。
+ * 11%→100% の崖を埋め、「本物かガセか分からない」わんちゃん帯を作る。
+ */
+const REACH_LOSE_WEIGHT: Record<number, number> = { 1: 8, 2: 5, 3: 1.3, 4: 0.4 };
+
+/**
  * Pick a reach pattern. Wins lean toward hotter (high-tier) reaches; gase (loss)
- * reaches are limited to weak tiers — so a hot reach genuinely means higher 信頼度.
+ * reaches taper toward weak tiers and never use guaranteed (tier5) productions —
+ * so a hotter reach genuinely means higher 信頼度.
  */
 export function pickReach(win: boolean): ReachDef {
-  const pool = win ? SLOT_REACHES : SLOT_REACHES.filter((r) => r.tier <= 3);
-  const weight = (t: number) => (win ? t * t : 4 - t); // win:1,4,9,16,25 / lose:3,2,1
+  const pool = win ? SLOT_REACHES : SLOT_REACHES.filter((r) => !r.guaranteed);
+  const weight = (t: number) => (win ? t * t : (REACH_LOSE_WEIGHT[t] ?? 0));
   const total = pool.reduce((s, r) => s + weight(r.tier), 0);
   let r = Math.random() * total;
   for (const def of pool) {
