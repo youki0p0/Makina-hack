@@ -27,6 +27,17 @@ export const ENEMY_ABILITY_LABEL: Record<EnemyAbility, string> = {
   shock: "麻痺",
 };
 
+/** Matchup trait keys an enemy can carry (besides always-on boss executeImmune). */
+export type EnemyTrait = "lifestealImmune" | "multiHitResist" | "statusResist";
+
+/** Bestiary-facing labels for matchup traits. */
+export const ENEMY_TRAIT_LABEL: Record<EnemyTrait | "executeImmune", string> = {
+  lifestealImmune: "吸血無効",
+  multiHitResist: "多段耐性",
+  statusResist: "状態異常耐性",
+  executeImmune: "即死無効",
+};
+
 const ENEMY_DEFS: EnemyDef[] = [
   ["slime", "スライム", "🟢", null, "弱いが数が多い"],
   ["bat", "コウモリ", "🦇", null, "素早く飛び回る"],
@@ -254,10 +265,65 @@ export function generateEnemy(floor: number, scale: EnemyScale = DEFAULT_SCALE):
     chargeCounter: 0,
     bossTurns: 0,
     modTier: 0,
+    // 相性フラグは既定 false。下で付与する。
+    lifestealImmune: false,
+    multiHitResist: false,
+    statusResist: false,
+    executeImmune: false,
   };
+
+  assignMatchupTraits(enemy, floor, rank, isBossFloor, isFinalBoss);
 
   // Apply the floor's ★ modifier (no-op below floor 50); harder modes grow it faster.
   return applyEnemyModifier(enemy, enemyModTierForFloor(floor), scale.enemyStarBonus);
+}
+
+/** Roster of rollable traits for normal/boss extra traits. */
+const ALL_TRAITS: readonly EnemyTrait[] = ["lifestealImmune", "multiHitResist", "statusResist"];
+
+/**
+ * テンプレIDから自然なフレーバー相性を優先付与する弱マップ。該当しなければ
+ * 単純なランダム抽選にフォールバックする(過剰設計はしない)。
+ */
+const TRAIT_FLAVOR: Record<string, EnemyTrait> = {
+  // アンデッド/スライム系 → 状態異常耐性
+  slime: "statusResist", zombie: "statusResist", skeleton: "statusResist",
+  mummy: "statusResist", slimeking: "statusResist", lich: "statusResist",
+  // 装甲/甲殻系 → 多段耐性
+  golem: "multiHitResist", gargoyle: "multiHitResist", crab: "multiHitResist",
+  titan: "multiHitResist",
+  // 構造体/虚無系 → 吸血無効
+  wisp: "lifestealImmune", specter: "lifestealImmune", voidlord: "lifestealImmune",
+  djinn: "lifestealImmune",
+};
+
+/**
+ * 相性フラグを付与してマッチアップに多様性を与える(単一ビルドで全対応させない)。
+ * - ボス/最終ボス: executeImmune 常時。さらに章ボス(rank>=3)は追加で1相性をランダム付与。
+ * - 通常敵 floor>=250: 30%で [吸血無効/多段耐性/状態異常耐性] のどれか1つだけ付与。
+ *   フレーバーに合う敵は優先、無ければ重み無しランダム。
+ */
+function assignMatchupTraits(
+  enemy: Enemy,
+  floor: number,
+  rank: number,
+  isBossFloor: boolean,
+  isFinalBoss: boolean,
+): void {
+  if (isBossFloor || isFinalBoss) {
+    enemy.executeImmune = true;
+    if (rank >= 3) {
+      const t = ALL_TRAITS[Math.floor(Math.random() * ALL_TRAITS.length)];
+      enemy[t] = true;
+    }
+    return;
+  }
+  // 通常敵: 浅層(floor<250)は無相性のまま。深層のみ抽選。
+  if (floor < 250) return;
+  if (Math.random() < 0.3) {
+    const t = TRAIT_FLAVOR[enemy.templateId] ?? ALL_TRAITS[Math.floor(Math.random() * ALL_TRAITS.length)];
+    enemy[t] = true;
+  }
 }
 
 function pickNormalTemplate(floor: number): EnemyTemplate {

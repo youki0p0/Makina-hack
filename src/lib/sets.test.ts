@@ -33,6 +33,65 @@ function equipSet(key: string, n: number): EquippedItems {
   return eq;
 }
 
+describe("signature resonance (固有共鳴)", () => {
+  // One signature item per slot so we can dial the count exactly.
+  const SIG_BY_SLOT: Record<EquipmentSlot, string> = {
+    weapon: "vampiric_sword",
+    helm: "sentinel_helm",
+    armor: "heavy_armor",
+    gloves: "duelist_gloves",
+    boots: "windstep_boots",
+    accessory: "gambler_ring",
+  };
+
+  function equipSignature(n: number): EquippedItems {
+    const eq = emptyEquipped();
+    const slots = EQUIP_SLOTS.slice(0, n) as EquipmentSlot[];
+    for (const slot of slots) {
+      const item = getItemById(SIG_BY_SLOT[slot])!;
+      expect(item.signature).toBe(true);
+      eq[slot] = item;
+    }
+    return eq;
+  }
+
+  it("grants no resonance with fewer than 2 signature pieces", () => {
+    const eff = computeSetEffects(equipSignature(1));
+    expect(eff.attackPct).toBe(0);
+    expect(eff.maxHpPct).toBe(0);
+  });
+
+  it("2 pieces grant +12% attack / +12% maxHp", () => {
+    const eff = computeSetEffects(equipSignature(2));
+    expect(eff.attackPct).toBeCloseTo(0.12);
+    expect(eff.maxHpPct).toBeCloseTo(0.12);
+  });
+
+  it("4 pieces grant +25% attack, extraHit, +1 reroll", () => {
+    const eff = computeSetEffects(equipSignature(4));
+    expect(eff.attackPct).toBeCloseTo(0.25);
+    expect(eff.maxHpPct).toBeCloseTo(0.12);
+    expect(eff.extraHit).toBe(true);
+    expect(eff.statBonus.reroll).toBe(1);
+  });
+
+  it("6 pieces grant +45% attack / +30% maxHp and a no-miss capstone", () => {
+    const eff = computeSetEffects(equipSignature(6));
+    expect(eff.attackPct).toBeCloseTo(0.45);
+    expect(eff.maxHpPct).toBeCloseTo(0.3);
+    // Capstone pushes a no-miss dice modifier covering all faces.
+    const noMiss = eff.diceModifiers.find((m) => m.faces.length === 6 && m.effect.isMiss === false);
+    expect(noMiss).toBeDefined();
+  });
+});
+
+describe("single-set focus capstone", () => {
+  it("6 pieces of one named set grant +15% attack", () => {
+    const eff = computeSetEffects(equipSet("vampire", 6));
+    expect(eff.attackPct).toBeCloseTo(0.15);
+  });
+});
+
 describe("set bonuses", () => {
   it("gambler unlocks reroll / 1→2 / six-double at 2/4/6", () => {
     expect(computeSetEffects(equipSet("gambler", 2)).statBonus.reroll).toBe(1);

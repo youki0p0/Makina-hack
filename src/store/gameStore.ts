@@ -608,8 +608,13 @@ export const useGameStore = create<GameState>((set, get) => {
     buffs: ActiveBuff[] = [],
   ): ComputedStats {
     const base = computeStats(player, equipped, buffs, passiveBonus());
+    // 固有共鳴/セット集中の最終倍率(★スケール後に乗算)。装備IDからLIVE計算され
+    // セーブ非互換にならない。
+    const setEff = computeSetEffects(equipped, get().classId);
     // Job balance: per-class attack multiplier (centralized in jobBalance.ts).
-    return { ...base, attack: Math.round(base.attack * jobAttackMult(get().classId)) };
+    const attack = Math.round(base.attack * jobAttackMult(get().classId) * (1 + setEff.attackPct));
+    const maxHp = Math.round(base.maxHp * (1 + setEff.maxHpPct));
+    return { ...base, attack, maxHp };
   }
 
   /** Apply a loaded save into state (used by hydrate and import). */
@@ -868,9 +873,11 @@ export const useGameStore = create<GameState>((set, get) => {
         bonusHeal += Math.round(totalEnemyDamage * setEff.lifestealHighFacePct);
       }
       // Executioner 6pc: execute non-boss enemies at ≤15% HP.
+      // executeImmune の敵(ボス/最終ボス/一部章ボス)は即死しない。
       if (
         setEff.executePct > 0 &&
         !enemy.isBoss &&
+        !enemy.executeImmune &&
         attackHp > 0 &&
         enemy.hp <= enemy.maxHp * setEff.executePct
       ) {
