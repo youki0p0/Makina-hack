@@ -1351,10 +1351,12 @@ export const useGameStore = create<GameState>((set, get) => {
 
     setStartFloor: (floor: number) => {
       const state = get();
-      // Only floor 1, or one floor past a reached 50-mark checkpoint (51,101…).
+      // Only floor 1, one floor past a reached 50-mark checkpoint (51,101…), or
+      // the 1000F final boss once it has been reached (retry the last battle).
       const allowed =
         floor === 1 ||
-        (floor > 1 && (floor - 1) % 50 === 0 && floor - 1 <= state.checkpoint);
+        (floor > 1 && (floor - 1) % 50 === 0 && floor - 1 <= state.checkpoint) ||
+        (floor === FINAL_FLOOR && state.progress.highestFloorReached >= FINAL_FLOOR);
       if (!allowed) return;
       // Start a chosen run at full HP.
       const maxHp = currentStats(state.player, state.equipped).maxHp;
@@ -2068,6 +2070,14 @@ export const useGameStore = create<GameState>((set, get) => {
       startFloorPref = checkpoint + 1;
       finalLog = pushLogs(finalLog, [
         { text: `💾 セーブポイント到達！(${checkpoint}階クリア) 以降の敗北は${checkpoint + 1}階から再開`, tone: "good" },
+      ]);
+    }
+    // 最終決戦のセーブポイント: 1000階(ラスボス)に到達したら、敗北しても1000階から
+    // 再挑戦できるよう復帰アンカーを1000に固定する。
+    if (newFloor === FINAL_FLOOR) {
+      startFloorPref = FINAL_FLOOR;
+      finalLog = pushLogs(finalLog, [
+        { text: `💾 最終セーブポイント！ ラスボス 機神デウス＝エクス＝マキナ。敗北しても1000階から再挑戦できる。`, tone: "good" },
       ]);
     }
     let discoveredItems = state.progress.discoveredItems;

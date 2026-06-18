@@ -1,4 +1,5 @@
 import { applyEnemyModifier, enemyModTierForFloor } from "@/data/modifiers";
+import { FINAL_FLOOR } from "@/data/worlds";
 import type { EnemyScale } from "@/data/difficulty";
 import type { Enemy, EnemyAbility, EnemyTemplate } from "@/types/game";
 
@@ -135,6 +136,28 @@ export const BOSS_TEMPLATES: EnemyTemplate[] = BOSS_DEFS.map(
   }),
 );
 
+/**
+ * 1000F の固定ラスボス。「ダイス×機械神」DEUS EX MACHINA。サイクルするボスとは別枠で、
+ * 最深部だけに出現する固有キャラクター。防御無視の一撃を放つ最終存在。
+ */
+export const FINAL_BOSS: EnemyTemplate = {
+  id: "deus",
+  name: "機神デウス＝エクス＝マキナ",
+  emoji: "🎲",
+  baseHp: 200,
+  baseAttack: 18,
+  baseDefense: 10,
+  baseExp: 50,
+  baseGold: 60,
+  dropRate: 1,
+  isBoss: true,
+  ability: "guardBreak",
+  desc: "全ての出目を支配する機械の神。ダイスと歯車の化身たる最終存在。",
+};
+
+/** All bosses for the bestiary (cycling bosses + the fixed final boss). */
+export const BESTIARY_BOSSES: readonly EnemyTemplate[] = [...BOSS_TEMPLATES, FINAL_BOSS];
+
 /** Backwards-compatible alias to the first boss. */
 export const BOSS_TEMPLATE: EnemyTemplate = BOSS_TEMPLATES[0];
 
@@ -174,7 +197,8 @@ const DEFAULT_SCALE: EnemyScale = {
 export function generateEnemy(floor: number, scale: EnemyScale = DEFAULT_SCALE): Enemy {
   const rank = bossRank(floor);
   const isBossFloor = rank > 0;
-  const template = isBossFloor ? pickBoss(floor) : pickNormalTemplate(floor);
+  const isFinalBoss = floor === FINAL_FLOOR;
+  const template = isFinalBoss ? FINAL_BOSS : isBossFloor ? pickBoss(floor) : pickNormalTemplate(floor);
 
   const tier = Math.floor(floor / 10);
   const hpScale = 1 + floor * scale.hpPerFloor;
@@ -208,7 +232,7 @@ export function generateEnemy(floor: number, scale: EnemyScale = DEFAULT_SCALE):
   const enemy: Enemy = {
     id: `${template.id}_${floor}`,
     templateId: template.id,
-    name: isBossFloor ? `${template.name} Lv${tier}` : template.name,
+    name: isFinalBoss ? template.name : isBossFloor ? `${template.name} Lv${tier}` : template.name,
     emoji: template.emoji,
     maxHp,
     hp: maxHp,

@@ -22,7 +22,7 @@ window.AudioContext = FakeCtx;
 afterAll(() => { /* noop */ });
 
 test("every jukebox theme renders a full loop without error and makes sound", () => {
-  const STEPS = 16 * 32; // one full 32-bar loop
+  const STEPS = 16 * 64; // cover the longest theme loop (final = 48 bars) with margin
   for (const t of MUSIC_TRACKS) {
     oscCount = 0;
     expect(() => __tickThemeForTest(t.theme, STEPS)).not.toThrow();

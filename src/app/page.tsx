@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import SoundToggle from "@/components/SoundToggle";
 import PixelGlyph from "@/components/PixelGlyph";
 import { DIFFICULTY_LIST } from "@/data/difficulty";
+import { FINAL_FLOOR } from "@/data/worlds";
 import { isFeatureUnlocked, FEATURE_UNLOCKS } from "@/data/unlocks";
 import { getDailyBonus } from "@/lib/daily";
 import { useGameStore } from "@/store/gameStore";
@@ -38,6 +39,12 @@ export default function TitlePage() {
   // checkpoint (51, 101, …) so you resume after the cleared boss.
   const startFloors: number[] = [1];
   for (let f = 50; f <= checkpoint; f += 50) startFloors.push(f + 1);
+  // Once the 1000F final boss has been reached, offer it directly so you can
+  // retry the last battle from its save point.
+  if (progress.highestFloorReached >= FINAL_FLOOR && !startFloors.includes(FINAL_FLOOR)) {
+    startFloors.push(FINAL_FLOOR);
+    startFloors.sort((a, b) => a - b);
+  }
 
   const hasProgress = hydrated && (floor > 1 || player.level > 1);
   const artifactsUnlocked = isFeatureUnlocked("artifacts", progress);
@@ -84,7 +91,11 @@ export default function TitlePage() {
               >
                 {startFloors.map((f) => (
                   <option key={f} value={f}>
-                    {f === 1 ? "1階から（最初）" : `${f}階から（セーブポイント）`}{/* 51,101… */}
+                    {f === 1
+                      ? "1階から（最初）"
+                      : f === FINAL_FLOOR
+                        ? "1000階 ラスボスから（再挑戦）"
+                        : `${f}階から（セーブポイント）`}
                   </option>
                 ))}
               </select>

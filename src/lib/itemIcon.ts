@@ -732,8 +732,36 @@ function drawCreature(g: Grid, kind: CreatureKind, p: CreaturePalette, opt?: Cre
   }
 }
 
+/** 機神デウス＝エクス＝マキナ: a flashy dice × machine-god boss sprite. */
+function drawDeus(g: Grid): void {
+  const gold = "#fbbf24";
+  const goldL = "#fde68a";
+  const black = "#1c1917";
+  const cyan = "#22d3ee";
+  const red = "#f87171";
+  // radiant gear ring + teeth
+  ring(g, 8, 8, 7, gold);
+  for (const [x, y] of [[8, 0], [8, 15], [0, 8], [15, 8], [2, 2], [13, 2], [2, 13], [13, 13], [5, 0], [11, 0]] as const) set(g, x, y, gold);
+  // dark machine core
+  disc(g, 8, 8, 6, black);
+  ring(g, 8, 8, 6, goldL);
+  // central golden die (face "5") — the dice god's core
+  rect(g, 5, 5, 11, 11, gold);
+  rect(g, 6, 6, 10, 10, black);
+  for (const [x, y] of [[7, 7], [9, 7], [7, 9], [9, 9]] as const) set(g, x, y, goldL); // 4 corner pips
+  set(g, 8, 8, red); // burning central pip (eye)
+  // cyan energy accents at the cardinal points
+  set(g, 8, 3, cyan); set(g, 3, 8, cyan); set(g, 13, 8, cyan); set(g, 8, 13, cyan);
+  // glowing top "crown" horns of gold
+  set(g, 4, 1, goldL); set(g, 12, 1, goldL);
+}
+
 function buildEnemyGrid(spec: EnemyIconSpec): Grid {
   const g = blank();
+  if (spec.templateId === "deus") {
+    drawDeus(g);
+    return g;
+  }
   const art = ENEMY_ART[spec.templateId] ?? { kind: "beast", pal: "furGray" };
   drawCreature(g, art.kind, CP[art.pal], art.opt);
   // Bosses wear a small golden crown.
