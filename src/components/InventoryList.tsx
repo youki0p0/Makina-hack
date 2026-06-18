@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { canEquip, CLASSES } from "@/data/classes";
 import { SCRAP_VALUE } from "@/lib/loot";
 import { itemKey, rarityLabel, rarityPipString, rarityRank, rarityStyle, slotLabel } from "@/lib/ui";
@@ -89,9 +89,13 @@ export default function InventoryList() {
   const selectedItem = selected !== null ? inventory[selected] : null;
 
   // Distinct sets the player currently owns (for the set filter dropdown).
-  const ownedSets = Array.from(
-    new Set(inventory.map((it) => it.setId).filter((s): s is string => Boolean(s))),
-  ).sort();
+  const ownedSets = useMemo(
+    () =>
+      Array.from(
+        new Set(inventory.map((it) => it.setId).filter((s): s is string => Boolean(s))),
+      ).sort(),
+    [inventory],
+  );
 
   // "Stronger than what's equipped in this slot" → show a ▲ to speed decisions.
   const itemScore = (it: Equipment) =>
@@ -104,17 +108,31 @@ export default function InventoryList() {
   };
 
   // Keep original indices for equip/scrap while filtering+sorting for display.
-  const rows = inventory
-    .map((item, index) => ({ item, index }))
-    .filter((r) => filter === "all" || r.item.slot === filter)
-    .filter((r) => setKeyFilter === "all" || r.item.setId === setKeyFilter)
-    .sort((a, b) => {
-      const aFav = favorites.includes(itemKey(a.item));
-      const bFav = favorites.includes(itemKey(b.item));
-      if (aFav !== bFav) return aFav ? -1 : 1;
-      if (sort === "name") return a.item.name.localeCompare(b.item.name, "ja");
-      return sortValue(b.item, sort) - sortValue(a.item, sort);
-    });
+  // Memoized so re-renders (opening the detail modal, auto-battle ticks, etc.)
+  // don't re-sort the whole (up to 150-item) inventory every time.
+  const rows = useMemo(
+    () =>
+      inventory
+        .map((item, index) => ({ item, index }))
+        .filter((r) => filter === "all" || r.item.slot === filter)
+        .filter((r) => setKeyFilter === "all" || r.item.setId === setKeyFilter)
+        .sort((a, b) => {
+          const aFav = favorites.includes(itemKey(a.item));
+          const bFav = favorites.includes(itemKey(b.item));
+          if (aFav !== bFav) return aFav ? -1 : 1;
+          if (sort === "name") return a.item.name.localeCompare(b.item.name, "ja");
+          return sortValue(b.item, sort) - sortValue(a.item, sort);
+        }),
+    [inventory, filter, setKeyFilter, sort, favorites],
+  );
+
+  // 深層では所持品が150件になり、各行がcanvas生成のアイコンを持つため、全件を一度に
+  // 描画/再描画すると重い。表示件数を絞り「もっと見る」で増やして主スレッド負荷を抑える。
+  const PAGE = 50;
+  const [visible, setVisible] = useState(PAGE);
+  useEffect(() => {
+    setVisible(PAGE);
+  }, [filter, setKeyFilter, sort]);
 
   return (
     <div className="space-y-2">
@@ -226,7 +244,7 @@ export default function InventoryList() {
         </p>
       ) : (
         <div className="space-y-2">
-          {rows.map(({ item, index }) => {
+          {rows.slice(0, visible).map(({ item, index }) => {
             const fav = favorites.includes(itemKey(item));
             return (
               <div
@@ -271,6 +289,14 @@ export default function InventoryList() {
               </div>
             );
           })}
+          {rows.length > visible && (
+            <button
+              onClick={() => setVisible((v) => v + PAGE)}
+              className="h-10 w-full rounded-xl bg-white/10 text-xs font-bold text-gray-200 active:scale-95"
+            >
+              もっと見る（残り {rows.length - visible} 件）
+            </button>
+          )}
         </div>
       )}
 

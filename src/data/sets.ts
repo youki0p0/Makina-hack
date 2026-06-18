@@ -291,7 +291,9 @@ export function proceduralSetDef(n: number): SetDef {
 // getSetDef runs several times per turn via computeSetEffects. Cache by key so the
 // build happens once per unique set (#perf).
 const setDefCache = new Map<string, SetDef | null>();
-const SETDEF_CACHE_MAX = 128;
+// Deep Endless runs touch many gset<n> keys; a larger cache avoids LRU thrash
+// (rebuilding the same procedural set repeatedly) when re-rendering deep inventories.
+const SETDEF_CACHE_MAX = 256;
 
 /** Resolve any set key (fixed or `gset<n>`) into its definition. */
 export function getSetDef(key: string): SetDef | null {
@@ -340,7 +342,9 @@ export function availableSetKeys(floor: number): string[] {
     warmonger: 300,
   };
   for (const s of SET_DEFS) if (floor >= (namedFloor[s.key] ?? 1)) keys.push(s.key);
-  for (let n = 0; proceduralSetFloor(n) <= floor; n++) keys.push(`gset${n}`);
+  // proceduralSetFloor(n) = 150 + n*150 ≤ floor  ⇒  n ≤ (floor-150)/150 (closed form).
+  const maxN = Math.floor((floor - 150) / 150);
+  for (let n = 0; n <= maxN; n++) keys.push(`gset${n}`);
   return keys;
 }
 
