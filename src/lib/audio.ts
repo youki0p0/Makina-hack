@@ -339,6 +339,9 @@ export function slotSfx(kind: SlotSfx): void {
 
 const BAR = 16;
 const LOOP_BARS = 32;
+// The final-boss theme runs a longer, self-contained loop with its own dynamics
+// (build → climax → quiet breakdown → rebuild → grand climax).
+const FINAL_LOOP_BARS = 48;
 const DETUNE = 1.006; // ~+10 cent chorus for the pad
 
 interface Chord {
@@ -629,7 +632,8 @@ function bgmTick(): void {
     else if (def.casino) casinoTick();
     else dungeonTick(); // dungeon / boss (variants inside)
   }
-  bgmStep = (bgmStep + 1) % (BAR * LOOP_BARS);
+  const loopBars = bgmTheme === "final" ? FINAL_LOOP_BARS : LOOP_BARS;
+  bgmStep = (bgmStep + 1) % (BAR * loopBars);
 }
 
 // ===== Per-world renderer (場所コンセプト曲) =====
@@ -749,98 +753,115 @@ function worldTick(cfg: WorldMusic): void {
 
 // ===== Final boss theme (1000F: 機神デウス＝エクス＝マキナ) =====
 // 最終決戦はメインテーマ(メニュー＝dungeonの PROG / LEAD_PHRASE)の荘厳な再臨。
-// 同じメロディーラインを踏襲しつつ、テンポは速いまま、壮大で強そうな効果を満載に:
-// 重いブラスのパワーコード、フルトライアドの合唱、深いサブベース、ティンパニ、
-// オーケストラ・ヒット、オクターブ重ねの主旋律、シンバル/riser。
+// 48小節の長いループに起伏を付ける: 導入ビルド → 全効果のクライマックス →
+// 一旦静かなブレイク → そこからフェードで音がどんどん乗る再構築 → 大サビ。
+// テンポはダイスラッシュ並みに疾走、効果(ブラス/合唱/サブ/ティンパニ/ヒット)は満載。
 const FINAL_STEP_MS = 84; // ダイスラッシュ(idol)と同じ突っ走るテンポ(≈178 BPM, 16分)
+
+/** Arrangement dynamics for the final theme: intensity 0..1 + calm/build flags. */
+function finalPhase(bar: number): { lv: number; calm: boolean; build: boolean } {
+  const b = bar % FINAL_LOOP_BARS; // 0..47
+  if (b < 4) return { lv: 0.35 + b * 0.16, calm: false, build: true }; // 導入ビルド 0.35→0.83
+  if (b < 16) return { lv: 1, calm: false, build: false }; // クライマックス
+  if (b < 20) return { lv: 0.25, calm: true, build: false }; // 静かなブレイク
+  if (b < 32) return { lv: 0.3 + ((b - 20) / 12) * 0.7, calm: false, build: true }; // 再構築フェード 0.3→1
+  return { lv: 1, calm: false, build: false }; // 大サビ(32–47)
+}
 
 function finalTick(): void {
   if (muted) return;
   const step = bgmStep;
   const bar = Math.floor(step / BAR);
   const inBar = step % BAR;
-  const mode = sectionOf(bar);
   const chord = PROG[bar % PROG.length]; // ★ メインテーマの進行を踏襲
-  const secBar = bar % 8;
-  const full = mode === "B";
-  const heroic = mode !== "A"; // 主旋律/ブラスは短いイントロ後から
+  const { lv, calm, build } = finalPhase(bar);
+  const climax = lv >= 0.99 && !calm;
+  const heroic = lv > 0.5 && !calm;
 
-  // ---- Drums: 重いキック(4つ打ち) + バックビート・スネア + ride ----
-  if (inBar % 4 === 0) {
-    noise(0.06, 0.24);
-    slideTone(120, 40, 0.12, "sine", 0.28); // big kick
+  // ---- Drums: フル時は重いキック(4つ打ち)+バックビート+ride。静寂時は心音だけ ----
+  if (!calm && lv > 0.4) {
+    if (inBar % 4 === 0) {
+      noise(0.06, 0.24 * lv);
+      slideTone(120, 40, 0.12, "sine", 0.28 * lv);
+    }
+    if (inBar % 2 === 1) noise(0.02, (climax ? 0.09 : 0.05) * lv);
+    if (inBar === 4 || inBar === 12) {
+      noise(0.16, 0.2 * lv);
+      tone(190, 0.12, "triangle", 0.14 * lv);
+    }
   }
-  if (heroic && inBar % 2 === 1) noise(0.02, full ? 0.09 : 0.06); // ride/hat
-  if (inBar === 4 || inBar === 12) {
-    noise(0.16, 0.2);
-    tone(190, 0.12, "triangle", 0.14); // snare body
-  }
-  // ティンパニのフィル(サビ直前の小節)
-  if (mode === "A2" && secBar === 7 && inBar >= 8) {
-    const toms = [110, 98, 82, 73];
-    const f = toms[(inBar - 8) % 4];
-    slideTone(f * 1.5, f, 0.14, "sine", 0.2);
+  if (calm && inBar === 0) {
+    noise(0.03, 0.05);
+    slideTone(90, 40, 0.12, "sine", 0.1); // 静かな鼓動
   }
 
-  // ---- Bass: 深いサブ + サウのオクターブ駆動(力強さ) ----
-  if (inBar % 2 === 0) {
+  // ---- Bass: サウのオクターブ駆動 + 深いサブ(静寂時は柔らかく長く) ----
+  if (lv > 0.25 && inBar % 2 === 0) {
     const bf = inBar % 4 === 0 ? chord.root : chord.root * 2;
-    tone(bf, 0.14, "sawtooth", 0.2);
-    tone(bf, 0.02, "square", 0.12);
+    tone(bf, 0.14, "sawtooth", (calm ? 0.07 : 0.2) * Math.max(0.4, lv));
   }
-  if (inBar === 0) tone(chord.root * 0.5, 0.6, "sine", 0.16); // sub octave
+  if (inBar === 0) tone(chord.root * 0.5, calm ? 1.2 : 0.6, "sine", calm ? 0.1 : 0.16);
 
-  // ---- ブラスのパワーコード(デチューンsaw root+5度+oct、左右に広く、荘厳) ----
-  if (inBar === 0 || (full && inBar === 8)) {
-    const v = full ? 0.1 : 0.08;
+  // ---- ブラスのパワーコード(デチューンsaw root+5度+oct、左右に広く) ----
+  if (!calm && (inBar === 0 || (climax && inBar === 8))) {
+    const v = (climax ? 0.1 : 0.07) * lv;
     voice(chord.root, 0.5, "sawtooth", v, 0, -0.55, 0.22);
     voice(chord.root * 1.007, 0.5, "sawtooth", v, 0, 0.55, 0.22);
     voice(chord.fifth, 0.5, "sawtooth", v * 0.9, 0, 0.3, 0.22);
     voice(chord.root * 2, 0.5, "sawtooth", v * 0.7, 0, -0.3, 0.22);
   }
 
-  // ---- 合唱: フルトライアド + 高オクターブを大きな残響で(壮大さ) ----
+  // ---- 合唱: 常に鳴る壮大な土台。静寂時は剥き出しで前に出る ----
   if (inBar === 0) {
-    voice(chord.arp[0], 1.8, "sine", 0.05, 0, -0.5, 0.5);
-    voice(chord.arp[1], 1.8, "sine", 0.05, 0.04, 0.5, 0.5);
-    voice(chord.fifth * 2, 1.8, "sine", 0.035, 0.08, 0, 0.5);
+    const cv = calm ? 0.06 : 0.05 * Math.max(0.5, lv);
+    const dur = calm ? 2.4 : 1.8;
+    voice(chord.arp[0], dur, "sine", cv, 0, -0.5, 0.5);
+    voice(chord.arp[1], dur, "sine", cv, 0.04, 0.5, 0.5);
+    voice(chord.fifth * 2, dur, "sine", cv * 0.7, 0.08, 0, 0.5);
   }
 
-  // ---- 16分の高速アルペジオ(疾走感) ----
+  // ---- 16分の高速アルペジオ(盛り上がり時のみ) ----
   if (heroic) {
-    const shape = ARP_SHAPES[secBar % ARP_SHAPES.length];
+    const shape = ARP_SHAPES[(bar % 8) % ARP_SHAPES.length];
     const note = chord.arp[shape[step & 3]];
-    if (note) tone(note, 0.1, "square", full ? 0.07 : 0.05);
+    if (note) tone(note, 0.1, "square", (climax ? 0.07 : 0.05) * lv);
   }
 
-  // ---- 高域のオーケストラ・シマー(サビ) ----
-  if (full && inBar % 2 === 0) {
+  // ---- 高域シマー: クライマックスは密に、静寂時は疎で綺麗に ----
+  if ((climax && inBar % 2 === 0) || (calm && inBar % 4 === 0)) {
     const note = chord.arp[(step >> 1) % chord.arp.length] * 2;
     const pan = (step >> 1) % 2 === 0 ? -0.6 : 0.6;
-    voice(note, 0.3, "triangle", 0.045, 0, pan, 0.5);
+    voice(note, calm ? 0.5 : 0.3, calm ? "sine" : "triangle", calm ? 0.05 : 0.045, 0, pan, 0.5);
   }
 
-  // ---- 主旋律: メニューのメロディーラインを再臨(ブラス＋オクターブ重ね＋エコー) ----
-  if (heroic) {
-    const note = LEAD_PHRASE[(bar % 4) * BAR + inBar];
-    if (note) {
-      echoTone(note, 0.28, "sawtooth", 0.13, 0, 2, 0.11, 0.45); // brassy lead
-      echoTone(note * 2, 0.24, "square", 0.06, 0, 1, 0.11, 0.45); // octave上のきらめき
-      voice(note, 0.3, "sine", 0.05, 0, 0, 0.4); // 滑らかな重ね
+  // ---- 主旋律(メインテーマ): 強度で音色を変える。静寂=柔らかいサイン、クライマックス=ブラス+オクターブ ----
+  const note = LEAD_PHRASE[(bar % 4) * BAR + inBar];
+  if (note) {
+    if (calm) {
+      voice(note, 0.5, "sine", 0.07, 0, 0, 0.5); // 静かな主旋律
+    } else if (climax) {
+      echoTone(note, 0.28, "sawtooth", 0.13, 0, 2, 0.11, 0.45);
+      echoTone(note * 2, 0.24, "square", 0.06, 0, 1, 0.11, 0.45);
+      voice(note, 0.3, "sine", 0.05, 0, 0, 0.4);
+    } else if (heroic || build) {
+      echoTone(note, 0.26, "sawtooth", 0.1 * Math.max(0.5, lv), 0, 1, 0.11, 0.4);
     }
   }
 
-  // ---- オーケストラ・ヒット + シンバル(サビ頭) ----
-  if (full && inBar === 0) {
-    noise(0.34, 0.2);
-    tone(chord.root, 0.3, "sawtooth", 0.12);
-    tone(chord.fifth, 0.3, "sawtooth", 0.09);
+  // ---- 再構築/導入の riser: クライマックスに近づくほど強く駆け上がる ----
+  if (build) {
+    const b = bar % FINAL_LOOP_BARS;
+    const toClimax = b < 4 ? (b + inBar / 16) / 4 : (b - 20 + inBar / 16) / 12;
+    if (inBar % 2 === 0) slideTone(300, 1200, 0.12, "sawtooth", 0.02 + toClimax * 0.05);
+    if (inBar % 4 === 2) noise(0.04, 0.03 + toClimax * 0.18);
   }
-  // サビへ駆け上がる riser
-  if (mode === "A2" && secBar === 7) {
-    const b = inBar / 16;
-    slideTone(300, 1500, 0.1, "sawtooth", 0.04 + b * 0.07);
-    noise(0.04, 0.05 + b * 0.22);
+
+  // ---- オーケストラ・ヒット + シンバル(各クライマックス突入の頭) ----
+  const lb = bar % FINAL_LOOP_BARS;
+  if (!calm && (lb === 4 || lb === 32) && inBar === 0) {
+    noise(0.4, 0.22);
+    tone(chord.root, 0.4, "sawtooth", 0.13);
+    tone(chord.fifth, 0.4, "sawtooth", 0.1);
   }
 }
 
@@ -1257,7 +1278,7 @@ const WORLD_TRACKS: MusicTrack[] = WORLD_KEYS.map((key, i) => {
 export const MUSIC_TRACKS: MusicTrack[] = [
   { id: "dungeon", name: "迷宮 / 拠点", desc: "メニューで流れる A-minor のダンジョンループ", theme: "dungeon" },
   ...WORLD_TRACKS,
-  { id: "final", name: "機神デウス＝エクス＝マキナ (1000階)", desc: "メインテーマが荘厳に再臨する最終決戦曲。ブラス・合唱・ティンパニ満載", theme: "final" },
+  { id: "final", name: "機神デウス＝エクス＝マキナ (1000階)", desc: "メインテーマが荘厳に再臨する長尺の最終決戦曲。盛り上がり→静寂→再構築の大きな起伏", theme: "final" },
   { id: "boss", name: "大ボス戦", desc: "速く緊迫した大ボス階のテーマ", theme: "boss" },
   { id: "casino", name: "カジノ", desc: "落ち着いた煌びやかなラウンジ", theme: "casino" },
   { id: "forge", name: "鍛冶屋", desc: "重厚な D-ドリアン。金床のクランク", theme: "forge" },
