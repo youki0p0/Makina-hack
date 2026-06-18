@@ -159,6 +159,8 @@ export interface Equipment {
   forgeLevel?: number;
   /** Consecutive forge failures (pity counter). */
   forgeStreak?: number;
+  /** 固有装備: 手作りの名前付きレジェ/エピック。6部位揃えると固有共鳴が発動する。 */
+  signature?: boolean;
 }
 
 export type EquippedItems = {
@@ -288,6 +290,15 @@ export interface Enemy {
   bossTurns?: number;
   /** Infinite ★ modifier tier (0 = none). Boosts HP/attack/drops. */
   modTier: number;
+  // ===== Matchup traits (相性) — ビルド多様化のための耐性フラグ(既定 false) =====
+  /** 吸血無効: 与ダメージによる回復が発生しない(純サステイン対策)。 */
+  lifestealImmune?: boolean;
+  /** 多段耐性: 2ヒット目以降のダメージが40%に減衰(手数ビルド対策)。 */
+  multiHitResist?: boolean;
+  /** 状態異常耐性: 毒/燃焼などの状態異常を付与できない(DoT対策)。 */
+  statusResist?: boolean;
+  /** 即死無効: executePct による即死を受けない(ボス/最終ボスは常時)。 */
+  executeImmune?: boolean;
 }
 
 // ===== Consumables =====

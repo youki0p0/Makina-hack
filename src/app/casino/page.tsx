@@ -14,6 +14,7 @@ import {
   DAIPAN_LIMIT,
   MACHINE_COUNT,
   SET_WEAPON_COIN,
+  SIGNATURE_WEAPON_COIN,
   SOULS_COIN,
   HIT_WINDOW_MS,
   coinBuyCost,
@@ -806,6 +807,7 @@ function CoinShop() {
   const souls = useGameStore((s) => s.souls);
   const highest = useGameStore((s) => s.progress.highestFloorReached);
   const buyWeapon = useGameStore((s) => s.coinBuySetWeapon);
+  const buySignature = useGameStore((s) => s.coinBuySignatureWeapon);
   const buySouls = useGameStore((s) => s.coinBuySouls);
 
   const keys = useMemo(
@@ -816,12 +818,20 @@ function CoinShop() {
   const [msg, setMsg] = useState<string | null>(null);
 
   const canWeapon = coins >= SET_WEAPON_COIN;
+  const canSignature = coins >= SIGNATURE_WEAPON_COIN;
   const canSoul = coins >= SOULS_COIN;
 
   const doWeapon = () => {
     const w = buyWeapon(sel);
     if (w) {
       setMsg(`⚔️ ${w.name} を交換！`);
+      setTimeout(() => setMsg(null), 2500);
+    }
+  };
+  const doSignature = () => {
+    const w = buySignature();
+    if (w) {
+      setMsg(`🌟 固有武器「${w.name}」を交換！`);
       setTimeout(() => setMsg(null), 2500);
     }
   };
@@ -888,6 +898,23 @@ function CoinShop() {
           className="mt-2 h-12 w-full rounded-xl bg-fuchsia-600 text-sm font-extrabold text-white active:scale-95 disabled:opacity-40"
         >
           交換（🪙{fmt(SET_WEAPON_COIN)}）
+        </button>
+      </div>
+
+      {/* 固有(signature)武器 exchange — ランダム1種 */}
+      <div className="rounded-2xl border border-amber-400/40 bg-amber-400/5 p-3">
+        <p className="flex items-center gap-1 text-sm font-bold text-amber-200">
+          <PixelGlyph kind="drop" size={14} /> 固有武器と交換
+        </p>
+        <p className="mt-0.5 text-[10px] text-gray-400">
+          ダイス目を書き換える固有(銘入り)武器をランダムに1つ入手。
+        </p>
+        <button
+          onClick={doSignature}
+          disabled={!canSignature}
+          className="mt-2 h-12 w-full rounded-xl bg-amber-500 text-sm font-extrabold text-black active:scale-95 disabled:opacity-40"
+        >
+          交換（🪙{fmt(SIGNATURE_WEAPON_COIN)}）
         </button>
       </div>
 

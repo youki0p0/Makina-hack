@@ -47,6 +47,16 @@ export default function EquipmentPanel() {
         </div>
       )}
 
+      {(setEff.attackPct > 0 || setEff.maxHpPct > 0) && (
+        <div className="rounded-xl border border-cyan-400/50 bg-cyan-400/10 p-2">
+          <p className="text-[10px] font-bold text-cyan-200">固有共鳴 / セット集中</p>
+          <p className="mt-1 text-[10px] text-cyan-100">
+            {setEff.attackPct > 0 && <span>攻撃 +{Math.round(setEff.attackPct * 100)}% </span>}
+            {setEff.maxHpPct > 0 && <span>最大HP +{Math.round(setEff.maxHpPct * 100)}%</span>}
+          </p>
+        </div>
+      )}
+
       {setEff.synergies.length > 0 && (
         <div className="rounded-xl border border-amber-400/50 bg-amber-400/10 p-2">
           <p className="flex items-center gap-1 text-[10px] font-bold text-amber-200"><PixelGlyph kind="stun" size={12} /> シナジー発動</p>

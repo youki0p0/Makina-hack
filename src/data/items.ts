@@ -80,12 +80,13 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     rarity: "epic",
     slot: "weapon",
     equipTag: "light",
-    attack: 5,
+    signature: true,
+    attack: 8,
     defense: 0,
     maxHp: 0,
     rerollModifier: 0,
     minFloor: 6,
-    description: "攻撃力+5。4以上で与ダメージの25%回復。",
+    description: "【固有】攻撃力+8。4以上で与ダメージの25%回復。",
     diceModifiers: [
       {
         faces: [4, 5, 6],
@@ -127,18 +128,20 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     rarity: "epic",
     slot: "weapon",
     equipTag: "light",
-    attack: 3,
+    signature: true,
+    attack: 5,
     defense: 0,
     maxHp: 0,
     rerollModifier: 1,
-    description: "攻撃力+3、リロール+1。2以上で毒を付与(継続ダメージ・累積)。",
+    description: "【固有】攻撃力+5、リロール+1。2以上で強毒を付与(継続ダメージ・累積)。",
     diceModifiers: [
       {
         faces: [2, 3, 4, 5, 6],
         effect: {
-          statusEffect: { kind: "poison", damagePerTurnMultiplier: 0.2, turns: 4 },
+          // DoT延命: 継続ダメージ倍率を 0.2→0.3 に強化。
+          statusEffect: { kind: "poison", damagePerTurnMultiplier: 0.3, turns: 4 },
         },
-        description: "2以上: 毒を付与 (4T・累積)",
+        description: "2以上: 強毒を付与 (4T・累積)",
       },
     ],
   },
@@ -148,18 +151,20 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     rarity: "legendary",
     slot: "weapon",
     equipTag: "heavy",
-    attack: 6,
+    signature: true,
+    attack: 9,
     defense: 0,
     maxHp: 0,
     rerollModifier: 0,
     minFloor: 8,
-    description: "攻撃力+6。4以上で燃焼(強力な継続ダメージ)を付与。",
+    description: "【固有】攻撃力+9。4以上で燃焼(強力な継続ダメージ)を付与。",
     diceModifiers: [
       {
         faces: [4, 5, 6],
         effect: {
           kind: "fireball",
-          statusEffect: { kind: "burn", damagePerTurnMultiplier: 0.45, turns: 3 },
+          // DoT延命: 燃焼倍率を 0.45→0.55 に強化。
+          statusEffect: { kind: "burn", damagePerTurnMultiplier: 0.55, turns: 3 },
         },
         label: "業火",
         description: "4以上: 燃焼を付与 (3T)",
@@ -172,11 +177,12 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     rarity: "epic",
     slot: "weapon",
     equipTag: "heavy",
-    attack: 5,
+    signature: true,
+    attack: 8,
     defense: 0,
     maxHp: 0,
     rerollModifier: 0,
-    description: "攻撃力+5。6で敵をスタン(1ターン行動不能)。",
+    description: "【固有】攻撃力+8。6で敵をスタン(1ターン行動不能)。",
     diceModifiers: [
       {
         faces: [6],
@@ -192,11 +198,12 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     rarity: "rare",
     slot: "weapon",
     equipTag: "magic",
-    attack: 3,
+    signature: true,
+    attack: 5,
     defense: 0,
     maxHp: 0,
     rerollModifier: 0,
-    description: "攻撃力+3。2〜3で敵を弱体化(攻撃ダウン)。",
+    description: "【固有】攻撃力+5。2〜3で敵を弱体化(攻撃ダウン)。",
     diceModifiers: [
       {
         faces: [2, 3],
@@ -246,12 +253,13 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     rarity: "epic",
     slot: "armor",
     equipTag: "heavy",
+    signature: true,
     attack: 0,
-    defense: 9,
-    maxHp: 10,
+    defense: 13,
+    maxHp: 22,
     rerollModifier: -1,
     minFloor: 7,
-    description: "防御+9、リロール-1。1〜3でもガード効果。",
+    description: "【固有】防御+13 / HP+22、リロール-1。1〜3でもガード効果。",
     diceModifiers: [
       {
         faces: [1, 2, 3],
@@ -259,6 +267,53 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
         description: "1〜3: ガード+10",
       },
     ],
+  },
+
+  // ===== signature helm / gloves / boots (固有6部位を成立させるための名前付き防具) =====
+  {
+    id: "sentinel_helm",
+    name: "番人の兜",
+    rarity: "epic",
+    slot: "helm",
+    equipTag: "heavy",
+    signature: true,
+    attack: 0,
+    defense: 8,
+    maxHp: 22,
+    rerollModifier: 0,
+    minFloor: 12,
+    description: "【固有】防+8 / HP+22。揺るがぬ守りの兜。",
+    diceModifiers: [],
+  },
+  {
+    id: "duelist_gloves",
+    name: "決闘者の篭手",
+    rarity: "epic",
+    slot: "gloves",
+    equipTag: "light",
+    signature: true,
+    attack: 6,
+    defense: 4,
+    maxHp: 0,
+    rerollModifier: 0,
+    minFloor: 12,
+    description: "【固有】攻+6 / 防+4。手数を支える篭手。",
+    diceModifiers: [],
+  },
+  {
+    id: "windstep_boots",
+    name: "疾風の脚甲",
+    rarity: "epic",
+    slot: "boots",
+    equipTag: "light",
+    signature: true,
+    attack: 0,
+    defense: 6,
+    maxHp: 18,
+    rerollModifier: 1,
+    minFloor: 12,
+    description: "【固有】防+6 / HP+18、リロール+1。風を駆ける脚甲。",
+    diceModifiers: [],
   },
 
   {
@@ -297,11 +352,12 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "賭博師の指輪",
     rarity: "epic",
     slot: "accessory",
-    attack: 0,
+    signature: true,
+    attack: 4,
     defense: 0,
-    maxHp: 0,
+    maxHp: 12,
     rerollModifier: 0,
-    description: "1で自傷、6で超火力。一か八か。",
+    description: "【固有】攻+4 / HP+12。1で自傷、6で超火力。一か八か。",
     diceModifiers: [
       {
         faces: [1],
@@ -458,12 +514,13 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     rarity: "legendary",
     slot: "weapon",
     equipTag: "heavy",
-    attack: 16,
+    signature: true,
+    attack: 24,
     defense: 0,
     maxHp: 0,
     rerollModifier: -1,
     minFloor: 20,
-    description: "攻+16、リロール-1。全出目が強攻撃になるが反動で自傷する。",
+    description: "【固有】攻+24、リロール-1。全出目が強攻撃になるが反動で自傷する。",
     diceModifiers: [
       {
         faces: [1, 2, 3, 4, 5, 6],
@@ -479,12 +536,13 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     rarity: "legendary",
     slot: "weapon",
     equipTag: "light",
-    attack: 9,
+    signature: true,
+    attack: 14,
     defense: 0,
     maxHp: 0,
     rerollModifier: 0,
     minFloor: 18,
-    description: "攻+9。偶数の出目が会心、奇数は小攻撃になる。",
+    description: "【固有】攻+14。偶数の出目が会心、奇数は小攻撃になる。",
     diceModifiers: [
       {
         faces: [1, 3, 5],
@@ -506,12 +564,13 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     rarity: "legendary",
     slot: "weapon",
     equipTag: "heavy",
-    attack: 12,
+    signature: true,
+    attack: 18,
     defense: 0,
     maxHp: 0,
     rerollModifier: 0,
     minFloor: 30,
-    description: "攻+12。6で会心の2連撃。",
+    description: "【固有】攻+18。6で会心の2連撃。",
     diceModifiers: [
       {
         faces: [6],
@@ -527,16 +586,18 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     rarity: "epic",
     slot: "weapon",
     equipTag: "magic",
-    attack: 7,
+    signature: true,
+    attack: 10,
     defense: 0,
     maxHp: 0,
     rerollModifier: 0,
     minFloor: 14,
-    description: "攻+7。3以上で猛毒を付与する。",
+    description: "【固有】攻+10。3以上で猛毒を付与する。",
     diceModifiers: [
       {
         faces: [3, 4, 5, 6],
-        effect: { statusEffect: { kind: "poison", damagePerTurnMultiplier: 0.25, turns: 3 } },
+        // DoT延命: 継続ダメージ倍率を 0.25→0.35 に強化。
+        effect: { statusEffect: { kind: "poison", damagePerTurnMultiplier: 0.35, turns: 3 } },
         description: "3以上: 猛毒 (3T)",
       },
     ],
@@ -547,12 +608,13 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     rarity: "legendary",
     slot: "weapon",
     equipTag: "magic",
-    attack: 8,
+    signature: true,
+    attack: 12,
     defense: 0,
     maxHp: 0,
     rerollModifier: 0,
     minFloor: 24,
-    description: "攻+8。5でスタン、6で火球。",
+    description: "【固有】攻+12。5でスタン、6で火球。",
     diceModifiers: [
       {
         faces: [5],
@@ -573,12 +635,13 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     name: "運命のダイス",
     rarity: "legendary",
     slot: "accessory",
+    signature: true,
     attack: 0,
-    defense: 0,
-    maxHp: 10,
+    defense: 4,
+    maxHp: 24,
     rerollModifier: 2,
     minFloor: 16,
-    description: "HP+10、リロール+2。1の目を通常攻撃に変える。",
+    description: "【固有】防+4 / HP+24、リロール+2。1の目を通常攻撃に変える。",
     diceModifiers: [
       {
         faces: [1],
@@ -594,12 +657,13 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     rarity: "legendary",
     slot: "armor",
     equipTag: "heavy",
+    signature: true,
     attack: 0,
-    defense: 8,
-    maxHp: 30,
+    defense: 12,
+    maxHp: 50,
     rerollModifier: 0,
     minFloor: 22,
-    description: "防+8、HP+30。1〜3で大ガード＋回復。",
+    description: "【固有】防+12、HP+50。1〜3で大ガード＋回復。",
     diceModifiers: [
       {
         faces: [1, 2, 3],
@@ -871,12 +935,15 @@ export function rollSetDrop(floor: number): Equipment {
 
 // ===== 神機マキナ (the one-and-only unique weapon) =====
 // Granted only by the 1000F ending (YES route) or by reaching floor 1250 (NO
-// route). Stats are 92% of the strongest droppable weapon; every face becomes a
-// plain normal attack ("Complete").
+// route). Every face becomes a plain normal attack ("Complete").
+// 全出目が通常攻撃(×1.0)で会心・追撃・特大火球を一切持たないぶん、ベース攻撃を
+// 大きく(約3倍)盛る。高倍率が無いので壊れず、「事故らない安定火力」に全振りした
+// 最終武器という位置づけ。
+const MAKINA_ATTACK_MULT = 3;
 function makinaAttackValue(): number {
-  // 92% of the strongest base weapon (top-tier procedural weapon).
+  // 最強ベース武器(最上位ティア)の92% × 安定特化ボーナス。
   const strongest = genItem("weapon", GEN_MAX_TIER).attack;
-  return Math.round(strongest * 0.92);
+  return Math.round(strongest * 0.92 * MAKINA_ATTACK_MULT);
 }
 
 export const MAKINA_ID = "makina_god";
@@ -923,6 +990,14 @@ export function makeMakina(): Equipment {
  * tracks as individually-collectible.
  */
 export const ITEMS: readonly Equipment[] = [...SIGNATURE_ITEMS];
+
+/**
+ * 固有(signature)武器の id 一覧。カジノコイン交換所などで「固有武器を1つ付与」する
+ * 抽選母集団に使う。神機マキナ(unique)は通常入手から除外する。
+ */
+export const SIGNATURE_WEAPON_IDS: readonly string[] = SIGNATURE_ITEMS.filter(
+  (i) => i.signature && i.slot === "weapon" && !i.unique,
+).map((i) => i.id);
 
 const ITEM_MAP: Map<string, Equipment> = new Map(ITEMS.map((i) => [i.id, i]));
 

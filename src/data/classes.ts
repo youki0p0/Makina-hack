@@ -53,13 +53,20 @@ export const CLASSES: readonly CharacterClass[] = [
     id: "rogue",
     name: "盗賊",
     icon: "🗡️",
-    description: "手数とリロール。4以上で2回攻撃。",
+    description: "手数とリロール。3以上で2回、6で3回攻撃。",
     statMods: { attack: 1, defense: 0, maxHp: 0, reroll: 1 },
     diceModifiers: [
+      // 手数ビルド強化: 発動面を3以上に拡張し、6は3回攻撃に。
       {
-        faces: [4, 5, 6],
+        faces: [3, 4, 5],
         effect: { extraHits: 1 },
-        description: "4以上: 2回攻撃",
+        description: "3以上: 2回攻撃",
+      },
+      {
+        faces: [6],
+        effect: { extraHits: 2 },
+        label: "乱舞",
+        description: "6: 3回攻撃",
       },
     ],
   },
@@ -74,14 +81,15 @@ export const CLASSES: readonly CharacterClass[] = [
     diceModifiers: [
       {
         faces: [5],
-        effect: { kind: "skill", damageMultiplier: 2.2 },
-        description: "5: 魔力の一撃",
+        // グラス火力の延命: 火球に8%吸命を付与し、バーストでも前進できるように。
+        effect: { kind: "skill", damageMultiplier: 2.2, lifestealPct: 0.08 },
+        description: "5: 魔力の一撃 (8%吸命)",
       },
       {
         faces: [6],
-        effect: { kind: "fireball", damageMultiplier: 3.2 },
+        effect: { kind: "fireball", damageMultiplier: 3.2, lifestealPct: 0.08 },
         label: "大火球",
-        description: "6: 大火球",
+        description: "6: 大火球 (8%吸命)",
       },
     ],
   },
@@ -102,9 +110,10 @@ export const CLASSES: readonly CharacterClass[] = [
       },
       {
         faces: [5, 6],
-        effect: { kind: "critical", damageMultiplier: 2.8 },
+        // グラス火力の延命: 高火力面に10%吸命を付与しバースト概念を成立させる。
+        effect: { kind: "critical", damageMultiplier: 2.8, lifestealPct: 0.1 },
         label: "大ダメージ",
-        description: "5〜6: 大ダメージ",
+        description: "5〜6: 大ダメージ (10%吸命)",
       },
     ],
   },
@@ -133,16 +142,29 @@ export const CLASSES: readonly CharacterClass[] = [
     id: "hexer",
     name: "呪術師",
     icon: "🪄",
-    description: "弱体特化。3〜4で敵を弱体化、6で大火球。",
+    description: "状態異常特化。2で毒、3〜5で弱体＋毒、6で大火球。",
     unlock: (p) => p.maxFloor >= 6,
     unlockHint: "6階に到達で解放",
     statMods: { attack: 1, defense: 0, maxHp: 0, reroll: 0 },
     diceModifiers: [
+      // DoT概念の強化: 弱体を-5に、毒を全面に付与してDoTビルドを成立させる。
       {
-        faces: [3, 4],
-        effect: { kind: "weaken", weaken: 3 },
-        label: "弱体化",
-        description: "3〜4: 敵の攻撃-3",
+        faces: [2],
+        effect: {
+          statusEffect: { kind: "poison", damagePerTurnMultiplier: 0.3, turns: 4 },
+        },
+        label: "呪毒",
+        description: "2: 強毒を付与 (4T)",
+      },
+      {
+        faces: [3, 4, 5],
+        effect: {
+          kind: "weaken",
+          weaken: 5,
+          statusEffect: { kind: "poison", damagePerTurnMultiplier: 0.3, turns: 4 },
+        },
+        label: "呪詛",
+        description: "3〜5: 敵の攻撃-5＋強毒",
       },
       {
         faces: [6],
@@ -176,8 +198,8 @@ export const CLASSES: readonly CharacterClass[] = [
     unlockHint: "200階に到達で解放",
     statMods: { attack: 9, defense: -1, maxHp: -3, reroll: 0 },
     diceModifiers: [
-      { faces: [5], effect: { kind: "skill", damageMultiplier: 2.6, isMiss: false }, label: "魔技", description: "5: 魔技 ×2.6" },
-      { faces: [6], effect: { kind: "fireball", damageMultiplier: 3.6 }, label: "特大火球", description: "6: 特大火球 ×3.6" },
+      { faces: [5], effect: { kind: "skill", damageMultiplier: 2.6, isMiss: false, lifestealPct: 0.08 }, label: "魔技", description: "5: 魔技 ×2.6 (8%吸命)" },
+      { faces: [6], effect: { kind: "fireball", damageMultiplier: 3.6, lifestealPct: 0.08 }, label: "特大火球", description: "6: 特大火球 ×3.6 (8%吸命)" },
     ],
   },
   {
@@ -190,7 +212,7 @@ export const CLASSES: readonly CharacterClass[] = [
     statMods: { attack: 11, defense: -2, maxHp: 0, reroll: 0 },
     diceModifiers: [
       { faces: [1, 2], effect: { kind: "selfDamage", selfDamagePct: 0.2, damageMultiplier: 1.4, isMiss: false }, label: "猛進", description: "1〜2: 自傷つき攻撃" },
-      { faces: [5, 6], effect: { kind: "critical", damageMultiplier: 3.2, isMiss: false }, label: "破軍", description: "5〜6: 破軍 ×3.2" },
+      { faces: [5, 6], effect: { kind: "critical", damageMultiplier: 3.2, isMiss: false, lifestealPct: 0.1 }, label: "破軍", description: "5〜6: 破軍 ×3.2 (10%吸命)" },
     ],
   },
 
@@ -219,7 +241,7 @@ export const CLASSES: readonly CharacterClass[] = [
     statMods: { attack: 14, defense: -3, maxHp: 0, reroll: 0 },
     diceModifiers: [
       { faces: [1, 2, 3, 4, 5], effect: { kind: "strong", damageMultiplier: 1.7, isMiss: false, selfDamagePct: 0.06 }, label: "業", description: "全出目: 強攻撃(反動)" },
-      { faces: [6], effect: { kind: "fireball", damageMultiplier: 4.2 }, label: "終焉", description: "6: 終焉 ×4.2" },
+      { faces: [6], effect: { kind: "fireball", damageMultiplier: 4.2, lifestealPct: 0.1 }, label: "終焉", description: "6: 終焉 ×4.2 (10%吸命)" },
     ],
   },
 ];

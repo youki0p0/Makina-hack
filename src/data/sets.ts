@@ -358,6 +358,10 @@ export interface SetEffects {
   healOnReroll: number;
   sixDouble: boolean;
   rollTwoDice: boolean;
+  /** 最終的な攻撃倍率(★スケール後の attack に (1+attackPct) を乗算)。 */
+  attackPct: number;
+  /** 最終的なHP倍率(maxHp に (1+maxHpPct) を乗算)。 */
+  maxHpPct: number;
   activeTiers: { key: string; name: string; pieces: number; icon: string }[];
   /** Active set×job synergies (label + description) for the UI. */
   synergies: { name: string; desc: string }[];
@@ -539,6 +543,8 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
     healOnReroll: 0,
     sixDouble: false,
     rollTwoDice: false,
+    attackPct: 0,
+    maxHpPct: 0,
     activeTiers: [],
     synergies: [],
   };
@@ -564,6 +570,44 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
       if (b.sixDouble) eff.sixDouble = true;
       if (b.rollTwoDice) eff.rollTwoDice = true;
       if (b.faceOneToTwo) eff.diceModifiers.push(gamblerFaceOneToTwo());
+    }
+  }
+
+  // ===== 固有共鳴 (Signature Resonance) =====
+  // 装備中の固有(signature)装備の数から LIVE 計算するボーナス。装備IDから毎回
+  // 再計算されるためセーブ非互換にならない。固有装備を揃えるほど攻撃/HPが伸び、
+  // 「固有6部位」が耐久メタに匹敵する一つのビルド概念になる。
+  let sigCount = 0;
+  for (const slot of EQUIP_SLOTS) {
+    if (equipped[slot]?.signature) sigCount += 1;
+  }
+  if (sigCount >= 2) {
+    eff.attackPct += 0.12;
+    eff.maxHpPct += 0.12;
+  }
+  if (sigCount >= 4) {
+    eff.attackPct += 0.13; // 累計 .25
+    eff.extraHit = true;
+    eff.statBonus.reroll += 1;
+  }
+  if (sigCount >= 6) {
+    eff.attackPct += 0.2; // 累計 .45
+    eff.maxHpPct += 0.18; // 累計 .30
+    // 大成: 全ての面のミスを消す(出目1などの空振りを無くす)。
+    eff.diceModifiers.push({
+      faces: [1, 2, 3, 4, 5, 6],
+      effect: { isMiss: false },
+      description: "固有共鳴6: 全ての出目がミスしない",
+    });
+  }
+
+  // ===== セット集中ボーナス (single-set focus capstone) =====
+  // 単一の名前付きセットを6部位揃えると攻撃+15%。2pcスイッチ分散ではなく
+  // 一つの概念に振り切る選択を競争力あるものにする(上方修正のみ)。
+  for (const [key, n] of Object.entries(counts)) {
+    if (n >= 6 && getSetDef(key)) {
+      eff.attackPct += 0.15;
+      break;
     }
   }
 

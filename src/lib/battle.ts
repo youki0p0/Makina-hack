@@ -149,11 +149,17 @@ export function resolvePlayerAction(
   if (e.damageMultiplier > 0) {
     const enemyDef = enemy.defense + (enemy.bonusDefense ?? 0);
     const perHit = Math.max(1, Math.round(stats.attack * e.damageMultiplier) - enemyDef);
-    enemyDamage = perHit * hits;
-    if (hits > 1) {
-      logs.push(`${face.name}！ ${hits}回攻撃で ${enemyDamage} ダメージ`);
+    // 多段耐性: 2ヒット目以降は40%に減衰(手数ビルドの天敵)。
+    if (hits > 1 && enemy.multiHitResist) {
+      enemyDamage = perHit + (hits - 1) * Math.round(perHit * 0.4);
+      logs.push(`${face.name}！ ${hits}回攻撃 (多段耐性で減衰) ${enemyDamage} ダメージ`);
     } else {
-      logs.push(`${face.name}！ ${enemyDamage} ダメージ`);
+      enemyDamage = perHit * hits;
+      if (hits > 1) {
+        logs.push(`${face.name}！ ${hits}回攻撃で ${enemyDamage} ダメージ`);
+      } else {
+        logs.push(`${face.name}！ ${enemyDamage} ダメージ`);
+      }
     }
   }
 
@@ -162,8 +168,12 @@ export function resolvePlayerAction(
     logs.push(`反動で ${selfDamage} の自傷ダメージ`);
   }
 
-  const heal = e.lifestealPct > 0 && enemyDamage > 0 ? Math.round(enemyDamage * e.lifestealPct) : 0;
-  if (heal > 0) {
+  // 吸血無効の敵には回復しない(純サステインビルドの天敵)。
+  let heal = e.lifestealPct > 0 && enemyDamage > 0 ? Math.round(enemyDamage * e.lifestealPct) : 0;
+  if (heal > 0 && enemy.lifestealImmune) {
+    heal = 0;
+    logs.push("吸血が効かない！");
+  } else if (heal > 0) {
     logs.push(`${heal} 回復した`);
   }
 
@@ -172,8 +182,12 @@ export function resolvePlayerAction(
     logs.push(`ガード態勢 (防御+${guard})`);
   }
 
-  const status = e.statusEffect ? buildStatus(e.statusEffect, stats.attack) : null;
-  if (status) {
+  // 状態異常耐性の敵には毒/燃焼を付与できない(DoTビルドの天敵)。
+  let status = e.statusEffect ? buildStatus(e.statusEffect, stats.attack) : null;
+  if (status && enemy.statusResist) {
+    status = null;
+    logs.push("状態異常が効かない！");
+  } else if (status) {
     logs.push(`${STATUS_LABEL[status.kind]}を付与！ (${status.damagePerTurn}/T × ${status.remainingTurns}T)`);
   }
 
@@ -350,9 +364,9 @@ export function resolveBossTurn(
   guard: number,
 ): BossTurnResult {
   const weaken = enemy.weakenTurns > 0 ? enemy.weakenAmount : 0;
-  // DPS関門: 8ターンを超えると攻撃が毎ターン+30%加速。規定ターン内に倒せない
-  // (=火力不足)と必ず力尽きるので、ボス前で武器集め/強化フェーズが強制される。
-  const ramp = 1 + Math.max(0, (enemy.bossTurns ?? 0) - 8) * 0.3;
+  // DPS関門(緩和版): 12ターンを超えると攻撃が毎ターン+20%加速。猶予を広げることで
+  // バースト/グラスキャノン系も間に合えば突破でき、単一耐久ビルドへの収束を防ぐ。
+  const ramp = 1 + Math.max(0, (enemy.bossTurns ?? 0) - 12) * 0.2;
   const eatk = Math.max(1, Math.round(enemy.attack * (enemy.enraged ? 1.5 : 1) * ramp) - weaken);
 
   // Unleash the charged attack.
