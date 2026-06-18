@@ -103,6 +103,7 @@ import {
 } from "@/lib/casino";
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState } from "@/lib/save";
+import { runDailyMaintenance } from "@/lib/maintenance";
 import { itemKey, rarityRank } from "@/lib/ui";
 import type {
   ActiveBuff,
@@ -749,6 +750,9 @@ export const useGameStore = create<GameState>((set, get) => {
 
     hydrate: () => {
       if (get().hydrated) return;
+      // 1日1回（＋更新後の初回）、メモリ解放のためページをリロードする。必要な時
+      // だけ即リロードし、解放後の新しいページで改めて読み込みが走る。
+      runDailyMaintenance();
       const loaded = loadGame();
       if (loaded) {
         applyLoaded(loaded);
