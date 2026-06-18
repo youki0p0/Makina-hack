@@ -64,8 +64,6 @@ export default function TitlePage() {
           Machina
         </h1>
         <p className="mt-3 text-sm text-gray-400">
-          ダイス版 Diablo
-          <br />
           装備で出目が書き換わるハクスラRPG
         </p>
       </div>
