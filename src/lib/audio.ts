@@ -748,22 +748,11 @@ function worldTick(cfg: WorldMusic): void {
 }
 
 // ===== Final boss theme (1000F: 機神デウス＝エクス＝マキナ) =====
-// The single most hype track: a fast D-major battle anthem. Four-on-the-floor
-// drive, octave bass, wide power-chord stabs, a soaring lead, choir + bell, and
-// risers/crashes into each chorus — the climactic "上がる" theme.
-const FINAL_STEP_MS = 104; // ≈180 BPM (16th notes)
-const FINAL_PROG: Chord[] = [
-  ch(47, "min"), ch(43, "maj"), ch(50, "maj"), ch(45, "maj"), // Bm G D A
-  ch(47, "min"), ch(43, "maj"), ch(45, "maj"), ch(45, "maj"), // Bm G A A
-];
-// Soaring 4-bar hook (64 steps), D major. 0 = rest.
-const D5 = 587.33, E5 = 659.25, Fs5 = 739.99, G5 = 783.99, A5 = 880, B5 = 987.77, Cs6 = 1108.73, D6 = 1174.66;
-const FINAL_LEAD: number[] = [
-  Fs5, 0, 0, 0, A5, 0, 0, 0, B5, 0, 0, 0, A5, 0, Fs5, 0,
-  G5, 0, 0, 0, B5, 0, 0, 0, D6, 0, B5, 0, A5, 0, 0, 0,
-  Fs5, 0, A5, 0, D6, 0, 0, 0, A5, 0, Fs5, 0, E5, 0, 0, 0,
-  E5, 0, 0, 0, A5, 0, 0, 0, Cs6, 0, B5, 0, A5, 0, 0, 0,
-];
+// 最終決戦はメインテーマ(メニュー＝dungeonの PROG / LEAD_PHRASE)の荘厳な再臨。
+// 同じメロディーラインを踏襲しつつ、テンポは速いまま、壮大で強そうな効果を満載に:
+// 重いブラスのパワーコード、フルトライアドの合唱、深いサブベース、ティンパニ、
+// オーケストラ・ヒット、オクターブ重ねの主旋律、シンバル/riser。
+const FINAL_STEP_MS = 104; // ≈180 BPM (16th notes) — スピード感は据え置き
 
 function finalTick(): void {
   if (muted) return;
@@ -771,71 +760,88 @@ function finalTick(): void {
   const bar = Math.floor(step / BAR);
   const inBar = step % BAR;
   const mode = sectionOf(bar);
-  const chord = FINAL_PROG[bar % FINAL_PROG.length];
+  const chord = PROG[bar % PROG.length]; // ★ メインテーマの進行を踏襲
   const secBar = bar % 8;
   const full = mode === "B";
+  const heroic = mode !== "A"; // 主旋律/ブラスは短いイントロ後から
 
-  // ---- Drums: four-on-the-floor kick + offbeat hats + snare backbeat ----
+  // ---- Drums: 重いキック(4つ打ち) + バックビート・スネア + ride ----
   if (inBar % 4 === 0) {
-    noise(0.05, 0.2);
-    slideTone(110, 40, 0.1, "sine", 0.24);
+    noise(0.06, 0.24);
+    slideTone(120, 40, 0.12, "sine", 0.28); // big kick
   }
-  if (mode !== "A" && inBar % 2 === 1) noise(0.02, full ? 0.08 : 0.06);
+  if (heroic && inBar % 2 === 1) noise(0.02, full ? 0.09 : 0.06); // ride/hat
   if (inBar === 4 || inBar === 12) {
-    noise(0.13, 0.16);
-    tone(190, 0.1, "triangle", 0.12);
+    noise(0.16, 0.2);
+    tone(190, 0.12, "triangle", 0.14); // snare body
+  }
+  // ティンパニのフィル(サビ直前の小節)
+  if (mode === "A2" && secBar === 7 && inBar >= 8) {
+    const toms = [110, 98, 82, 73];
+    const f = toms[(inBar - 8) % 4];
+    slideTone(f * 1.5, f, 0.14, "sine", 0.2);
   }
 
-  // ---- Driving octave bass (8ths) ----
+  // ---- Bass: 深いサブ + サウのオクターブ駆動(力強さ) ----
   if (inBar % 2 === 0) {
     const bf = inBar % 4 === 0 ? chord.root : chord.root * 2;
-    tone(bf, 0.13, "sawtooth", 0.2);
+    tone(bf, 0.14, "sawtooth", 0.2);
     tone(bf, 0.02, "square", 0.12);
   }
+  if (inBar === 0) tone(chord.root * 0.5, 0.6, "sine", 0.16); // sub octave
 
-  // ---- Wide power-chord saw stab on the bar head ----
-  if (inBar === 0) {
-    voice(chord.root, 0.4, "sawtooth", 0.09, 0, -0.5, 0.2);
-    voice(chord.fifth, 0.4, "sawtooth", 0.08, 0, 0.5, 0.2);
-    voice(chord.root * 2, 0.4, "sawtooth", 0.06, 0, 0, 0.2);
+  // ---- ブラスのパワーコード(デチューンsaw root+5度+oct、左右に広く、荘厳) ----
+  if (inBar === 0 || (full && inBar === 8)) {
+    const v = full ? 0.1 : 0.08;
+    voice(chord.root, 0.5, "sawtooth", v, 0, -0.55, 0.22);
+    voice(chord.root * 1.007, 0.5, "sawtooth", v, 0, 0.55, 0.22);
+    voice(chord.fifth, 0.5, "sawtooth", v * 0.9, 0, 0.3, 0.22);
+    voice(chord.root * 2, 0.5, "sawtooth", v * 0.7, 0, -0.3, 0.22);
   }
 
-  // ---- Choir pad ----
+  // ---- 合唱: フルトライアド + 高オクターブを大きな残響で(壮大さ) ----
   if (inBar === 0) {
-    voice(chord.arp[0], 1.6, "sine", 0.04, 0, -0.4, 0.4);
-    voice(chord.arp[1], 1.6, "sine", 0.04, 0.04, 0.4, 0.4);
+    voice(chord.arp[0], 1.8, "sine", 0.05, 0, -0.5, 0.5);
+    voice(chord.arp[1], 1.8, "sine", 0.05, 0.04, 0.5, 0.5);
+    voice(chord.fifth * 2, 1.8, "sine", 0.035, 0.08, 0, 0.5);
   }
 
-  // ---- Fast 16th square arp (kept energetic except in the brief intro) ----
-  if (mode !== "A") {
+  // ---- 16分の高速アルペジオ(疾走感) ----
+  if (heroic) {
     const shape = ARP_SHAPES[secBar % ARP_SHAPES.length];
     const note = chord.arp[shape[step & 3]];
-    if (note) tone(note, 0.1, "square", full ? 0.09 : 0.07);
+    if (note) tone(note, 0.1, "square", full ? 0.07 : 0.05);
   }
 
-  // ---- Bell sparkle in the chorus ----
+  // ---- 高域のオーケストラ・シマー(サビ) ----
   if (full && inBar % 2 === 0) {
     const note = chord.arp[(step >> 1) % chord.arp.length] * 2;
     const pan = (step >> 1) % 2 === 0 ? -0.6 : 0.6;
-    voice(note, 0.25, "sine", 0.05, 0, pan, 0.45);
+    voice(note, 0.3, "triangle", 0.045, 0, pan, 0.5);
   }
 
-  // ---- Soaring lead (echoed), through build + chorus + outro ----
-  if (mode !== "A") {
-    const note = FINAL_LEAD[(bar % 4) * BAR + inBar];
+  // ---- 主旋律: メニューのメロディーラインを再臨(ブラス＋オクターブ重ね＋エコー) ----
+  if (heroic) {
+    const note = LEAD_PHRASE[(bar % 4) * BAR + inBar];
     if (note) {
-      echoTone(note, 0.24, "square", 0.12, 0, 2, 0.1, 0.4);
-      echoTone(note * 1.005, 0.24, "square", 0.06, 0.01, 1, 0.1, 0.4); // detune thickness
+      echoTone(note, 0.28, "sawtooth", 0.13, 0, 2, 0.11, 0.45); // brassy lead
+      echoTone(note * 2, 0.24, "square", 0.06, 0, 1, 0.11, 0.45); // octave上のきらめき
+      voice(note, 0.3, "sine", 0.05, 0, 0, 0.4); // 滑らかな重ね
     }
   }
 
-  // ---- Riser into the chorus + crash on the chorus head ----
+  // ---- オーケストラ・ヒット + シンバル(サビ頭) ----
+  if (full && inBar === 0) {
+    noise(0.34, 0.2);
+    tone(chord.root, 0.3, "sawtooth", 0.12);
+    tone(chord.fifth, 0.3, "sawtooth", 0.09);
+  }
+  // サビへ駆け上がる riser
   if (mode === "A2" && secBar === 7) {
     const b = inBar / 16;
-    slideTone(300, 1400, 0.1, "sawtooth", 0.04 + b * 0.06);
-    noise(0.04, 0.05 + b * 0.2);
+    slideTone(300, 1500, 0.1, "sawtooth", 0.04 + b * 0.07);
+    noise(0.04, 0.05 + b * 0.22);
   }
-  if (full && inBar === 0) noise(0.3, 0.18);
 }
 
 // ===== Casino renderer (落ち着いた煌びやかラウンジ) =====
@@ -1251,7 +1257,7 @@ const WORLD_TRACKS: MusicTrack[] = WORLD_KEYS.map((key, i) => {
 export const MUSIC_TRACKS: MusicTrack[] = [
   { id: "dungeon", name: "迷宮 / 拠点", desc: "メニューで流れる A-minor のダンジョンループ", theme: "dungeon" },
   ...WORLD_TRACKS,
-  { id: "final", name: "機神デウス＝エクス＝マキナ (1000階)", desc: "最終決戦の最高潮テーマ。疾走するD majorの戦闘アンセム", theme: "final" },
+  { id: "final", name: "機神デウス＝エクス＝マキナ (1000階)", desc: "メインテーマが荘厳に再臨する最終決戦曲。ブラス・合唱・ティンパニ満載", theme: "final" },
   { id: "boss", name: "大ボス戦", desc: "速く緊迫した大ボス階のテーマ", theme: "boss" },
   { id: "casino", name: "カジノ", desc: "落ち着いた煌びやかなラウンジ", theme: "casino" },
   { id: "forge", name: "鍛冶屋", desc: "重厚な D-ドリアン。金床のクランク", theme: "forge" },
