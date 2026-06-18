@@ -935,12 +935,15 @@ export function rollSetDrop(floor: number): Equipment {
 
 // ===== 神機マキナ (the one-and-only unique weapon) =====
 // Granted only by the 1000F ending (YES route) or by reaching floor 1250 (NO
-// route). Stats are 92% of the strongest droppable weapon; every face becomes a
-// plain normal attack ("Complete").
+// route). Every face becomes a plain normal attack ("Complete").
+// 全出目が通常攻撃(×1.0)で会心・追撃・特大火球を一切持たないぶん、ベース攻撃を
+// 大きく(約3倍)盛る。高倍率が無いので壊れず、「事故らない安定火力」に全振りした
+// 最終武器という位置づけ。
+const MAKINA_ATTACK_MULT = 3;
 function makinaAttackValue(): number {
-  // 92% of the strongest base weapon (top-tier procedural weapon).
+  // 最強ベース武器(最上位ティア)の92% × 安定特化ボーナス。
   const strongest = genItem("weapon", GEN_MAX_TIER).attack;
-  return Math.round(strongest * 0.92);
+  return Math.round(strongest * 0.92 * MAKINA_ATTACK_MULT);
 }
 
 export const MAKINA_ID = "makina_god";
