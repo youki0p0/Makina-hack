@@ -808,8 +808,9 @@ function finalClimax(chord: Chord, step: number, inBar: number, bar: number, lb:
     echoTone(note * 2, 0.24, "square", 0.06, 0, 1, 0.11, 0.45);
     voice(note, 0.3, "sine", 0.05, 0, 0, 0.4);
   }
-  // orchestral hit + crash at each climax downbeat (drop landing)
-  if ((lb === 0 || lb === 32) && inBar === 0) {
+  // orchestral hit + crash ONLY at the real drop (bar 32, after the build).
+  // 冒頭(bar 0)では鳴らさない — 大シンバルでいきなり始まるのを避ける。
+  if (lb === 32 && inBar === 0) {
     noise(0.4, 0.22);
     tone(chord.root, 0.4, "sawtooth", 0.13);
     tone(chord.fifth, 0.4, "sawtooth", 0.1);
@@ -863,11 +864,10 @@ function finalTick(): void {
     const bnote = chord.arp[(step >> 1) % chord.arp.length] * 2;
     voice(bnote, 0.5, "sine", 0.05, 0, bar % 2 ? 0.5 : -0.5, 0.55);
   }
+  // 主旋律: ビルド中は柔らかいサインのままフレーズ頭(16小節)から鳴らし、徐々に音量を
+  // 上げるだけ(途中から開始する違和感を排除)。ブラスへの開花はドロップ後の大サビで。
   const note = LEAD_PHRASE[(bar % 4) * BAR + inBar];
-  if (note) {
-    if (tier >= 5) echoTone(note, 0.26, "sawtooth", 0.09 + (tier - 5) * 0.02, 0, 1, 0.11, 0.4);
-    else voice(note, 0.5, "sine", 0.06, 0, 0, 0.5);
-  }
+  if (note) voice(note, 0.5, "sine", 0.06 + Math.min(0.03, tier * 0.005), 0, 0, 0.5);
 
   // tier1+: 柔らかいサブ
   if (tier >= 1 && inBar === 0) tone(chord.root * 0.5, 1.0, "sine", 0.12);
