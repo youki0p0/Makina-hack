@@ -22,7 +22,7 @@ import {
   type BjOutcome,
 } from "@/lib/casino";
 import { estimateTier } from "@/data/items";
-import { availableSetKeys, getSetDef } from "@/data/sets";
+import { SET_DEFS, getSetDef } from "@/data/sets";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { ENEMY_TEMPLATES, BOSS_TEMPLATES } from "@/data/enemies";
 import { getSlotIconDataUrl } from "@/lib/itemIcon";
@@ -805,15 +805,13 @@ function Blackjack() {
 function CoinShop() {
   const coins = useGameStore((s) => s.coins);
   const souls = useGameStore((s) => s.souls);
-  const highest = useGameStore((s) => s.progress.highestFloorReached);
   const buyWeapon = useGameStore((s) => s.coinBuySetWeapon);
   const buySignature = useGameStore((s) => s.coinBuySignatureWeapon);
   const buySouls = useGameStore((s) => s.coinBuySouls);
 
-  const keys = useMemo(
-    () => availableSetKeys(highest).filter((k) => !getSetDef(k)?.procedural),
-    [highest],
-  );
+  // The exchange offers the hand-tuned named sets (a deliberate coin grind sink).
+  // Weapon tier scales to the player's gear, so floor-gating isn't needed here.
+  const keys = useMemo(() => SET_DEFS.map((s) => s.key), []);
   const [sel, setSel] = useState(keys[0] ?? "gambler");
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -841,20 +839,6 @@ function CoinShop() {
     setMsg(`🔮 転生ポイント +${n}！`);
     setTimeout(() => setMsg(null), 2500);
   };
-
-  // カジノコイン0枚では交換所に入れない(冷やかし防止 / フリーズ回避)。
-  if (coins <= 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16">
-        <div className="w-full max-w-xs animate-pop rounded-2xl border border-fuchsia-500/40 bg-[#15131f] p-6 text-center shadow-lg">
-          <div className="text-4xl">🪙</div>
-          <p className="mt-3 text-base font-extrabold text-fuchsia-200">カジノコイン持っていないよ。</p>
-          <p className="mt-1 text-sm text-gray-300">冷やかしはやめよう。</p>
-          <p className="mt-3 text-[10px] text-gray-500">スロットでカジノコインを稼いでから来てね。</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-3">

@@ -23,6 +23,29 @@ function emptyEquipped(): EquippedItems {
   };
 }
 
+describe("proceduralSetDef never hangs (casino freeze regression)", () => {
+  it("returns 3 distinct primitives for every index", () => {
+    // The old pick-loop used a step that could be 0 or PRIMS.length/2 for some
+    // n, cycling forever and freezing the casino exchange at deep floors.
+    // Guard against any regression by exercising a wide range of indices.
+    for (let n = 0; n < 600; n++) {
+      const def = proceduralSetDef(n);
+      expect(def.bonuses).toHaveLength(3);
+      expect(def.bonuses.map((b) => b.pieces)).toEqual([2, 4, 6]);
+      expect(def.procedural).toBe(true);
+      // The three primitives backing the tiers must be distinct.
+      const sigs = def.bonuses.map((b) => JSON.stringify({ ...b, pieces: 0, desc: "" }));
+      expect(new Set(sigs).size).toBe(3);
+    }
+  });
+
+  it("getSetDef resolves deep procedural keys quickly", () => {
+    for (const n of [8, 21, 34, 47, 268]) {
+      expect(getSetDef(`gset${n}`)).not.toBeNull();
+    }
+  });
+});
+
 /** Equip the first `n` slots with pieces of the given set. */
 function equipSet(key: string, n: number): EquippedItems {
   const eq = emptyEquipped();
