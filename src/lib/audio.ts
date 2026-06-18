@@ -8,6 +8,7 @@ let master: GainNode | null = null;
 let muted = false;
 let bgmTimer: ReturnType<typeof setInterval> | null = null;
 let bgmStep = 0;
+let finalIntro = 0; // remaining steps of the final theme's one-time intro pickup
 let initialized = false;
 
 function getCtx(): AudioContext | null {
@@ -342,6 +343,9 @@ const LOOP_BARS = 32;
 // The final-boss theme runs a longer, self-contained loop with its own dynamics
 // (build → climax → quiet breakdown → rebuild → grand climax).
 const FINAL_LOOP_BARS = 48;
+// A one-time 7-note pickup (anacrusis) played only when the final theme first
+// starts — so it clearly "launches" instead of resuming mid-phrase. Not replayed on loop.
+const FINAL_INTRO_STEPS = 14;
 const DETUNE = 1.006; // ~+10 cent chorus for the pad
 
 interface Chord {
@@ -620,6 +624,13 @@ function themeStepMs(theme: BgmTheme): number {
 // Dispatcher: each theme has its own full-band renderer; all share one step clock.
 function bgmTick(): void {
   if (muted) return;
+  // One-time intro pickup for the final theme — bgmStep stays at 0 until it ends,
+  // so the looping body always begins cleanly on the downbeat (and never replays it).
+  if (bgmTheme === "final" && finalIntro > 0) {
+    finalIntroTick(FINAL_INTRO_STEPS - finalIntro);
+    finalIntro--;
+    return;
+  }
   const world = WORLD_MUSIC[bgmTheme as WorldKey];
   if (bgmTheme === "final") {
     finalTick();
@@ -761,6 +772,31 @@ const FINAL_STEP_MS = 84; // ダイスラッシュ(idol)と同じ突っ走るテ
 // ラスボス曲のコード進行 = 小室進行(vi–IV–V–I = Am–F–G–C)。主旋律(LEAD_PHRASE,
 // A minor)の動きはそのままに、コードだけ差し替える。4小節周期で旋律と揃う。
 const FINAL_PROG: Chord[] = [ch(45, "min"), ch(41, "maj"), ch(43, "maj"), ch(48, "maj")];
+
+// 7-note anacrusis: an A-minor run A3→G4 that climbs into the body's downbeat (A4).
+const FINAL_INTRO_RUN = [hz(45), hz(47), hz(48), hz(50), hz(52), hz(53), hz(55)]; // A3 B3 C4 D4 E4 F4 G4
+
+/** One-time intro pickup ("タタタタタタタ" → 本旋律). i = 0..FINAL_INTRO_STEPS-1. */
+function finalIntroTick(i: number): void {
+  if (i === 0) {
+    // soft choir bed swells in under the pickup
+    voice(hz(45), 1.3, "sine", 0.045, 0, -0.4, 0.45);
+    voice(hz(52), 1.3, "sine", 0.045, 0, 0.4, 0.45);
+  }
+  // 7 notes on the even steps (0,2,…,12), brassy + a drum tap each, crescendo.
+  if (i % 2 === 0) {
+    const idx = i / 2;
+    const note = FINAL_INTRO_RUN[idx];
+    if (note) {
+      const v = 0.08 + idx * 0.012;
+      tone(note, 0.14, "sawtooth", v);
+      tone(note * 2, 0.1, "square", v * 0.5);
+      noise(0.03, 0.06 + idx * 0.018); // タッ
+    }
+  }
+  // rising riser that peaks right at the downbeat
+  if (i % 2 === 0) slideTone(320, 1500, 0.16, "sawtooth", 0.03 + (i / FINAL_INTRO_STEPS) * 0.06);
+}
 
 // 48小節の構成(近代EDM流): クライマックスA[0–14] → 崩しの遷移[15] →
 // 静寂から2小節ごとに1レイヤーずつ積むビルド[16–31] → ドロップ → 大サビ[32–47]。
@@ -1257,6 +1293,7 @@ export function setBgmTheme(theme: BgmTheme, transpose = 1): void {
   bgmTheme = theme;
   bgmTranspose = transpose;
   bgmStep = 0;
+  finalIntro = theme === "final" ? FINAL_INTRO_STEPS : 0; // play the pickup once on entry
   // Only (re)start the timer if music is wanted and the tab is visible.
   clearTimer();
   if (bgmPlaying && !muted && (typeof document === "undefined" || !document.hidden)) {
@@ -1287,6 +1324,7 @@ export function __tickThemeForTest(theme: BgmTheme, steps: number): void {
   const prev = bgmTheme;
   bgmTheme = theme;
   bgmStep = 0;
+  finalIntro = theme === "final" ? FINAL_INTRO_STEPS : 0;
   muted = false;
   for (let i = 0; i < steps; i++) bgmTick();
   bgmTheme = prev;
