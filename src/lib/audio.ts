@@ -752,7 +752,7 @@ function worldTick(cfg: WorldMusic): void {
 // 同じメロディーラインを踏襲しつつ、テンポは速いまま、壮大で強そうな効果を満載に:
 // 重いブラスのパワーコード、フルトライアドの合唱、深いサブベース、ティンパニ、
 // オーケストラ・ヒット、オクターブ重ねの主旋律、シンバル/riser。
-const FINAL_STEP_MS = 104; // ≈180 BPM (16th notes) — スピード感は据え置き
+const FINAL_STEP_MS = 84; // ダイスラッシュ(idol)と同じ突っ走るテンポ(≈178 BPM, 16分)
 
 function finalTick(): void {
   if (muted) return;
