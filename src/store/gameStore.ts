@@ -1819,9 +1819,12 @@ export const useGameStore = create<GameState>((set, get) => {
       const reachedHamari = outcome === "big" ? cur.spins : cur.spins + 1;
       const isBonus = outcome === "big" || outcome === "reg";
       const now = Date.now();
-      const slotHits = isBonus
-        ? [...cur.hits, now].filter((t) => now - t <= HIT_WINDOW_MS)
-        : cur.hits.filter((t) => now - t <= HIT_WINDOW_MS);
+      // スピン毎に呼ばれるため spread+filter の二重確保を避け、1ループで構築する。
+      const slotHits: number[] = [];
+      for (const t of cur.hits) {
+        if (now - t <= HIT_WINDOW_MS) slotHits.push(t);
+      }
+      if (isBonus) slotHits.push(now); // BIG/REGの当たりを履歴に追加(now-now=0で必ず窓内)
       set({
         coins,
         slotReplay: outcome === "replay",

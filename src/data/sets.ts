@@ -528,7 +528,18 @@ function gamblerFaceOneToTwo(): DiceModifier {
  * Count equipped pieces per set and resolve the combined bonus effects.
  * Passing `classId` also applies any matching set×job synergies.
  */
+// 1ターンに複数箇所(buildFaces / passiveBonus / currentStats / confirm 等)から呼ばれる
+// ため、(equipped, classId) の参照が一致すれば結果を使い回す1エントリ参照メモ。装備
+// 変更・クラス変更で参照が変われば自動的に再計算される(ストアは不変更新)。戻り値は
+// 呼び出し側で破壊しない前提(全呼び出しが読み取りのみ)。
+let _setEffEquipped: EquippedItems | null = null;
+let _setEffClassId: ClassId | undefined;
+let _setEffResult: SetEffects | null = null;
+
 export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): SetEffects {
+  if (_setEffResult && equipped === _setEffEquipped && classId === _setEffClassId) {
+    return _setEffResult;
+  }
   const counts: Record<string, number> = {};
   for (const slot of EQUIP_SLOTS) {
     const it = equipped[slot];
@@ -625,5 +636,8 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
     }
   }
 
+  _setEffEquipped = equipped;
+  _setEffClassId = classId;
+  _setEffResult = eff;
   return eff;
 }
