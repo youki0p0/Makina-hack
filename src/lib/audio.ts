@@ -773,6 +773,9 @@ const FINAL_STEP_MS = 84; // ダイスラッシュ(idol)と同じ突っ走るテ
 // A minor)の動きはそのままに、コードだけ差し替える。4小節周期で旋律と揃う。
 const FINAL_PROG: Chord[] = [ch(45, "min"), ch(41, "maj"), ch(43, "maj"), ch(48, "maj")];
 
+// イントロ提示の旋律(7音): E-D-C-A-G-A-C(E5→…→C5)。本編 LEAD_PHRASE とは別。
+const FINAL_INTRO_LEAD = [659.25, 587.33, 523.25, 440, 392.0, 440, 523.25];
+
 /**
  * One-time intro: the main melody's opening 7 notes (LEAD_PHRASE[0..31] =
  * A-C-E-D-C-A-G) stated clearly over 2 bars with light backing + a build, then a
@@ -796,9 +799,9 @@ function finalIntroTick(i: number): void {
   }
   if (introBar === 1 && inBar % 2 === 1) noise(0.02, 0.05);
 
-  // ★ 主旋律の出だしを提示。イントロでは末尾の C-A-G(step20/24/28)は鳴らさず、
-  //   A-C-E-D の4音だけにする(本編クライマックスでは全音そのまま)。
-  const note = i < 20 ? LEAD_PHRASE[i] : 0;
+  // ★ イントロ提示の旋律 = E-D-C-A-G-A-C(7音、4分音符)。本編の主旋律は別途そのまま。
+  const li = i % 4 === 0 ? i / 4 : -1;
+  const note = li >= 0 ? (FINAL_INTRO_LEAD[li] ?? 0) : 0;
   if (note) {
     echoTone(note, 0.3, "sawtooth", 0.14, 0, 1, 0.12, 0.4);
     voice(note, 0.34, "sine", 0.06, 0, 0, 0.4);
