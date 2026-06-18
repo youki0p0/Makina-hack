@@ -416,7 +416,87 @@ const IDOL_LEAD: number[] = [
 /** Per-chapter battle themes (w1…w11) plus the fixed-location themes. */
 export type WorldKey =
   | "w1" | "w2" | "w3" | "w4" | "w5" | "w6" | "w7" | "w8" | "w9" | "w10" | "w11";
-export type BgmTheme = "dungeon" | "casino" | "forge" | "boss" | "idol" | "final" | WorldKey;
+export type BgmTheme = "dungeon" | "casino" | "forge" | "boss" | "idol" | "final" | "credits" | WorldKey;
+
+// ===== Credits theme: "Running Toward Light" (図鑑のクレジット曲) =====
+// 明るくほろ苦い D メジャー。IV→V→vi を多用し、簡単には解決しない。
+// 32小節ループ: イントロ4 / Aメロ8 / プリサビ4 / サビ16。BPM132 (16分 = stepMs)。
+// 既存エンジン(ファイル不使用・全合成)の流儀でオリジナル作曲を移植したもの。
+const CREDITS_STEP_MS = 114; // 16th note @ ~132 BPM
+
+// note-name (例 "F#5") → 周波数。
+function noteHz(s: string): number {
+  const base: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  let semis = base[s[0]];
+  let i = 1;
+  if (s[1] === "#") {
+    semis += 1;
+    i = 2;
+  }
+  const oct = parseInt(s.slice(i), 10);
+  return hz(12 * (oct + 1) + semis);
+}
+
+// 32小節のコード進行(1小節1コード)。ch() は hoist 済みの関数宣言なのでここで使える。
+const CREDITS_PROG: Chord[] = [
+  ch(59, "min"), ch(55, "maj"), ch(57, "maj"), ch(57, "maj"), // intro: Bm G A A
+  ch(50, "maj"), ch(57, "maj"), ch(59, "min"), ch(55, "maj"), // verse A: D A Bm G
+  ch(50, "maj"), ch(57, "maj"), ch(55, "maj"), ch(57, "maj"), // verse B: D A G A
+  ch(52, "min"), ch(54, "min"), ch(55, "maj"), ch(57, "maj"), // pre-chorus: Em F#m G A
+  ch(55, "maj"), ch(57, "maj"), ch(59, "min"), ch(59, "min"), // chorus: G A Bm Bm
+  ch(55, "maj"), ch(57, "maj"), ch(50, "maj"), ch(50, "maj"), //         G A D D
+  ch(55, "maj"), ch(57, "maj"), ch(59, "min"), ch(57, "maj"), //         G A Bm A
+  ch(55, "maj"), ch(57, "maj"), ch(57, "maj"), ch(50, "maj"), //         G A A D
+];
+
+type CreditsNote = [string, number]; // [音名 | "r"(休符), 拍数]
+// 8つの4小節フレーズ(各16拍)= 作曲した主旋律。
+const CREDITS_PHRASES: CreditsNote[][] = [
+  // intro lead (Bm G A A)
+  [["F#5",1],["D5",1],["F#5",2],["E5",1],["D5",1],["B4",2],["C#5",1],["E5",1],["A4",1],["C#5",1],["E5",2],["r",2]],
+  // verse A (D A Bm G)
+  [["F#4",1],["A4",1],["D5",1],["A4",0.5],["F#4",0.5],["E4",1],["A4",1],["C#5",1.5],["B4",0.5],["D5",1],["B4",1],["F#4",1],["B4",0.5],["D5",0.5],["B4",1],["D5",1],["E5",1],["D5",1]],
+  // verse B (D A G A)
+  [["A4",1],["F#4",1],["D4",1],["F#4",1],["E4",1],["A4",1],["C#5",1],["A4",1],["B4",1.5],["A4",0.5],["G4",1],["B4",1],["C#5",1],["B4",1],["A4",1],["E4",1]],
+  // pre-chorus (Em F#m G A) — 上昇して緊張を高める
+  [["E4",1],["G4",1],["B4",1],["E5",1],["F#4",1],["A4",1],["C#5",1],["F#5",1],["G4",1],["B4",1],["D5",1],["G5",1],["A4",1],["C#5",1],["E5",1],["A5",1]],
+  // chorus A (G A Bm Bm)
+  [["D5",2],["E5",1],["D5",1],["C#5",2],["E5",2],["F#5",2],["E5",1],["D5",1],["B4",2],["D5",2]],
+  // chorus B (G A D D)
+  [["D5",1],["E5",1],["G5",2],["F#5",2],["E5",2],["D5",2],["A4",1],["D5",1],["F#5",4]],
+  // chorus C (G A Bm A)
+  [["B4",1],["D5",1],["E5",2],["C#5",1],["E5",1],["A5",2],["F#5",2],["D5",2],["E5",2],["C#5",1],["E5",1]],
+  // chorus D (G A A D) — 最後にだけ I(D) へ解決
+  [["D5",1],["E5",1],["F#5",1],["G5",1],["A5",2],["E5",2],["F#5",2],["E5",1],["C#5",1],["D5",4]],
+];
+
+// フレーズ列を 512 ステップ(=32小節×16)の「ステップ→周波数/長さ」表に展開。
+function buildCreditsLead(): { freq: number[]; dur: number[] } {
+  const total = BAR * LOOP_BARS; // 512 steps
+  const freq = new Array<number>(total).fill(0);
+  const dur = new Array<number>(total).fill(0);
+  const secPerBeat = (CREDITS_STEP_MS / 1000) * 4; // 1拍 = 4ステップ
+  let beat = 0;
+  for (const phrase of CREDITS_PHRASES) {
+    for (const [name, d] of phrase) {
+      if (name !== "r") {
+        const stepIdx = Math.round(beat * 4) % total;
+        freq[stepIdx] = noteHz(name);
+        dur[stepIdx] = d * secPerBeat;
+      }
+      beat += d;
+    }
+  }
+  return { freq, dur };
+}
+const CREDITS_LEAD = buildCreditsLead();
+
+function creditsSection(bar: number): "intro" | "verse" | "pre" | "chorus" {
+  if (bar < 4) return "intro";
+  if (bar < 12) return "verse";
+  if (bar < 16) return "pre";
+  return "chorus";
+}
 
 interface ThemeDef {
   stepMs: number;
@@ -424,10 +504,12 @@ interface ThemeDef {
   metal?: boolean;
   idol?: boolean;
   casino?: boolean;
+  credits?: boolean;
 }
-const THEMES: Record<"dungeon" | "casino" | "forge" | "boss" | "idol", ThemeDef> = {
+const THEMES: Record<"dungeon" | "casino" | "forge" | "boss" | "idol" | "credits", ThemeDef> = {
   dungeon: { stepMs: 150, prog: PROG },
   boss: { stepMs: 124, prog: PROG },
+  credits: { stepMs: CREDITS_STEP_MS, prog: CREDITS_PROG, credits: true },
   // 落ち着いた煌びやかなラウンジ。専用レンダラ casinoTick が担当(通常カジノBGM)。
   casino: { stepMs: 162, prog: CASINO_PROG, casino: true },
   forge: { stepMs: 172, prog: FORGE_PROG, metal: true },
@@ -627,7 +709,8 @@ function bgmTick(): void {
     worldTick(world);
   } else {
     const def = THEMES[bgmTheme as keyof typeof THEMES];
-    if (def.idol) idolTick();
+    if (def.credits) creditsTick();
+    else if (def.idol) idolTick();
     else if (def.metal) forgeTick();
     else if (def.casino) casinoTick();
     else dungeonTick(); // dungeon / boss (variants inside)
@@ -1033,6 +1116,82 @@ function dungeonTick(): void {
   if (isBoss && mode !== "A" && inBar % 2 === 0) noise(0.018, 0.035);
 }
 
+// ===== Credits renderer ("Running Toward Light") =====
+// 全合成のクレジット曲。スパークリングなパルス・アルペジオ + 明るいパルス・リードで
+// 始まり(イントロ)、トライアングル・ベースとドラムでAメロ、密度を上げてプリサビ、
+// ワイドに開いたサビへ。装備や場所のテーマと同じ step クロックに乗る。
+function creditsTick(): void {
+  if (muted) return;
+  const T = bgmTranspose;
+  const step = bgmStep;
+  const bar = Math.floor(step / BAR); // 0..31
+  const inBar = step % BAR;
+  const chord = CREDITS_PROG[bar];
+  const sect = creditsSection(bar);
+  const intro = sect === "intro";
+  const verse = sect === "verse";
+  const pre = sect === "pre";
+  const chorus = sect === "chorus";
+  const duck = inBar === 0 ? 0.7 : 1;
+
+  // ---- Bass(triangle): イントロは静かなペダル、以降は駆けるオクターブ8分 ----
+  if (intro) {
+    if (inBar === 0) tone(chord.root * T, 1.4, "triangle", 0.12);
+  } else if (inBar % 2 === 0) {
+    const oct = inBar % 4 === 0 ? 1 : 2; // root → octave のバウンス
+    tone(chord.root * oct * T, 0.16, "triangle", chorus ? 0.2 : 0.16);
+  }
+
+  // ---- 暖かいデチューン・パッド(小節頭) ----
+  if (inBar === 0) {
+    pad(chord.root * T, 1.5, intro ? 0.04 : 0.055);
+    if (!intro) pad(chord.fifth * T, 1.5, 0.04);
+  }
+
+  // ---- きらめくパルス・アルペジオ(本曲の signature。通常8分 / ビルド・サビは16分) ----
+  const arpRate = pre || chorus ? 1 : 2;
+  if (inBar % arpRate === 0) {
+    const shape = ARP_SHAPES[bar % ARP_SHAPES.length];
+    const note = chord.arp[shape[Math.floor(step / arpRate) & 3]];
+    if (note) tone(note * T, 0.12, "square", (intro ? 0.09 : chorus ? 0.07 : 0.06) * duck);
+  }
+
+  // ---- スクエア・リード(作曲した主旋律)。サビはオクターブ重ね＋残響でワイドに ----
+  const lf = CREDITS_LEAD.freq[step];
+  if (lf) {
+    const dur = CREDITS_LEAD.dur[step];
+    const lv = chorus ? 0.13 : intro ? 0.085 : 0.11;
+    voice(lf * T, dur, "square", lv, 0, -0.05, chorus ? 0.18 : 0.08);
+    voice(lf * 2 * T, dur, "square", lv * 0.22, 0, 0.05, 0.12);
+  }
+
+  // ---- 高域のスパークル(イントロの煌めき＋サビのシマー、ステレオ＋残響) ----
+  if ((intro && inBar % 8 === 0) || (chorus && inBar % 4 === 0)) {
+    const n = chord.arp[2] * 2 * T;
+    const pan = (step >> 2) % 2 === 0 ? -0.5 : 0.5;
+    voice(n, 0.3, "sine", 0.045, 0, pan, 0.4);
+  }
+
+  // ---- ドラム ----
+  if (intro) {
+    if (bar >= 2 && inBar % 4 === 2) noise(0.02, 0.04); // 後半だけ軽いハット
+  } else {
+    if (inBar === 0 || inBar === 8) {
+      // キック(1・3拍)
+      noise(0.05, 0.18);
+      slideTone(110 * T, 42 * T, 0.1, "sine", 0.2);
+    }
+    if (inBar === 4 || inBar === 12) {
+      // スネア(2・4拍)
+      noise(0.14, 0.14);
+      tone(190 * T, 0.1, "triangle", 0.1);
+    }
+    if ((verse && inBar % 4 === 2) || ((pre || chorus) && inBar % 2 === 1)) noise(0.025, 0.06); // ハット
+    if (pre && bar === 15 && inBar >= 8) noise(0.03, 0.08 + (inBar - 8) * 0.012); // サビ直前のフィル
+    if (chorus && (bar === 16 || bar === 24) && inBar === 0) noise(0.5, 0.16); // クラッシュ
+  }
+}
+
 // ===== Forge renderer =====
 // Heavy, patient D-dorian: detuned-saw drone + deep sub, half-time kick, an anvil
 // clank with metallic overtones and a ringing echo tail, and a slow hammer-fall
@@ -1327,4 +1486,10 @@ export const MUSIC_TRACKS: MusicTrack[] = [
   { id: "casino", name: "カジノ", desc: "落ち着いた煌びやかなラウンジ", theme: "casino" },
   { id: "forge", name: "鍛冶屋", desc: "重厚な D-ドリアン。金床のクランク", theme: "forge" },
   { id: "idol", name: "ダイスラッシュ (AT)", desc: "王道進行のアイドルポップ(BIG中)", theme: "idol" },
+  {
+    id: "credits",
+    name: "スタッフロール 〜光へ走る〜",
+    desc: "明るくほろ苦い D メジャーのクレジット曲。IV→V→vi で駆け上がる",
+    theme: "credits",
+  },
 ];

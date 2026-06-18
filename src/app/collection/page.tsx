@@ -292,6 +292,19 @@ export default function CollectionPage() {
             ゲーム中のBGMをループ再生で鑑賞できる。曲をタップで再生、もう一度で停止。
             <span className="ml-1 text-[10px] text-gray-500">（再生するとサウンドがオンになります）</span>
           </p>
+
+          <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-3 text-[10px] text-violet-200">
+            <p className="flex items-center gap-1 font-bold">
+              <PixelGlyph kind="star" size={12} /> 楽曲クレジット
+            </p>
+            <p className="mt-1 leading-relaxed text-gray-300">
+              本作のBGMは全{MUSIC_TRACKS.length}曲すべて書き下ろしのオリジナル・チップチューン。
+              音声ファイルは使わず、Web Audioでリアルタイムに合成しています
+              （迷宮/拠点・各章フィールド・大ボス戦・カジノ・鍛冶屋・ダイスラッシュ(AT)、
+              そしてスタッフロール曲まで）。
+            </p>
+          </div>
+
           {MUSIC_TRACKS.map((t) => {
             const playing = playingId === t.id;
             return (
