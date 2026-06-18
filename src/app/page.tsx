@@ -250,6 +250,13 @@ export default function TitlePage() {
             💾 データ引き継ぎ
           </Link>
 
+          <Link
+            href="/news"
+            className="text-xs text-gray-500 underline active:scale-95"
+          >
+            📜 リリースノート（更新履歴）
+          </Link>
+
           {hasProgress && (
             <button
               onClick={() => {
