@@ -329,8 +329,11 @@ function assignMatchupTraits(
 }
 
 function pickNormalTemplate(floor: number): EnemyTemplate {
-  // Unlock tougher enemies as floors increase, but keep variety.
-  let pool = ENEMY_TEMPLATES.filter((_, idx) => idx <= Math.floor(floor / 2));
-  if (pool.length === 0) pool = [ENEMY_TEMPLATES[0]];
-  return pool[Math.floor(Math.random() * pool.length)];
+  // Unlock tougher enemies as floors increase, but keep variety. Use index math
+  // instead of Array.filter so enemy generation allocates NOTHING extra per
+  // battle (the old filter built a fresh ~50-element array + closure every call,
+  // which on long deep auto-battle runs added steady GC pressure / jank).
+  const maxIdx = Math.min(ENEMY_TEMPLATES.length - 1, Math.max(0, Math.floor(floor / 2)));
+  const idx = Math.floor(Math.random() * (maxIdx + 1));
+  return ENEMY_TEMPLATES[idx];
 }

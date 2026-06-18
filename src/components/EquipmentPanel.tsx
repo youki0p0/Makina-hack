@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { canEquip, CLASSES } from "@/data/classes";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { computeSetEffects, getSetDef } from "@/data/sets";
@@ -16,7 +16,7 @@ export default function EquipmentPanel() {
   const equipped = useGameStore((s) => s.equipped);
   const unequip = useGameStore((s) => s.unequipItem);
   const classId = useGameStore((s) => s.classId);
-  const setEff = computeSetEffects(equipped, classId);
+  const setEff = useMemo(() => computeSetEffects(equipped, classId), [equipped, classId]);
   const [detail, setDetail] = useState<EquipmentSlot | null>(null);
   const detailItem = detail ? equipped[detail] : null;
 
