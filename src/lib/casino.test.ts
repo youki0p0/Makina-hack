@@ -166,9 +166,11 @@ describe("slot machine (パチスロ4号機フレーバー)", () => {
     expect(count(6)).toBeGreaterThan(count(1));
   });
 
-  it("losing reaches never use the hottest (premium-tier) productions", () => {
+  it("losing reaches never use guaranteed (tier5) productions", () => {
     for (let i = 0; i < 300; i++) {
-      expect(pickReach(false).tier).toBeLessThanOrEqual(3);
+      const r = pickReach(false);
+      expect(r.guaranteed).not.toBe(true);
+      expect(r.tier).toBeLessThanOrEqual(4); // gase can reach カットイン(t4) but no further
     }
     // there are ~10 named reach productions
     expect(SLOT_REACHES.length).toBeGreaterThanOrEqual(10);
