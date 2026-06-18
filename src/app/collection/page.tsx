@@ -225,9 +225,7 @@ export default function CollectionPage() {
             撃破 {enemies.filter((e) => progress.defeatedEnemies.includes(e.id)).length} / {enemies.length}
           </p>
           {enemies.map((e) => {
-            // レビュー用: ラスボス(deus)のデザイン確認のため一時的に常時公開。
-            // 正式なアンロックゲート(撃破で解放)はレビュー後に戻す。
-            const found = progress.defeatedEnemies.includes(e.id) || e.id === "deus";
+            const found = progress.defeatedEnemies.includes(e.id);
             return (
               <div
                 key={e.id}
