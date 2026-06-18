@@ -8,6 +8,7 @@ let master: GainNode | null = null;
 let muted = false;
 let bgmTimer: ReturnType<typeof setInterval> | null = null;
 let bgmStep = 0;
+let finalIntro = 0; // remaining steps of the final theme's one-time melodic intro
 let initialized = false;
 
 function getCtx(): AudioContext | null {
@@ -342,6 +343,9 @@ const LOOP_BARS = 32;
 // The final-boss theme runs a longer, self-contained loop with its own dynamics
 // (build → climax → quiet breakdown → rebuild → grand climax).
 const FINAL_LOOP_BARS = 48;
+// One-time intro: state the main melody's opening (7 notes over 2 bars) clearly
+// with light backing + build, then drop into the body. Only on the first start.
+const FINAL_INTRO_STEPS = 32;
 const DETUNE = 1.006; // ~+10 cent chorus for the pad
 
 interface Chord {
@@ -620,6 +624,13 @@ function themeStepMs(theme: BgmTheme): number {
 // Dispatcher: each theme has its own full-band renderer; all share one step clock.
 function bgmTick(): void {
   if (muted) return;
+  // One-time melodic intro for the final theme — bgmStep is held at 0 until it ends,
+  // so the looping body always begins cleanly (and the intro never replays on loop).
+  if (bgmTheme === "final" && finalIntro > 0) {
+    finalIntroTick(FINAL_INTRO_STEPS - finalIntro);
+    finalIntro--;
+    return;
+  }
   const world = WORLD_MUSIC[bgmTheme as WorldKey];
   if (bgmTheme === "final") {
     finalTick();
@@ -762,6 +773,48 @@ const FINAL_STEP_MS = 84; // ダイスラッシュ(idol)と同じ突っ走るテ
 // A minor)の動きはそのままに、コードだけ差し替える。4小節周期で旋律と揃う。
 const FINAL_PROG: Chord[] = [ch(45, "min"), ch(41, "maj"), ch(43, "maj"), ch(48, "maj")];
 
+/**
+ * One-time intro: the main melody's opening 7 notes (LEAD_PHRASE[0..31] =
+ * A-C-E-D-C-A-G) stated clearly over 2 bars with light backing + a build, then a
+ * drop into the body. i = 0..FINAL_INTRO_STEPS-1.
+ */
+function finalIntroTick(i: number): void {
+  const introBar = Math.floor(i / BAR); // 0(Am) / 1(F)
+  const inBar = i % BAR;
+  const chord = FINAL_PROG[introBar % FINAL_PROG.length];
+
+  // soft pad bed + sub per bar
+  if (inBar === 0) {
+    voice(chord.arp[0], 1.9, "sine", 0.05, 0, -0.45, 0.5);
+    voice(chord.arp[1], 1.9, "sine", 0.05, 0.04, 0.45, 0.5);
+    tone(chord.root * 0.5, 1.0, "sine", 0.12);
+  }
+  // light kick (grows in bar 2) + hats in bar 2 to lead into the drop
+  if (inBar % 4 === 0) {
+    noise(0.04, introBar ? 0.16 : 0.1);
+    slideTone(110, 42, 0.1, "sine", introBar ? 0.2 : 0.14);
+  }
+  if (introBar === 1 && inBar % 2 === 1) noise(0.02, 0.05);
+
+  // ★ the 7-note main melody, foregrounded (brass + smooth sine + octave sparkle)
+  const note = LEAD_PHRASE[i];
+  if (note) {
+    echoTone(note, 0.3, "sawtooth", 0.14, 0, 1, 0.12, 0.4);
+    voice(note, 0.34, "sine", 0.06, 0, 0, 0.4);
+    voice(note * 2, 0.26, "triangle", 0.04, 0.02, 0.3, 0.4);
+  }
+
+  // riser building through bar 2 toward the drop
+  if (introBar === 1 && inBar % 2 === 0) {
+    slideTone(300, 1500, 0.16, "sawtooth", 0.03 + (inBar / 16) * 0.06);
+  }
+  // big impact landing the drop onto the body downbeat
+  if (i === FINAL_INTRO_STEPS - 1) {
+    noise(0.45, 0.24);
+    tone(chord.root, 0.5, "sine", 0.2);
+  }
+}
+
 // 48小節の構成(近代EDM流): クライマックスA[0–14] → 崩しの遷移[15] →
 // 静寂から2小節ごとに1レイヤーずつ積むビルド[16–31] → ドロップ → 大サビ[32–47]。
 // クライマックス↔ループ継ぎ目(47→0)は両方フルなので滑らか。
@@ -871,6 +924,15 @@ function finalTick(): void {
 
   // tier1+: 柔らかいサブ
   if (tier >= 1 && inBar === 0) tone(chord.root * 0.5, 1.0, "sine", 0.12);
+  // tier1+(=2番目のレイヤー追加から): バックコーラス「Ha—」。半小節ごとに和音上で
+  // 声のように歌う(息の"H"+デチューンの母音)。tierが上がるほど少し前に出る。
+  if (tier >= 1 && (inBar === 0 || inBar === 8)) {
+    const vv = 0.045 + Math.min(0.03, (tier - 1) * 0.006);
+    const f = inBar === 0 ? chord.arp[0] : chord.arp[1];
+    noisePan(0.05, vv * 0.5, inBar === 0 ? -0.4 : 0.4, 0.4); // 息の "H"
+    voice(f, 1.1, "sine", vv, 0.02, inBar === 0 ? -0.45 : 0.45, 0.5); // 母音の芯
+    voice(f * 1.006, 1.1, "triangle", vv * 0.6, 0.04, inBar === 0 ? 0.45 : -0.45, 0.55); // 人声感のデチューン
+  }
   // tier2+: 静かな4つ打ちキック(徐々に強く)
   if (tier >= 2 && inBar % 4 === 0) {
     noise(0.04, 0.07 + tier * 0.02);
@@ -1257,6 +1319,7 @@ export function setBgmTheme(theme: BgmTheme, transpose = 1): void {
   bgmTheme = theme;
   bgmTranspose = transpose;
   bgmStep = 0;
+  finalIntro = theme === "final" ? FINAL_INTRO_STEPS : 0; // state the melody once on entry
   // Only (re)start the timer if music is wanted and the tab is visible.
   clearTimer();
   if (bgmPlaying && !muted && (typeof document === "undefined" || !document.hidden)) {
@@ -1287,6 +1350,7 @@ export function __tickThemeForTest(theme: BgmTheme, steps: number): void {
   const prev = bgmTheme;
   bgmTheme = theme;
   bgmStep = 0;
+  finalIntro = theme === "final" ? FINAL_INTRO_STEPS : 0;
   muted = false;
   for (let i = 0; i < steps; i++) bgmTick();
   bgmTheme = prev;
