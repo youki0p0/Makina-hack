@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import AudioController from "@/components/AudioController";
+import AchievementToaster from "@/components/AchievementToaster";
 import PWARegister from "@/components/PWARegister";
 import "./globals.css";
 
@@ -37,6 +38,7 @@ export default function RootLayout({
       <body>
         <AudioController />
         <PWARegister />
+        <AchievementToaster />
         <div className="app-shell">{children}</div>
       </body>
     </html>

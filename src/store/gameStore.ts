@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { defaultProgress } from "@/data/achievements";
+import { defaultProgress, newlyEarnedAchievements } from "@/data/achievements";
 import { difficultyScale, getDifficulty, normalizeDifficulty, type Difficulty } from "@/data/difficulty";
 import { getDailyBonus } from "@/lib/daily";
 import {
@@ -295,6 +295,8 @@ interface GameState {
   diceFaces: DiceFace[];
   rerollsLeft: number;
   battleLog: BattleLogEntry[];
+  /** Pending achievement-unlock toasts (FIFO of achievement ids). Not persisted. */
+  achievementQueue: string[];
   lastResult: BattleResult | null;
   /** Temporary consumable buffs in effect, counting down per battle. */
   activeBuffs: ActiveBuff[];
@@ -417,6 +419,8 @@ interface GameState {
   // misc
   toggleFavorite: (key: string) => void;
   markHelpSeen: () => void;
+  /** Dismiss the current achievement-unlock toast (advance the queue). */
+  dismissAchievement: () => void;
   setTitle: (id: string) => void;
   setDifficulty: (id: Difficulty) => void;
   setHandedness: (h: "right" | "left") => void;
@@ -496,7 +500,22 @@ export const useGameStore = create<GameState>((set, get) => {
       saveTimer = null;
     }
   }
+  // Detect newly-earned achievements on every state-change (persist is called
+  // after every mutating action) and queue an unlock toast. Single chokepoint so
+  // we don't have to wire each victory/casino/rebirth site. Does NOT call persist
+  // (the outer persist will save the updated notifiedAchievements).
+  function syncAchievementToasts(): void {
+    const p = get().progress;
+    if (!p) return;
+    const earned = newlyEarnedAchievements(p);
+    if (earned.length === 0) return;
+    set({
+      progress: { ...p, notifiedAchievements: [...p.notifiedAchievements, ...earned] },
+      achievementQueue: [...get().achievementQueue, ...earned],
+    });
+  }
   function persist(): void {
+    syncAchievementToasts();
     if (saveTimer != null) return; // a write is already scheduled
     saveTimer = setTimeout(() => {
       saveTimer = null;
@@ -720,6 +739,7 @@ export const useGameStore = create<GameState>((set, get) => {
     diceFaces: [],
     rerollsLeft: 1,
     battleLog: [],
+    achievementQueue: [],
     lastResult: null,
     activeBuffs: [],
     playerStatuses: [],
@@ -1437,6 +1457,12 @@ export const useGameStore = create<GameState>((set, get) => {
       if (get().seenHelp) return;
       set({ seenHelp: true });
       persist();
+    },
+
+    dismissAchievement: () => {
+      const q = get().achievementQueue;
+      if (q.length === 0) return;
+      set({ achievementQueue: q.slice(1) });
     },
 
     setTitle: (id: string) => {
