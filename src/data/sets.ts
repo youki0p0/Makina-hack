@@ -270,12 +270,15 @@ const SET_ICONS = ["🜲", "✶", "❖", "☄", "⚜", "🩸", "⟡", "🔱", "�
 export function proceduralSetDef(n: number): SetDef {
   const a = SET_ADJ[n % SET_ADJ.length];
   const b = SET_NOUN[Math.floor(n / SET_ADJ.length) % SET_NOUN.length];
-  // Pick three distinct primitives deterministically from n.
+  // Pick three distinct primitives deterministically from n. Walking
+  // consecutive indices from a per-n start guarantees distinct picks in exactly
+  // 3 steps and is bounded by PRIMS.length, so it can never hang regardless of
+  // PRIMS.length / parity. (A previous step-based variant could land on a step
+  // of 0 or PRIMS.length/2, cycling forever and freezing the casino exchange.)
   const picks: number[] = [];
-  let k = (n * 7 + 3) % PRIMS.length;
-  while (picks.length < 3) {
-    if (!picks.includes(k)) picks.push(k);
-    k = (k + 5 + n) % PRIMS.length;
+  const start = (n * 7 + 3) % PRIMS.length;
+  for (let i = 0; i < PRIMS.length && picks.length < 3; i++) {
+    picks.push((start + i) % PRIMS.length);
   }
   const tiers: (2 | 4 | 6)[] = [2, 4, 6];
   return {
