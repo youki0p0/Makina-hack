@@ -27,6 +27,21 @@ export function defaultProgress(): Progress {
     claimedEndlessMessages: [],
     rankPoints: 0,
     playSeconds: 0,
+    claimedTitles: [],
+    soulsFraction: 0,
+    slotBigCount: 0,
+    totalCoinsWon: 0,
+    daipanCount: 0,
+    casinoBanned: false,
+    fateWins: 0,
+    forgeCount: 0,
+    maxForgeLevel: 0,
+    echoWins: 0,
+    classesUsed: [],
+    setsCompleted: [],
+    noDamageBossKills: 0,
+    perfectClears: 0,
+    maxSingleHit: 0,
   };
 }
 
@@ -64,6 +79,22 @@ export function normalizeProgress(p?: Partial<Progress>): Progress {
       : [],
     rankPoints: typeof p.rankPoints === "number" ? p.rankPoints : 0,
     playSeconds: typeof p.playSeconds === "number" ? p.playSeconds : 0,
+    // Title system (default empty/0 → existing saves get a one-time retroactive grant).
+    claimedTitles: Array.isArray(p.claimedTitles) ? [...p.claimedTitles] : [],
+    soulsFraction: typeof p.soulsFraction === "number" ? p.soulsFraction : 0,
+    slotBigCount: typeof p.slotBigCount === "number" ? p.slotBigCount : 0,
+    totalCoinsWon: typeof p.totalCoinsWon === "number" ? p.totalCoinsWon : 0,
+    daipanCount: typeof p.daipanCount === "number" ? p.daipanCount : 0,
+    casinoBanned: p.casinoBanned === true,
+    fateWins: typeof p.fateWins === "number" ? p.fateWins : 0,
+    forgeCount: typeof p.forgeCount === "number" ? p.forgeCount : 0,
+    maxForgeLevel: typeof p.maxForgeLevel === "number" ? p.maxForgeLevel : 0,
+    echoWins: typeof p.echoWins === "number" ? p.echoWins : 0,
+    classesUsed: Array.isArray(p.classesUsed) ? [...p.classesUsed] : [],
+    setsCompleted: Array.isArray(p.setsCompleted) ? [...p.setsCompleted] : [],
+    noDamageBossKills: typeof p.noDamageBossKills === "number" ? p.noDamageBossKills : 0,
+    perfectClears: typeof p.perfectClears === "number" ? p.perfectClears : 0,
+    maxSingleHit: typeof p.maxSingleHit === "number" ? p.maxSingleHit : 0,
   };
 }
 

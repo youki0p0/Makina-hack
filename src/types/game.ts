@@ -391,6 +391,35 @@ export interface Progress {
   rankPoints: number;
   /** Rough accumulated play time in seconds (incremented per battle). */
   playSeconds: number;
+  // ===== Title (称号) system =====
+  /** Title ids already unlocked + soul-rewarded (idempotency ledger). */
+  claimedTitles: string[];
+  /** Carried fractional soul remainder from title rewards (0 ≤ f < 1). */
+  soulsFraction: number;
+  /** Casino: cumulative slot BIG (ダイスラッシュ) hits. */
+  slotBigCount: number;
+  /** Casino: cumulative coins won from payouts. */
+  totalCoinsWon: number;
+  /** Casino: cumulative 台パン count, and whether ever banned (出禁). */
+  daipanCount: number;
+  casinoBanned: boolean;
+  /** Casino: 運命の大博打 wins. */
+  fateWins: number;
+  /** Forge: successful forges + highest forge level reached. */
+  forgeCount: number;
+  maxForgeLevel: number;
+  /** Echo Battle wins. */
+  echoWins: number;
+  /** Class ids ever equipped (職業経験). */
+  classesUsed: string[];
+  /** Set keys ever completed (full set bonus reached). */
+  setsCompleted: string[];
+  /** Bosses defeated without taking any damage that battle. */
+  noDamageBossKills: number;
+  /** Floors cleared without taking any damage that battle. */
+  perfectClears: number;
+  /** Biggest single-confirm damage ever dealt. */
+  maxSingleHit: number;
 }
 
 // ===== Persistence =====
