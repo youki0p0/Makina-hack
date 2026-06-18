@@ -18,7 +18,17 @@ import {
   isClassUnlocked,
 } from "@/data/classes";
 import { generateEnemy } from "@/data/enemies";
-import { estimateTier, genItem, genSetItem, getItemById, getItemInstance, makeMakina, MAKINA_ID } from "@/data/items";
+import {
+  estimateTier,
+  genItem,
+  genSetItem,
+  getItemById,
+  getItemInstance,
+  makeMakina,
+  MAKINA_ID,
+  rollGenDrop,
+  SIGNATURE_WEAPON_IDS,
+} from "@/data/items";
 import { forgeCost, rollForge, starInjectCost, FORGE_MAX, type ForgeKind } from "@/data/forge";
 import { applyModifier, modTierForFloor, rollDropModTier } from "@/data/modifiers";
 import { computeSetEffects, getSetDef } from "@/data/sets";
@@ -78,6 +88,7 @@ import {
   HIT_WINDOW_MS,
   MACHINE_COUNT,
   SET_WEAPON_COIN,
+  SIGNATURE_WEAPON_COIN,
   SOULS_COIN,
   settingBucket,
   machineSettings,
@@ -452,6 +463,8 @@ interface GameState {
   daiPan: () => { count: number; banned: boolean };
   /** カジノコイン交換所: spend coins for a set-piece weapon. Returns it or null. */
   coinBuySetWeapon: (setKey: string) => Equipment | null;
+  /** カジノコイン交換所: spend 2000 coins for one random 固有(signature) weapon. Returns it or null. */
+  coinBuySignatureWeapon: () => Equipment | null;
   /** カジノコイン交換所: spend coins for 転生ポイント (souls). */
   coinBuySouls: (n: number) => void;
 
@@ -1770,7 +1783,12 @@ export const useGameStore = create<GameState>((set, get) => {
         atGames = AT_GAMES;
         progress = { ...progress, jackpots: progress.jackpots + 1 };
         if (Math.random() < 0.5) {
-          prize = randomCasinoPrize();
+          // 賞品の3割は「現在階に見合う手続き生成武器」(残りは従来のカジノ専用賞品)。
+          // 深層ほど強い武器が当たり、序盤の入れ食いにはならない形でプールに混ぜる。
+          prize =
+            Math.random() < 0.3
+              ? applyModifier(rollGenDrop(state.currentFloor, 0, "weapon"), modTierForFloor(state.currentFloor))
+              : randomCasinoPrize();
           const capped = capInventory([...inventory, { ...prize }], state.favorites);
           inventory = capped.kept;
           gachaPoints += capped.material;
@@ -1868,6 +1886,35 @@ export const useGameStore = create<GameState>((set, get) => {
       const capped = capInventory([...state.inventory, weapon], state.favorites);
       set({
         coins: state.coins - SET_WEAPON_COIN,
+        inventory: capped.kept,
+        gachaPoints: state.gachaPoints + capped.material,
+        lastPull: weapon,
+        progress: { ...state.progress, discoveredItems: discover(state.progress.discoveredItems, weapon.id) },
+      });
+      persist();
+      return weapon;
+    },
+
+    coinBuySignatureWeapon: (): Equipment | null => {
+      const state = get();
+      // コイン不足ガード(2000枚)。
+      if (state.coins < SIGNATURE_WEAPON_COIN) return null;
+      if (SIGNATURE_WEAPON_IDS.length === 0) return null;
+      // 固有武器をランダムに1つ抽選。固有武器は通常アイテム(id持ち)なのでセーブ互換に影響なし。
+      const id = SIGNATURE_WEAPON_IDS[Math.floor(Math.random() * SIGNATURE_WEAPON_IDS.length)];
+      const base = getItemById(id);
+      if (!base) return null;
+      // 終盤でも腐らないよう、所持ベスト装備の★modを引き継いで付与。
+      let refMod = 0;
+      const consider = (it: Equipment | null) => {
+        if (it) refMod = Math.max(refMod, it.modTier ?? 0);
+      };
+      for (const slot of EQUIP_SLOTS) consider(state.equipped[slot]);
+      for (const it of state.inventory) consider(it);
+      const weapon = refMod > 0 && !base.noModifier ? applyModifier(base, refMod) : base;
+      const capped = capInventory([...state.inventory, weapon], state.favorites);
+      set({
+        coins: state.coins - SIGNATURE_WEAPON_COIN,
         inventory: capped.kept,
         gachaPoints: state.gachaPoints + capped.material,
         lastPull: weapon,

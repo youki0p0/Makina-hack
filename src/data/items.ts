@@ -988,6 +988,14 @@ export function makeMakina(): Equipment {
  */
 export const ITEMS: readonly Equipment[] = [...SIGNATURE_ITEMS];
 
+/**
+ * 固有(signature)武器の id 一覧。カジノコイン交換所などで「固有武器を1つ付与」する
+ * 抽選母集団に使う。神機マキナ(unique)は通常入手から除外する。
+ */
+export const SIGNATURE_WEAPON_IDS: readonly string[] = SIGNATURE_ITEMS.filter(
+  (i) => i.signature && i.slot === "weapon" && !i.unique,
+).map((i) => i.id);
+
 const ITEM_MAP: Map<string, Equipment> = new Map(ITEMS.map((i) => [i.id, i]));
 
 /** Get a fresh copy of an item by id, or null if unknown. */

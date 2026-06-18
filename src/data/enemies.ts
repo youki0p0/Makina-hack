@@ -299,9 +299,10 @@ const TRAIT_FLAVOR: Record<string, EnemyTrait> = {
 
 /**
  * 相性フラグを付与してマッチアップに多様性を与える(単一ビルドで全対応させない)。
- * - ボス/最終ボス: executeImmune 常時。さらに章ボス(rank>=3)は追加で1相性をランダム付与。
- * - 通常敵 floor>=250: 30%で [吸血無効/多段耐性/状態異常耐性] のどれか1つだけ付与。
- *   フレーバーに合う敵は優先、無ければ重み無しランダム。
+ * - ボス/最終ボス: executeImmune 常時。50階区切りの大ボス(rank>=2、章ボス含む)は
+ *   追加で1相性を必ずランダム付与。小ボス(rank===1、10階毎)は相性なし。
+ * - 通常敵 floor>=300: 8%で [吸血無効/多段耐性/状態異常耐性] のどれか1つだけ付与
+ *   ("スパイス"程度の希少さに抑える)。フレーバーに合う敵は優先、無ければ重み無しランダム。
  */
 function assignMatchupTraits(
   enemy: Enemy,
@@ -312,15 +313,16 @@ function assignMatchupTraits(
 ): void {
   if (isBossFloor || isFinalBoss) {
     enemy.executeImmune = true;
-    if (rank >= 3) {
+    // 50階毎(rank>=2)の大ボスは相性を必ず1つ持つ。小ボス(rank===1)は無し。
+    if (rank >= 2) {
       const t = ALL_TRAITS[Math.floor(Math.random() * ALL_TRAITS.length)];
       enemy[t] = true;
     }
     return;
   }
-  // 通常敵: 浅層(floor<250)は無相性のまま。深層のみ抽選。
-  if (floor < 250) return;
-  if (Math.random() < 0.3) {
+  // 通常敵: floor<300 は無相性のまま。深層のみ低確率で抽選("スパイス")。
+  if (floor < 300) return;
+  if (Math.random() < 0.08) {
     const t = TRAIT_FLAVOR[enemy.templateId] ?? ALL_TRAITS[Math.floor(Math.random() * ALL_TRAITS.length)];
     enemy[t] = true;
   }

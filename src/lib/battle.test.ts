@@ -125,6 +125,58 @@ describe("enemy matchup traits", () => {
   });
 });
 
+describe("matchup trait assignment frequency", () => {
+  const hasTrait = (e: ReturnType<typeof generateEnemy>) =>
+    e.lifestealImmune || e.multiHitResist || e.statusResist;
+  const traitCount = (e: ReturnType<typeof generateEnemy>) =>
+    (e.lifestealImmune ? 1 : 0) + (e.multiHitResist ? 1 : 0) + (e.statusResist ? 1 : 0);
+
+  it("normal enemies below floor 300 never carry a matchup trait", () => {
+    // 浅層(floor<300)は無相性。300以上が抽選対象。
+    for (let floor = 1; floor < 300; floor++) {
+      if (floor % 10 === 0) continue; // skip boss floors
+      const e = generateEnemy(floor);
+      expect(hasTrait(e)).toBe(false);
+    }
+  });
+
+  it("normal-enemy trait rate is rare (~8%, well below 20%) at deep floors", () => {
+    // 深層の通常敵(非ボス階)を多数サンプルしてレートを確認。
+    let withTrait = 0;
+    let total = 0;
+    for (let i = 0; i < 4000; i++) {
+      const floor = 301 + (i % 7); // 301..307, all non-boss floors
+      const e = generateEnemy(floor);
+      total++;
+      if (hasTrait(e)) withTrait++;
+      expect(traitCount(e)).toBeLessThanOrEqual(1); // 通常敵は高々1つ
+    }
+    const rate = withTrait / total;
+    expect(rate).toBeGreaterThan(0.02);
+    expect(rate).toBeLessThan(0.2);
+  });
+
+  it("rank>=2 bosses (every 50F) always carry a trait plus executeImmune", () => {
+    for (const floor of [50, 100, 150, 200, 250, 500, 1000]) {
+      // 何度引いても必ず相性を持つ(ランダム性に依存しない保証)。
+      for (let i = 0; i < 50; i++) {
+        const e = generateEnemy(floor);
+        expect(e.executeImmune).toBe(true);
+        expect(hasTrait(e)).toBe(true);
+      }
+    }
+  });
+
+  it("small bosses (rank 1, every 10F) keep executeImmune but need no trait", () => {
+    // 小ボスは即死無効のみ。相性は保証しない(あっても通常敵抽選分のみ=ここでは無し)。
+    for (const floor of [10, 20, 30, 40, 60, 70, 110]) {
+      const e = generateEnemy(floor);
+      expect(e.executeImmune).toBe(true);
+      expect(hasTrait(e)).toBe(false);
+    }
+  });
+});
+
 describe("boss DPS gate ramp (softened to turn 12 / +20%)", () => {
   function boss(bossTurns: number) {
     const e = generateEnemy(100); // a chapter boss floor

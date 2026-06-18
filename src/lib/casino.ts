@@ -142,6 +142,8 @@ export const BAN_BOSSES = 10;
 export const SET_WEAPON_COIN = 8000;
 /** Coins per 転生ポイント (deliberately pricier). */
 export const SOULS_COIN = 3000;
+/** Coins to exchange for one random 固有(signature) weapon. */
+export const SIGNATURE_WEAPON_COIN = 2000;
 
 /**
  * Coin payout for an outcome (replay pays 0 — next spin is free instead).
