@@ -3,14 +3,16 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { bossRank } from "@/data/enemies";
+import { getWorld } from "@/data/worlds";
 import { initAudio, isMuted, setBgmTheme, startBgm } from "@/lib/audio";
+import type { BgmTheme } from "@/lib/audio";
 import { useGameStore } from "@/store/gameStore";
 
 /**
  * Starts audio on the first user gesture (browsers block autoplay) and switches
  * the BGM theme by location: casino (calm glamorous lounge; BIG/ダイスラッシュ
  * temporarily swaps to the idol theme) / forge / dungeon, and on the battle
- * screen a per-50-floor "world" theme (pitch shifts deeper) or a tense boss theme.
+ * screen a per-chapter location theme (w1…w11) or a tense boss theme.
  */
 export default function AudioController() {
   const pathname = usePathname();
@@ -32,8 +34,9 @@ export default function AudioController() {
       if (bossRank(floor) >= 2) {
         setBgmTheme("boss");
       } else {
-        const seg = Math.floor((floor - 1) / 50); // new key every 50 floors
-        setBgmTheme("world", Math.pow(2, (seg % 6) / 12));
+        // Each 100-floor chapter has its own location-themed track (w1…w11).
+        const chapter = Math.min(11, getWorld(floor).chapter);
+        setBgmTheme(`w${chapter}` as BgmTheme);
       }
     } else {
       setBgmTheme("dungeon");
