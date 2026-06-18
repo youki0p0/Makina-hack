@@ -801,8 +801,8 @@ function finalClimax(chord: Chord, step: number, inBar: number, bar: number, lb:
     const bnote = chord.arp[(step >> 1) % chord.arp.length] * 2;
     voice(bnote, 0.3, "triangle", 0.045, 0, (step >> 1) % 2 === 0 ? -0.6 : 0.6, 0.5);
   }
-  // soaring brass lead (the main theme) — 1小節目から全音そのまま。
-  const note = LEAD_PHRASE[(bar % 4) * BAR + inBar];
+  // soaring brass lead — メニューで耳に聴こえる並び(E-D-B-A から)に合わせて開始位置を回転。
+  const note = LEAD_PHRASE[((bar + 3) % 4) * BAR + inBar];
   if (note) {
     echoTone(note, 0.28, "sawtooth", 0.13, 0, 2, 0.11, 0.45);
     echoTone(note * 2, 0.24, "square", 0.06, 0, 1, 0.11, 0.45);
@@ -864,8 +864,8 @@ function finalTick(): void {
     const bnote = chord.arp[(step >> 1) % chord.arp.length] * 2;
     voice(bnote, 0.5, "sine", 0.05, 0, bar % 2 ? 0.5 : -0.5, 0.55);
   }
-  // 主旋律: ビルド中は柔らかいサインで1小節目から全音そのまま。
-  const note = LEAD_PHRASE[(bar % 4) * BAR + inBar];
+  // 主旋律: ビルド中は柔らかいサイン。メニューと同じく E-D-B-A から始まる並びに合わせる。
+  const note = LEAD_PHRASE[((bar + 3) % 4) * BAR + inBar];
   if (note) voice(note, 0.5, "sine", 0.06 + Math.min(0.03, tier * 0.005), 0, 0, 0.5);
 
   // tier1+: 柔らかいサブ
