@@ -410,7 +410,11 @@ const IDOL_LEAD: number[] = [
   440.0, 0, 523.25, 0, 659.25, 0, 0, 0, 587.33, 0, 523.25, 0, 440.0, 0, 0, 0,
 ];
 
-export type BgmTheme = "dungeon" | "world" | "casino" | "forge" | "boss" | "idol";
+/** Per-chapter battle themes (w1…w11) plus the fixed-location themes. */
+export type WorldKey =
+  | "w1" | "w2" | "w3" | "w4" | "w5" | "w6" | "w7" | "w8" | "w9" | "w10" | "w11";
+export type BgmTheme = "dungeon" | "casino" | "forge" | "boss" | "idol" | WorldKey;
+
 interface ThemeDef {
   stepMs: number;
   prog: Chord[];
@@ -418,9 +422,8 @@ interface ThemeDef {
   idol?: boolean;
   casino?: boolean;
 }
-const THEMES: Record<BgmTheme, ThemeDef> = {
+const THEMES: Record<"dungeon" | "casino" | "forge" | "boss" | "idol", ThemeDef> = {
   dungeon: { stepMs: 150, prog: PROG },
-  world: { stepMs: 142, prog: PROG },
   boss: { stepMs: 124, prog: PROG },
   // 落ち着いた煌びやかなラウンジ。専用レンダラ casinoTick が担当(通常カジノBGM)。
   casino: { stepMs: 162, prog: CASINO_PROG, casino: true },
@@ -430,6 +433,114 @@ const THEMES: Record<BgmTheme, ThemeDef> = {
 };
 let bgmTheme: BgmTheme = "dungeon";
 let bgmTranspose = 1;
+
+// ===== Per-world battle music (場所コンセプトのオリジナル曲) =====
+// Each chapter gets its own composition: a key/progression for mood, a tempo,
+// instrument timbres and feature flags (pad / bell / choir / drone / arp / drum
+// style / reverb). One flexible renderer (worldTick) turns a config into a track,
+// so all 11 worlds sound distinct and match their location concept.
+
+/** MIDI note → frequency (A4 = 69 = 440Hz). */
+function hz(midi: number): number {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+/** Build a chord (low root + fifth + a mid-octave triad arp) from a MIDI root. */
+function ch(rootMidi: number, quality: "min" | "maj" | "sus" | "dom"): Chord {
+  const third = quality === "maj" || quality === "dom" ? 4 : quality === "sus" ? 5 : 3;
+  return {
+    root: hz(rootMidi),
+    fifth: hz(rootMidi + 7),
+    arp: [hz(rootMidi + 12 + third), hz(rootMidi + 19), hz(rootMidi + 24), hz(rootMidi + 19)],
+  };
+}
+
+type DrumStyle = "none" | "soft" | "march" | "drive" | "techno";
+interface WorldMusic {
+  name: string;
+  desc: string;
+  stepMs: number;
+  prog: Chord[];
+  bassWave: OscillatorType;
+  arpWave: OscillatorType;
+  drums: DrumStyle;
+  pad?: boolean;
+  bell?: boolean;
+  choir?: boolean;
+  drone?: boolean;
+  arp?: boolean;
+  arpRate?: number; // steps per arp note (1 = 16ths, 2 = 8ths)
+  lead?: boolean;
+  reverb?: number;
+}
+
+const WORLD_MUSIC: Record<WorldKey, WorldMusic> = {
+  // 1 始まりの草原 — bright pastoral D major, gentle.
+  w1: {
+    name: "始まりの草原", desc: "明るく牧歌的なD majorのフィールド曲",
+    stepMs: 150, prog: [ch(50, "maj"), ch(45, "maj"), ch(47, "min"), ch(43, "maj"), ch(50, "maj"), ch(45, "maj"), ch(43, "maj"), ch(45, "maj")],
+    bassWave: "triangle", arpWave: "square", drums: "soft", pad: true, arp: true, arpRate: 2, lead: true, reverb: 0.12,
+  },
+  // 2 深き洞窟 — dark, slow A minor; dripping bells + low drone, very sparse.
+  w2: {
+    name: "深き洞窟", desc: "暗く緩やかなA minor。水滴のベルと低いドローン",
+    stepMs: 182, prog: [ch(45, "min"), ch(41, "maj"), ch(38, "min"), ch(40, "min"), ch(45, "min"), ch(48, "maj"), ch(41, "maj"), ch(40, "min")],
+    bassWave: "triangle", arpWave: "sine", drums: "none", pad: true, bell: true, drone: true, reverb: 0.42,
+  },
+  // 3 古代遺跡 — grand E Phrygian march, brass-ish saws.
+  w3: {
+    name: "古代遺跡", desc: "荘厳なEフリジアンの行進曲。ブラス風のこぎり波",
+    stepMs: 150, prog: [ch(40, "min"), ch(41, "maj"), ch(43, "maj"), ch(40, "min"), ch(40, "min"), ch(45, "min"), ch(41, "maj"), ch(40, "min")],
+    bassWave: "sawtooth", arpWave: "sawtooth", drums: "march", pad: true, arp: true, arpRate: 2, lead: true, reverb: 0.24,
+  },
+  // 4 氷結世界 — crystalline B minor, suspended chords, shimmering bells.
+  w4: {
+    name: "氷結世界", desc: "硝子のように冷たいB minor。煌めくベルとサス和音",
+    stepMs: 158, prog: [ch(47, "min"), ch(43, "maj"), ch(50, "maj"), ch(45, "sus"), ch(47, "min"), ch(42, "min"), ch(43, "maj"), ch(45, "sus")],
+    bassWave: "triangle", arpWave: "triangle", drums: "soft", pad: true, bell: true, choir: true, arp: true, arpRate: 2, reverb: 0.46,
+  },
+  // 5 灼熱火山 — aggressive driving E minor, fast, harsh.
+  w5: {
+    name: "灼熱火山", desc: "獰猛で疾走するE minor。歪んだベースと突進ドラム",
+    stepMs: 118, prog: [ch(40, "min"), ch(48, "maj"), ch(43, "maj"), ch(50, "maj"), ch(40, "min"), ch(41, "maj"), ch(45, "min"), ch(47, "maj")],
+    bassWave: "sawtooth", arpWave: "square", drums: "drive", arp: true, arpRate: 1, lead: true, reverb: 0.08,
+  },
+  // 6 奈落 — ominous, slow, dissonant D minor drone.
+  w6: {
+    name: "奈落", desc: "不穏でゆったりとしたD minor。不協和音とドローン",
+    stepMs: 178, prog: [ch(38, "min"), ch(44, "min"), ch(38, "min"), ch(46, "maj"), ch(38, "min"), ch(39, "maj"), ch(44, "min"), ch(38, "min")],
+    bassWave: "sawtooth", arpWave: "sawtooth", drums: "none", pad: true, drone: true, reverb: 0.4,
+  },
+  // 7 天界 — radiant C major, airy choir + bells.
+  w7: {
+    name: "天界", desc: "荘厳で晴れやかなC major。聖歌隊の声とベル",
+    stepMs: 152, prog: [ch(48, "maj"), ch(43, "maj"), ch(45, "min"), ch(41, "maj"), ch(48, "maj"), ch(50, "maj"), ch(43, "dom"), ch(48, "maj")],
+    bassWave: "sine", arpWave: "sine", drums: "soft", pad: true, bell: true, choir: true, arp: true, arpRate: 2, lead: true, reverb: 0.5,
+  },
+  // 8 星界 — dreamy F# minor, fast twinkling arps, deep reverb.
+  w8: {
+    name: "星界", desc: "幻想的なF# minor。瞬く高速アルペジオと深い残響",
+    stepMs: 104, prog: [ch(42, "min"), ch(50, "maj"), ch(45, "maj"), ch(40, "maj"), ch(42, "min"), ch(37, "maj"), ch(44, "min"), ch(45, "maj")],
+    bassWave: "triangle", arpWave: "triangle", drums: "soft", bell: true, arp: true, arpRate: 1, reverb: 0.46,
+  },
+  // 9 虚無 — ambient drone, minimal, almost no rhythm.
+  w9: {
+    name: "虚無", desc: "アンビエントなドローン。リズムは希薄、漂う無音の音楽",
+    stepMs: 196, prog: [ch(45, "min"), ch(45, "sus"), ch(43, "min"), ch(45, "min"), ch(45, "min"), ch(44, "maj"), ch(43, "min"), ch(45, "sus")],
+    bassWave: "sine", arpWave: "sine", drums: "none", pad: true, drone: true, bell: true, reverb: 0.52,
+  },
+  // 10 機械神界 — mechanical techno, driving 16th acid arps.
+  w10: {
+    name: "機械神界", desc: "機械的なテクノ。駆動する16分アシッド・アルペジオ",
+    stepMs: 92, prog: [ch(45, "min"), ch(41, "maj"), ch(48, "maj"), ch(43, "maj"), ch(45, "min"), ch(41, "maj"), ch(40, "min"), ch(43, "dom")],
+    bassWave: "square", arpWave: "square", drums: "techno", arp: true, arpRate: 1, lead: true, reverb: 0.14,
+  },
+  // 11 Endless Abyss — hypnotic dark violet B minor loop.
+  w11: {
+    name: "Endless Abyss", desc: "催眠的な暗紫のB minorループ",
+    stepMs: 150, prog: [ch(47, "min"), ch(42, "min"), ch(43, "maj"), ch(40, "min"), ch(47, "min"), ch(45, "maj"), ch(42, "min"), ch(43, "maj")],
+    bassWave: "sawtooth", arpWave: "triangle", drums: "soft", pad: true, drone: true, arp: true, arpRate: 2, reverb: 0.34,
+  },
+};
 
 // Arpeggio figures (indices into chord.arp), rotated every bar for variety.
 const ARP_SHAPES: number[][] = [
@@ -448,9 +559,11 @@ const LEAD_PHRASE: number[] = [
 ];
 
 type Mode = "A" | "A2" | "B" | "Ap";
+// Intro (sparse, mode A) is kept short — 3 bars instead of 8 — so the melody/arp
+// (mode A2) kicks in fast and the track doesn't feel like it takes forever to start.
 function sectionOf(bar: number): Mode {
   const b = bar % LOOP_BARS;
-  if (b < 8) return "A";
+  if (b < 3) return "A";
   if (b < 16) return "A2";
   if (b < 24) return "B";
   return "Ap";
@@ -493,15 +606,142 @@ function echoTone(
   for (let i = 0; i <= taps; i++) tone(freq, dur, type, vol * Math.pow(decay, i), when + i * spread);
 }
 
+/** Step length (ms) for the current theme — world themes carry their own tempo. */
+function themeStepMs(theme: BgmTheme): number {
+  const w = WORLD_MUSIC[theme as WorldKey];
+  if (w) return w.stepMs;
+  return THEMES[theme as keyof typeof THEMES].stepMs;
+}
+
 // Dispatcher: each theme has its own full-band renderer; all share one step clock.
 function bgmTick(): void {
   if (muted) return;
-  const def = THEMES[bgmTheme];
-  if (def.idol) idolTick();
-  else if (def.metal) forgeTick();
-  else if (def.casino) casinoTick();
-  else dungeonTick(); // dungeon / world / boss (variants inside)
+  const world = WORLD_MUSIC[bgmTheme as WorldKey];
+  if (world) {
+    worldTick(world);
+  } else {
+    const def = THEMES[bgmTheme as keyof typeof THEMES];
+    if (def.idol) idolTick();
+    else if (def.metal) forgeTick();
+    else if (def.casino) casinoTick();
+    else dungeonTick(); // dungeon / boss (variants inside)
+  }
   bgmStep = (bgmStep + 1) % (BAR * LOOP_BARS);
+}
+
+// ===== Per-world renderer (場所コンセプト曲) =====
+// Config-driven: bass + optional drone/pad/choir/arp/bell/lead and a drum style,
+// shaped by the shared section dynamics (short intro → build → chorus → outro).
+function worldDrums(style: DrumStyle, inBar: number, mode: Mode, full: boolean): void {
+  if (style === "none") {
+    if (full && inBar % 4 === 2) noise(0.02, 0.04);
+    return;
+  }
+  if (style === "soft") {
+    if (inBar === 0 || (full && inBar === 8)) {
+      noise(0.05, 0.16);
+      slideTone(95, 42, 0.1, "sine", 0.18);
+    }
+    if (mode !== "A" && inBar % 2 === 1) noise(0.02, 0.05);
+    if (full && (inBar === 4 || inBar === 12)) noise(0.12, 0.12);
+    return;
+  }
+  if (style === "march") {
+    if (inBar % 4 === 0) {
+      noise(0.05, 0.18);
+      slideTone(90, 40, 0.1, "sine", 0.2);
+    }
+    if (inBar % 4 === 2) noise(0.04, 0.1); // snare
+    if (full && (inBar === 6 || inBar === 14)) noise(0.1, 0.12);
+    return;
+  }
+  if (style === "drive") {
+    if (inBar % 2 === 0) {
+      noise(0.04, 0.16);
+      slideTone(100, 40, 0.08, "sine", 0.2);
+    }
+    if (mode !== "A" && inBar % 2 === 1) noise(0.02, 0.07);
+    if (full && (inBar === 4 || inBar === 12)) {
+      noise(0.13, 0.14);
+      tone(190, 0.1, "triangle", 0.1);
+    }
+    return;
+  }
+  // techno: four-on-the-floor kick + offbeat hats + clap
+  if (inBar % 4 === 0) {
+    noise(0.04, 0.18);
+    slideTone(110, 40, 0.08, "sine", 0.22);
+  }
+  if (mode !== "A" && inBar % 2 === 1) noise(0.02, 0.08);
+  if (full && inBar === 8) noise(0.05, 0.12);
+}
+
+function worldTick(cfg: WorldMusic): void {
+  const T = bgmTranspose;
+  const step = bgmStep;
+  const bar = Math.floor(step / BAR);
+  const inBar = step % BAR;
+  const mode = sectionOf(bar);
+  const dyn = DYN[mode];
+  const chord = cfg.prog[bar % cfg.prog.length];
+  const full = mode === "B";
+  const rev = cfg.reverb ?? 0;
+  const secBar = bar % 8;
+  const phraseStep = (secBar % 4) * BAR + inBar;
+
+  // ---- Bass: octave "drop" at the bar head, fifth mid-bar in fuller sections ----
+  if (inBar === 0) {
+    slideTone(chord.root * 2 * T, chord.root * T, 0.4, cfg.bassWave, 0.18, 0, 0.08);
+    tone(chord.root * T, 0.5, "sine", 0.1);
+  }
+  if (inBar === 8 && dyn.bassOct) tone(chord.fifth * T, 0.4, cfg.bassWave, 0.12);
+
+  // ---- Drone: a sustained low bed for cave / abyss / void ----
+  if (cfg.drone && inBar === 0) {
+    voice(chord.root * T, 2.0, "sawtooth", 0.05, 0, -0.3, rev);
+    voice(chord.root * 1.006 * T, 2.0, "sawtooth", 0.05, 0, 0.3, rev);
+  }
+
+  // ---- Pad: warm detuned-sine chord body ----
+  if (cfg.pad && inBar === 0) {
+    pad(chord.root * T, 1.6, 0.05);
+    if (dyn.padFifth) pad(chord.fifth * T, 1.6, 0.04);
+  }
+
+  // ---- Choir: airy "aah" voices, wide + reverberant (heaven / ice) ----
+  if (cfg.choir && inBar === 0) {
+    voice(chord.arp[0] * T, 2.0, "sine", 0.04, 0, -0.45, Math.max(0.4, rev));
+    voice(chord.arp[1] * T, 2.0, "sine", 0.04, 0.05, 0.45, Math.max(0.4, rev));
+  }
+
+  // ---- Arpeggio: square/triangle figure, 8ths or 16ths ----
+  if (cfg.arp && dyn.arp) {
+    const rate = cfg.arpRate ?? 2;
+    if (inBar % rate === 0) {
+      const shape = ARP_SHAPES[secBar % ARP_SHAPES.length];
+      const note = chord.arp[shape[Math.floor(step / rate) & 3]];
+      const v = dyn.arpVol * (inBar === 0 ? 0.6 : 1);
+      if (note) {
+        tone(note * T, 0.12, cfg.arpWave, v);
+        if (dyn.arpGhost) tone(note * T, 0.1, cfg.arpWave, v * 0.4, 0.06);
+      }
+    }
+  }
+
+  // ---- Bell: crystalline high notes, stereo + reverb (ice / astral / cave drip) ----
+  if (cfg.bell && (full ? inBar % 2 === 0 : inBar % 4 === 2)) {
+    const note = chord.arp[(step >> 1) % chord.arp.length] * 2 * T;
+    const pan = (step >> 1) % 2 === 0 ? -0.6 : 0.6;
+    voice(note, 0.28, "sine", 0.05, 0, pan, Math.max(0.4, rev));
+  }
+
+  // ---- Lead: sparse melody with echo, only in fuller sections ----
+  if (cfg.lead && dyn.lead) {
+    const note = LEAD_PHRASE[phraseStep];
+    if (note) echoTone(note * T, 0.26, cfg.arpWave, 0.1, 0, 2, 0.12, 0.45);
+  }
+
+  worldDrums(cfg.drums, inBar, mode, full);
 }
 
 // ===== Casino renderer (落ち着いた煌びやかラウンジ) =====
@@ -556,7 +796,7 @@ function casinoTick(): void {
 // rotating square arpeggio, echoing lead, and full drums. Boss = faster, with a
 // dissonant stab, tom fill and ride; World = brighter with an octave shimmer.
 function dungeonTick(): void {
-  const def = THEMES[bgmTheme];
+  const def = bgmTheme === "boss" ? THEMES.boss : THEMES.dungeon;
   const T = bgmTranspose;
   const step = bgmStep;
   const bar = Math.floor(step / BAR);
@@ -568,7 +808,6 @@ function dungeonTick(): void {
   const phraseStep = (secBar % 4) * BAR + inBar;
   const duck = inBar === 0 ? 0.6 : 1;
   const isBoss = bgmTheme === "boss";
-  const isWorld = bgmTheme === "world";
   const full = mode === "B";
 
   // ---- Bass: bar head "drops" from the octave (slide) + sine sub; driving pulse on boss ----
@@ -584,7 +823,6 @@ function dungeonTick(): void {
   if (inBar === 0) {
     pad(chord.root * T, 1.6, 0.06);
     if (dyn.padFifth) pad(chord.fifth * T, 1.6, 0.05);
-    if (isWorld && dyn.padFifth) pad(chord.fifth * 2 * T, 1.8, 0.025);
   }
 
   // ---- Arpeggio: square 8ths, figure rotates; world doubles an octave up in the chorus ----
@@ -595,7 +833,6 @@ function dungeonTick(): void {
     if (note) {
       tone(note * T, 0.12, "square", v);
       if (dyn.arpGhost) tone(note * T, 0.1, "square", v * 0.4, 0.075);
-      if (isWorld && full) tone(note * 2 * T, 0.08, "square", v * 0.5, 0.04);
     }
   }
 
@@ -825,7 +1062,7 @@ let visHooked = false;
 
 function startTimer(): void {
   if (bgmTimer != null) return;
-  bgmTimer = setInterval(bgmTick, THEMES[bgmTheme].stepMs);
+  bgmTimer = setInterval(bgmTick, themeStepMs(bgmTheme));
 }
 function clearTimer(): void {
   if (bgmTimer != null) {
@@ -888,26 +1125,34 @@ export function setMuted(m: boolean): void {
   }
 }
 
+/** @internal test only — render `steps` of a theme through the synth path. */
+export function __tickThemeForTest(theme: BgmTheme, steps: number): void {
+  const prev = bgmTheme;
+  bgmTheme = theme;
+  bgmStep = 0;
+  muted = false;
+  for (let i = 0; i < steps; i++) bgmTick();
+  bgmTheme = prev;
+}
+
 // ===== Jukebox catalog (図鑑の音楽鑑賞) =====
-// 各BGMをループ再生で鑑賞するための一覧。階層曲は AudioController と同じく
-// 50階ごとにキーが半音上がる「world」テーマ(6キーで1巡)を再現する。
+// ループ再生で鑑賞するBGM一覧。各ワールド(章)はそれぞれ固有のオリジナル曲。
 export interface MusicTrack {
   id: string;
   name: string;
   desc: string;
   theme: BgmTheme;
-  /** Pitch transpose (深層のキー変化). 1 = 原曲キー。 */
+  /** Pitch transpose. 1 = 原曲キー。 */
   transpose?: number;
 }
 
-/** 6 floor "chapters": world theme keyed up a semitone every 50 floors. */
-const WORLD_TRACKS: MusicTrack[] = Array.from({ length: 6 }, (_, seg) => ({
-  id: `world-${seg}`,
-  name: `戦闘 ${seg * 50 + 1}–${seg * 50 + 50}階`,
-  desc: seg === 0 ? "「世界」テーマ・基準キー" : `「世界」テーマ・基準より${seg}半音上`,
-  theme: "world" as BgmTheme,
-  transpose: Math.pow(2, (seg % 6) / 12),
-}));
+/** One track per chapter (w1…w11), each a distinct location-themed composition. */
+const WORLD_KEYS: WorldKey[] = ["w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8", "w9", "w10", "w11"];
+const WORLD_TRACKS: MusicTrack[] = WORLD_KEYS.map((key, i) => {
+  const m = WORLD_MUSIC[key];
+  const range = i < 10 ? `${i * 100 + 1}–${i * 100 + 100}階` : "1001階〜";
+  return { id: key, name: `${m.name} (${range})`, desc: m.desc, theme: key };
+});
 
 export const MUSIC_TRACKS: MusicTrack[] = [
   { id: "dungeon", name: "迷宮 / 拠点", desc: "メニューで流れる A-minor のダンジョンループ", theme: "dungeon" },
