@@ -758,14 +758,58 @@ function worldTick(cfg: WorldMusic): void {
 // テンポはダイスラッシュ並みに疾走、効果(ブラス/合唱/サブ/ティンパニ/ヒット)は満載。
 const FINAL_STEP_MS = 84; // ダイスラッシュ(idol)と同じ突っ走るテンポ(≈178 BPM, 16分)
 
-/** Arrangement dynamics for the final theme: intensity 0..1 + calm/build flags. */
-function finalPhase(bar: number): { lv: number; calm: boolean; build: boolean } {
-  const b = bar % FINAL_LOOP_BARS; // 0..47
-  if (b < 4) return { lv: 0.35 + b * 0.16, calm: false, build: true }; // 導入ビルド 0.35→0.83
-  if (b < 16) return { lv: 1, calm: false, build: false }; // クライマックス
-  if (b < 20) return { lv: 0.25, calm: true, build: false }; // 静かなブレイク
-  if (b < 32) return { lv: 0.3 + ((b - 20) / 12) * 0.7, calm: false, build: true }; // 再構築フェード 0.3→1
-  return { lv: 1, calm: false, build: false }; // 大サビ(32–47)
+// 48小節の構成(近代EDM流): クライマックスA[0–14] → 崩しの遷移[15] →
+// 静寂から2小節ごとに1レイヤーずつ積むビルド[16–31] → ドロップ → 大サビ[32–47]。
+// クライマックス↔ループ継ぎ目(47→0)は両方フルなので滑らか。
+
+/** Full-band climax (used by [0–14] and [32–47]). */
+function finalClimax(chord: Chord, step: number, inBar: number, bar: number, lb: number): void {
+  // kick / hats / snare backbeat
+  if (inBar % 4 === 0) {
+    noise(0.06, 0.24);
+    slideTone(120, 40, 0.12, "sine", 0.28);
+  }
+  if (inBar % 2 === 1) noise(0.02, 0.09);
+  if (inBar === 4 || inBar === 12) {
+    noise(0.16, 0.2);
+    tone(190, 0.12, "triangle", 0.14);
+  }
+  // octave bass + sub
+  if (inBar % 2 === 0) tone(inBar % 4 === 0 ? chord.root : chord.root * 2, 0.14, "sawtooth", 0.2);
+  if (inBar === 0) tone(chord.root * 0.5, 0.6, "sine", 0.16);
+  // wide brass power chords
+  if (inBar === 0 || inBar === 8) {
+    voice(chord.root, 0.5, "sawtooth", 0.1, 0, -0.55, 0.22);
+    voice(chord.root * 1.007, 0.5, "sawtooth", 0.1, 0, 0.55, 0.22);
+    voice(chord.fifth, 0.5, "sawtooth", 0.09, 0, 0.3, 0.22);
+    voice(chord.root * 2, 0.5, "sawtooth", 0.07, 0, -0.3, 0.22);
+  }
+  // grand choir bed
+  if (inBar === 0) {
+    voice(chord.arp[0], 1.8, "sine", 0.05, 0, -0.5, 0.5);
+    voice(chord.arp[1], 1.8, "sine", 0.05, 0.04, 0.5, 0.5);
+    voice(chord.fifth * 2, 1.8, "sine", 0.035, 0.08, 0, 0.5);
+  }
+  // fast arp + high shimmer
+  const an = chord.arp[ARP_SHAPES[(bar % 8) % ARP_SHAPES.length][step & 3]];
+  if (an) tone(an, 0.1, "square", 0.07);
+  if (inBar % 2 === 0) {
+    const bnote = chord.arp[(step >> 1) % chord.arp.length] * 2;
+    voice(bnote, 0.3, "triangle", 0.045, 0, (step >> 1) % 2 === 0 ? -0.6 : 0.6, 0.5);
+  }
+  // soaring brass lead (the main theme)
+  const note = LEAD_PHRASE[(bar % 4) * BAR + inBar];
+  if (note) {
+    echoTone(note, 0.28, "sawtooth", 0.13, 0, 2, 0.11, 0.45);
+    echoTone(note * 2, 0.24, "square", 0.06, 0, 1, 0.11, 0.45);
+    voice(note, 0.3, "sine", 0.05, 0, 0, 0.4);
+  }
+  // orchestral hit + crash at each climax downbeat (drop landing)
+  if ((lb === 0 || lb === 32) && inBar === 0) {
+    noise(0.4, 0.22);
+    tone(chord.root, 0.4, "sawtooth", 0.13);
+    tone(chord.fifth, 0.4, "sawtooth", 0.1);
+  }
 }
 
 function finalTick(): void {
@@ -774,94 +818,82 @@ function finalTick(): void {
   const bar = Math.floor(step / BAR);
   const inBar = step % BAR;
   const chord = PROG[bar % PROG.length]; // ★ メインテーマの進行を踏襲
-  const { lv, calm, build } = finalPhase(bar);
-  const climax = lv >= 0.99 && !calm;
-  const heroic = lv > 0.5 && !calm;
+  const lb = bar % FINAL_LOOP_BARS;
 
-  // ---- Drums: フル時は重いキック(4つ打ち)+バックビート+ride。静寂時は心音だけ ----
-  if (!calm && lv > 0.4) {
-    if (inBar % 4 === 0) {
-      noise(0.06, 0.24 * lv);
-      slideTone(120, 40, 0.12, "sine", 0.28 * lv);
+  // ===== [15] クライマックス→静寂の "崩し" 遷移(EDMのダウンリフター+リバースシンバル) =====
+  if (lb === 15) {
+    if (inBar === 0) slideTone(chord.root * 4, chord.root, 1.3, "sawtooth", 0.13); // downlifter
+    // 加速するスネアロール → bar頭に向かって膨らむ逆再生シンバル
+    if (inBar % (inBar < 8 ? 2 : 1) === 0) noise(0.03, 0.05 + inBar * 0.012);
+    noisePan(0.06, 0.02 + (inBar / 16) * 0.24, 0, 0.35);
+    // 合唱だけは繋ぎとして残す
+    if (inBar === 0) {
+      voice(chord.arp[0], 1.6, "sine", 0.045, 0, -0.5, 0.5);
+      voice(chord.arp[1], 1.6, "sine", 0.045, 0.04, 0.5, 0.5);
     }
-    if (inBar % 2 === 1) noise(0.02, (climax ? 0.09 : 0.05) * lv);
-    if (inBar === 4 || inBar === 12) {
-      noise(0.16, 0.2 * lv);
-      tone(190, 0.12, "triangle", 0.14 * lv);
-    }
-  }
-  if (calm && inBar === 0) {
-    noise(0.03, 0.05);
-    slideTone(90, 40, 0.12, "sine", 0.1); // 静かな鼓動
+    return;
   }
 
-  // ---- Bass: サウのオクターブ駆動 + 深いサブ(静寂時は柔らかく長く) ----
-  if (lv > 0.25 && inBar % 2 === 0) {
-    const bf = inBar % 4 === 0 ? chord.root : chord.root * 2;
-    tone(bf, 0.14, "sawtooth", (calm ? 0.07 : 0.2) * Math.max(0.4, lv));
-  }
-  if (inBar === 0) tone(chord.root * 0.5, calm ? 1.2 : 0.6, "sine", calm ? 0.1 : 0.16);
-
-  // ---- ブラスのパワーコード(デチューンsaw root+5度+oct、左右に広く) ----
-  if (!calm && (inBar === 0 || (climax && inBar === 8))) {
-    const v = (climax ? 0.1 : 0.07) * lv;
-    voice(chord.root, 0.5, "sawtooth", v, 0, -0.55, 0.22);
-    voice(chord.root * 1.007, 0.5, "sawtooth", v, 0, 0.55, 0.22);
-    voice(chord.fifth, 0.5, "sawtooth", v * 0.9, 0, 0.3, 0.22);
-    voice(chord.root * 2, 0.5, "sawtooth", v * 0.7, 0, -0.3, 0.22);
+  // ===== クライマックス [0–14] / 大サビ [32–47] =====
+  if (lb < 15 || lb >= 32) {
+    finalClimax(chord, step, inBar, bar, lb);
+    return;
   }
 
-  // ---- 合唱: 常に鳴る壮大な土台。静寂時は剥き出しで前に出る ----
+  // ===== 静寂 → 2小節ごとにレイヤーを積むビルド [16–31] =====
+  const tier = Math.floor((lb - 16) / 2); // 0..7、2小節ごとに +1
+  // [16] ドロップ着地のインパクト + 長い残響テールで静寂へ
+  if (lb === 16 && inBar === 0) {
+    noise(0.5, 0.26);
+    tone(chord.root, 0.5, "sine", 0.2);
+    voice(chord.root, 2.6, "sawtooth", 0.05, 0, 0, 0.6); // reverberant boom tail
+  }
+
+  // tier0(常時): 剥き出しの合唱パッド + 柔らかい主旋律 + 疎なベル(静かな曲調)
   if (inBar === 0) {
-    const cv = calm ? 0.06 : 0.05 * Math.max(0.5, lv);
-    const dur = calm ? 2.4 : 1.8;
-    voice(chord.arp[0], dur, "sine", cv, 0, -0.5, 0.5);
-    voice(chord.arp[1], dur, "sine", cv, 0.04, 0.5, 0.5);
-    voice(chord.fifth * 2, dur, "sine", cv * 0.7, 0.08, 0, 0.5);
+    voice(chord.arp[0], 2.2, "sine", 0.06, 0, -0.5, 0.55);
+    voice(chord.arp[1], 2.2, "sine", 0.06, 0.04, 0.5, 0.55);
+    voice(chord.fifth * 2, 2.2, "sine", 0.04, 0.08, 0, 0.55);
   }
-
-  // ---- 16分の高速アルペジオ(盛り上がり時のみ) ----
-  if (heroic) {
-    const shape = ARP_SHAPES[(bar % 8) % ARP_SHAPES.length];
-    const note = chord.arp[shape[step & 3]];
-    if (note) tone(note, 0.1, "square", (climax ? 0.07 : 0.05) * lv);
+  if (inBar % 4 === 0) {
+    const bnote = chord.arp[(step >> 1) % chord.arp.length] * 2;
+    voice(bnote, 0.5, "sine", 0.05, 0, bar % 2 ? 0.5 : -0.5, 0.55);
   }
-
-  // ---- 高域シマー: クライマックスは密に、静寂時は疎で綺麗に ----
-  if ((climax && inBar % 2 === 0) || (calm && inBar % 4 === 0)) {
-    const note = chord.arp[(step >> 1) % chord.arp.length] * 2;
-    const pan = (step >> 1) % 2 === 0 ? -0.6 : 0.6;
-    voice(note, calm ? 0.5 : 0.3, calm ? "sine" : "triangle", calm ? 0.05 : 0.045, 0, pan, 0.5);
-  }
-
-  // ---- 主旋律(メインテーマ): 強度で音色を変える。静寂=柔らかいサイン、クライマックス=ブラス+オクターブ ----
   const note = LEAD_PHRASE[(bar % 4) * BAR + inBar];
   if (note) {
-    if (calm) {
-      voice(note, 0.5, "sine", 0.07, 0, 0, 0.5); // 静かな主旋律
-    } else if (climax) {
-      echoTone(note, 0.28, "sawtooth", 0.13, 0, 2, 0.11, 0.45);
-      echoTone(note * 2, 0.24, "square", 0.06, 0, 1, 0.11, 0.45);
-      voice(note, 0.3, "sine", 0.05, 0, 0, 0.4);
-    } else if (heroic || build) {
-      echoTone(note, 0.26, "sawtooth", 0.1 * Math.max(0.5, lv), 0, 1, 0.11, 0.4);
+    if (tier >= 5) echoTone(note, 0.26, "sawtooth", 0.09 + (tier - 5) * 0.02, 0, 1, 0.11, 0.4);
+    else voice(note, 0.5, "sine", 0.06, 0, 0, 0.5);
+  }
+
+  // tier1+: 柔らかいサブ
+  if (tier >= 1 && inBar === 0) tone(chord.root * 0.5, 1.0, "sine", 0.12);
+  // tier2+: 静かな4つ打ちキック(徐々に強く)
+  if (tier >= 2 && inBar % 4 === 0) {
+    noise(0.04, 0.07 + tier * 0.02);
+    slideTone(110, 42, 0.1, "sine", 0.1 + tier * 0.02);
+  }
+  // tier3+: 裏ハット
+  if (tier >= 3 && inBar % 2 === 1) noise(0.02, 0.05);
+  // tier4+: オクターブ・ベース駆動
+  if (tier >= 4 && inBar % 2 === 0) tone(inBar % 4 === 0 ? chord.root : chord.root * 2, 0.13, "sawtooth", 0.14);
+  // tier5+: アルペジオ復帰
+  if (tier >= 5) {
+    const an = chord.arp[ARP_SHAPES[(bar % 8) % ARP_SHAPES.length][step & 3]];
+    if (an) tone(an, 0.1, "square", 0.05);
+  }
+  // tier6+: ブラスstab + バックビートのクラップ
+  if (tier >= 6) {
+    if (inBar === 0) {
+      voice(chord.root, 0.4, "sawtooth", 0.07, 0, -0.5, 0.2);
+      voice(chord.fifth, 0.4, "sawtooth", 0.06, 0, 0.5, 0.2);
     }
+    if (inBar === 4 || inBar === 12) noisePan(0.05, 0.12, 0, 0.2);
   }
-
-  // ---- 再構築/導入の riser: クライマックスに近づくほど強く駆け上がる ----
-  if (build) {
-    const b = bar % FINAL_LOOP_BARS;
-    const toClimax = b < 4 ? (b + inBar / 16) / 4 : (b - 20 + inBar / 16) / 12;
-    if (inBar % 2 === 0) slideTone(300, 1200, 0.12, "sawtooth", 0.02 + toClimax * 0.05);
-    if (inBar % 4 === 2) noise(0.04, 0.03 + toClimax * 0.18);
-  }
-
-  // ---- オーケストラ・ヒット + シンバル(各クライマックス突入の頭) ----
-  const lb = bar % FINAL_LOOP_BARS;
-  if (!calm && (lb === 4 || lb === 32) && inBar === 0) {
-    noise(0.4, 0.22);
-    tone(chord.root, 0.4, "sawtooth", 0.13);
-    tone(chord.fifth, 0.4, "sawtooth", 0.1);
+  // tier7(最後の2小節 30–31): ドロップ直前のスネアロール加速 + riser
+  if (tier >= 7) {
+    const p = (lb - 30 + inBar / 16) / 2; // 0..1
+    if (inBar % (p < 0.5 ? 2 : 1) === 0) noise(0.03, 0.08 + p * 0.24);
+    if (inBar % 2 === 0) slideTone(300, 1600, 0.14, "sawtooth", 0.03 + p * 0.07);
   }
 }
 
