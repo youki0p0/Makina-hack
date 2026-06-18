@@ -118,6 +118,24 @@ import { faceByValue } from "@/data/diceFaces";
 
 const LOG_LIMIT = 14;
 
+/** セーブポイントの階層（1, 51, 101…）。ここでは転職を常に許可する。 */
+function isSavePointFloor(floor: number): boolean {
+  return floor >= 1 && (floor - 1) % 50 === 0;
+}
+
+/** 転職可能か（初期クラス中・敗北直後・セーブポイント階のいずれか）。 */
+function canChangeClassNow(state: {
+  classId: ClassId;
+  battleState: BattleState;
+  currentFloor: number;
+}): boolean {
+  return (
+    state.classId === DEFAULT_CLASS_ID ||
+    state.battleState === "lost" ||
+    isSavePointFloor(state.currentFloor)
+  );
+}
+
 function createPlayer(): Player {
   return {
     level: 1,
@@ -707,9 +725,8 @@ export const useGameStore = create<GameState>((set, get) => {
     stats: () => currentStats(get().player, get().equipped, get().activeBuffs),
     currentFace: () => faceByValue(get().diceFaces, get().diceValue),
     rebirthGain: () => computeRebirthGain(get().currentFloor, get().player.level),
-    // 転職できるのは倒れた後だけ（初期クラスのうちは常に可）。
-    canChangeClass: () =>
-      get().classId === DEFAULT_CLASS_ID || get().battleState === "lost",
+    // 転職できるのは初期クラス中・敗北直後・セーブポイント階（1,51,101…）。
+    canChangeClass: () => canChangeClassNow(get()),
 
     hydrate: () => {
       if (get().hydrated) return;
@@ -1910,8 +1927,8 @@ export const useGameStore = create<GameState>((set, get) => {
 
     changeClass: (id: ClassId) => {
       const state = get();
-      // 転職は倒れた後だけ（初期クラスのうちは自由）。
-      if (!(state.classId === DEFAULT_CLASS_ID || state.battleState === "lost")) return;
+      // 転職は初期クラス中・敗北直後・セーブポイント階のいずれか。
+      if (!canChangeClassNow(state)) return;
       if (id === state.classId) return;
       if (!isClassUnlocked(id, state.progress)) return;
       const cls = getClass(id);
