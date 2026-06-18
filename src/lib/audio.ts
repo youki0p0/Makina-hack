@@ -758,6 +758,10 @@ function worldTick(cfg: WorldMusic): void {
 // テンポはダイスラッシュ並みに疾走、効果(ブラス/合唱/サブ/ティンパニ/ヒット)は満載。
 const FINAL_STEP_MS = 84; // ダイスラッシュ(idol)と同じ突っ走るテンポ(≈178 BPM, 16分)
 
+// ラスボス曲のコード進行 = 小室進行(vi–IV–V–I = Am–F–G–C)。主旋律(LEAD_PHRASE,
+// A minor)の動きはそのままに、コードだけ差し替える。4小節周期で旋律と揃う。
+const FINAL_PROG: Chord[] = [ch(45, "min"), ch(41, "maj"), ch(43, "maj"), ch(48, "maj")];
+
 // 48小節の構成(近代EDM流): クライマックスA[0–14] → 崩しの遷移[15] →
 // 静寂から2小節ごとに1レイヤーずつ積むビルド[16–31] → ドロップ → 大サビ[32–47]。
 // クライマックス↔ループ継ぎ目(47→0)は両方フルなので滑らか。
@@ -817,7 +821,7 @@ function finalTick(): void {
   const step = bgmStep;
   const bar = Math.floor(step / BAR);
   const inBar = step % BAR;
-  const chord = PROG[bar % PROG.length]; // ★ メインテーマの進行を踏襲
+  const chord = FINAL_PROG[bar % FINAL_PROG.length]; // ★ 小室進行(旋律はメインテーマのまま)
   const lb = bar % FINAL_LOOP_BARS;
 
   // ===== [15] クライマックス→静寂の "崩し" 遷移(EDMのダウンリフター+リバースシンバル) =====
