@@ -379,6 +379,8 @@ export interface Progress {
   claimedMilestones: number[];
   /** Ids of floor achievements already claimed. */
   claimedFloorAchievements: string[];
+  /** Achievement ids already shown as an unlock toast (so each fires only once). */
+  notifiedAchievements: string[];
   /** The 1000F DEUS EX MACHINA ending has been witnessed (one-time, unskippable). */
   endingSeen: boolean;
   /** New Game+ count (強くてニューゲーム). */

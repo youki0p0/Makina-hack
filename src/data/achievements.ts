@@ -21,6 +21,7 @@ export function defaultProgress(): Progress {
     highestFloorReached: 1,
     claimedMilestones: [],
     claimedFloorAchievements: [],
+    notifiedAchievements: [],
     endingSeen: false,
     ngPlus: 0,
     makinaGranted: false,
@@ -49,7 +50,7 @@ export function defaultProgress(): Progress {
 export function normalizeProgress(p?: Partial<Progress>): Progress {
   const base = defaultProgress();
   if (!p) return base;
-  return {
+  const result: Progress = {
     maxFloor: typeof p.maxFloor === "number" ? p.maxFloor : base.maxFloor,
     kills: typeof p.kills === "number" ? p.kills : 0,
     bossKills: typeof p.bossKills === "number" ? p.bossKills : 0,
@@ -71,6 +72,8 @@ export function normalizeProgress(p?: Partial<Progress>): Progress {
     claimedFloorAchievements: Array.isArray(p.claimedFloorAchievements)
       ? [...p.claimedFloorAchievements]
       : [],
+    // Backfilled below once the rest of the fields are known.
+    notifiedAchievements: [],
     endingSeen: p.endingSeen === true,
     ngPlus: typeof p.ngPlus === "number" ? p.ngPlus : 0,
     makinaGranted: p.makinaGranted === true,
@@ -96,6 +99,14 @@ export function normalizeProgress(p?: Partial<Progress>): Progress {
     perfectClears: typeof p.perfectClears === "number" ? p.perfectClears : 0,
     maxSingleHit: typeof p.maxSingleHit === "number" ? p.maxSingleHit : 0,
   };
+  // notifiedAchievements: keep saved value if present. For OLD saves (field
+  // missing) backfill with everything ALREADY satisfied, so existing players
+  // don't get spammed with a wall of retroactive toasts on the first load —
+  // only achievements earned from here on will notify.
+  result.notifiedAchievements = Array.isArray(p.notifiedAchievements)
+    ? p.notifiedAchievements.filter((x): x is string => typeof x === "string")
+    : ACHIEVEMENTS.filter((a) => a.check(result)).map((a) => a.id);
+  return result;
 }
 
 export const ACHIEVEMENTS: readonly Achievement[] = [
@@ -117,4 +128,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
 
 export function achievedCount(p: Progress): number {
   return ACHIEVEMENTS.filter((a) => a.check(p)).length;
+}
+
+/** Look up an achievement by id (for the unlock toast). */
+export function getAchievement(id: string): Achievement | undefined {
+  return ACHIEVEMENTS.find((a) => a.id === id);
+}
+
+/** Achievement ids satisfied by `p` but not yet shown as a toast. */
+export function newlyEarnedAchievements(p: Progress): string[] {
+  const out: string[] = [];
+  for (const a of ACHIEVEMENTS) {
+    if (a.check(p) && !p.notifiedAchievements.includes(a.id)) out.push(a.id);
+  }
+  return out;
 }
