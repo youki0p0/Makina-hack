@@ -16,9 +16,27 @@ import EnemyIcon from "@/components/EnemyIcon";
 import PixelGlyph from "@/components/PixelGlyph";
 import GlyphText from "@/components/GlyphText";
 import { rarityLabel, rarityStyle } from "@/lib/ui";
+import {
+  MUSIC_TRACKS,
+  initAudio,
+  isMuted,
+  setBgmTheme,
+  setMuted,
+  startBgm,
+  stopBgm,
+} from "@/lib/audio";
 import { useGameStore } from "@/store/gameStore";
 
-type Tab = "achievements" | "items" | "sets" | "enemies" | "titles";
+type Tab = "achievements" | "items" | "sets" | "enemies" | "titles" | "music";
+
+const TAB_LABEL: Record<Tab, string> = {
+  achievements: "実績",
+  items: "装備",
+  sets: "セット",
+  enemies: "敵",
+  titles: "称号",
+  music: "音楽",
+};
 
 export default function CollectionPage() {
   const hydrate = useGameStore((s) => s.hydrate);
@@ -27,10 +45,32 @@ export default function CollectionPage() {
   const titleId = useGameStore((s) => s.titleId);
   const setTitle = useGameStore((s) => s.setTitle);
   const [tab, setTab] = useState<Tab>("achievements");
+  const [playingId, setPlayingId] = useState<string | null>(null);
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  // Stop the jukebox and restore the menu theme when leaving the 音楽 tab.
+  useEffect(() => {
+    if (tab !== "music" && playingId !== null) {
+      setBgmTheme("dungeon");
+      setPlayingId(null);
+    }
+  }, [tab, playingId]);
+
+  const playTrack = (track: (typeof MUSIC_TRACKS)[number]) => {
+    initAudio();
+    if (playingId === track.id) {
+      stopBgm();
+      setPlayingId(null);
+      return;
+    }
+    if (isMuted()) setMuted(false); // 鑑賞のためサウンドを有効化
+    setBgmTheme(track.theme, track.transpose ?? 1);
+    startBgm();
+    setPlayingId(track.id);
+  };
 
   if (!hydrated) {
     return (
@@ -64,8 +104,8 @@ export default function CollectionPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-5 gap-1">
-        {(["achievements", "items", "sets", "enemies", "titles"] as Tab[]).map((t) => (
+      <div className="grid grid-cols-6 gap-1">
+        {(["achievements", "items", "sets", "enemies", "titles", "music"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -73,15 +113,7 @@ export default function CollectionPage() {
               tab === t ? "bg-emerald-600 text-white" : "bg-white/10 text-gray-300"
             }`}
           >
-            {t === "achievements"
-              ? "実績"
-              : t === "items"
-                ? "装備"
-                : t === "sets"
-                  ? "セット"
-                  : t === "enemies"
-                    ? "敵"
-                    : "称号"}
+            {TAB_LABEL[t]}
           </button>
         ))}
       </div>
@@ -248,6 +280,38 @@ export default function CollectionPage() {
                   <p className="text-[10px] text-gray-400">{t.desc}</p>
                 </div>
                 {current && <span className="text-[10px] text-amber-300">選択中</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {tab === "music" && (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-400">
+            ゲーム中のBGMをループ再生で鑑賞できる。曲をタップで再生、もう一度で停止。
+            <span className="ml-1 text-[10px] text-gray-500">（再生するとサウンドがオンになります）</span>
+          </p>
+          {MUSIC_TRACKS.map((t) => {
+            const playing = playingId === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => playTrack(t)}
+                className={`flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left active:scale-[0.98] ${
+                  playing ? "border-emerald-500/60 bg-emerald-500/10" : "border-white/10 bg-black/20"
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className={`font-bold ${playing ? "text-emerald-200" : "text-gray-100"}`}>
+                    {t.name}
+                    {playing && <span className="ml-2 text-[10px] text-emerald-300">再生中…</span>}
+                  </p>
+                  <p className="text-[10px] text-gray-400">{t.desc}</p>
+                </div>
+                <span className={`shrink-0 text-lg ${playing ? "text-emerald-300" : "text-gray-400"}`}>
+                  {playing ? "⏸" : "▶"}
+                </span>
               </button>
             );
           })}

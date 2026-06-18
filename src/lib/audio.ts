@@ -887,3 +887,33 @@ export function setMuted(m: boolean): void {
     startBgm();
   }
 }
+
+// ===== Jukebox catalog (図鑑の音楽鑑賞) =====
+// 各BGMをループ再生で鑑賞するための一覧。階層曲は AudioController と同じく
+// 50階ごとにキーが半音上がる「world」テーマ(6キーで1巡)を再現する。
+export interface MusicTrack {
+  id: string;
+  name: string;
+  desc: string;
+  theme: BgmTheme;
+  /** Pitch transpose (深層のキー変化). 1 = 原曲キー。 */
+  transpose?: number;
+}
+
+/** 6 floor "chapters": world theme keyed up a semitone every 50 floors. */
+const WORLD_TRACKS: MusicTrack[] = Array.from({ length: 6 }, (_, seg) => ({
+  id: `world-${seg}`,
+  name: `戦闘 ${seg * 50 + 1}–${seg * 50 + 50}階`,
+  desc: seg === 0 ? "「世界」テーマ・基準キー" : `「世界」テーマ・基準より${seg}半音上`,
+  theme: "world" as BgmTheme,
+  transpose: Math.pow(2, (seg % 6) / 12),
+}));
+
+export const MUSIC_TRACKS: MusicTrack[] = [
+  { id: "dungeon", name: "迷宮 / 拠点", desc: "メニューで流れる A-minor のダンジョンループ", theme: "dungeon" },
+  ...WORLD_TRACKS,
+  { id: "boss", name: "大ボス戦", desc: "速く緊迫した大ボス階のテーマ", theme: "boss" },
+  { id: "casino", name: "カジノ", desc: "落ち着いた煌びやかなラウンジ", theme: "casino" },
+  { id: "forge", name: "鍛冶屋", desc: "重厚な D-ドリアン。金床のクランク", theme: "forge" },
+  { id: "idol", name: "ダイスラッシュ (AT)", desc: "王道進行のアイドルポップ(BIG中)", theme: "idol" },
+];
