@@ -93,6 +93,6 @@ describe("grantTitles", () => {
     // whole souls + carried fraction = the exact total awarded.
     const total = res.souls + res.progress.soulsFraction;
     expect(total).toBeGreaterThan(40);
-    expect(total).toBeLessThan(110);
+    expect(total).toBeLessThan(180);
   });
 });

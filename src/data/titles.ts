@@ -177,6 +177,75 @@ export const TITLES: readonly Title[] = [
   { id: "fg25", name: "鍛冶の達人", desc: "鍛冶25回成功", tier: "medium", check: (p) => p.forgeCount >= 25 },
   { id: "t100h", name: "時を忘れし者", desc: "累計100時間プレイ", tier: "secret", hidden: true, check: (p) => p.playSeconds >= 360000 },
 
+  // ===== 追加2 (やりこみ拡張・50称号) =====
+  // 探索の刻み
+  { id: "f_10", name: "石畳の探索者", desc: "10階に到達", tier: "easy", check: (p) => p.maxFloor >= 10 },
+  { id: "f_150", name: "洞窟前線", desc: "150階に到達", tier: "easy", check: (p) => p.maxFloor >= 150 },
+  { id: "f_250", name: "遺跡の先駆け", desc: "250階に到達", tier: "medium", check: (p) => p.maxFloor >= 250 },
+  { id: "f_350", name: "凍てつく道標", desc: "350階に到達", tier: "medium", check: (p) => p.maxFloor >= 350 },
+  { id: "f_450", name: "溶岩を踏む者", desc: "450階に到達", tier: "medium", check: (p) => p.maxFloor >= 450 },
+  { id: "f_550", name: "奈落の入口", desc: "550階に到達", tier: "medium", check: (p) => p.maxFloor >= 550 },
+  { id: "f_650", name: "深層の旅人", desc: "650階に到達", tier: "medium", check: (p) => p.maxFloor >= 650 },
+  { id: "f_750", name: "天界の門前", desc: "750階に到達", tier: "hard", check: (p) => p.maxFloor >= 750 },
+  { id: "f_850", name: "星屑の渡り", desc: "850階に到達", tier: "hard", check: (p) => p.maxFloor >= 850 },
+  { id: "f_950", name: "虚無の縁", desc: "950階に到達", tier: "hard", check: (p) => p.maxFloor >= 950 },
+
+  // 撃破 / 一撃
+  { id: "bk10", name: "ボス常連", desc: "ボスを10体撃破", tier: "easy", check: (p) => p.bossKills >= 10 },
+  { id: "bk75", name: "討伐の鬼", desc: "ボスを75体撃破", tier: "hard", check: (p) => p.bossKills >= 75 },
+  { id: "k2000", name: "二千殺し", desc: "敵を2000体撃破", tier: "hard", check: (p) => p.kills >= 2000 },
+  { id: "k3000", name: "皆殺しの権化", desc: "敵を3000体撃破", tier: "secret", hidden: true, check: (p) => p.kills >= 3000 },
+  { id: "hit1000", name: "千点突破", desc: "単発1000ダメージを与える", tier: "medium", check: (p) => p.maxSingleHit >= 1000 },
+  { id: "hit3000", name: "三千の衝撃", desc: "単発3000ダメージを与える", tier: "hard", check: (p) => p.maxSingleHit >= 3000 },
+  { id: "hit5000", name: "五千の終撃", desc: "単発5000ダメージを与える", tier: "secret", hidden: true, check: (p) => p.maxSingleHit >= 5000 },
+  { id: "s75", name: "連勝の鬼神", desc: "75連勝", tier: "hard", check: (p) => p.maxStreak >= 75 },
+
+  // 無傷
+  { id: "perfect5", name: "無傷の常勝", desc: "無傷クリア5回", tier: "medium", hidden: true, check: (p) => p.perfectClears >= 5 },
+  { id: "perfect20", name: "鉄壁の証", desc: "無傷クリア20回", tier: "hard", hidden: true, check: (p) => p.perfectClears >= 20 },
+  { id: "nd_boss3", name: "無傷の狩人", desc: "無傷でボスを3体撃破", tier: "secret", hidden: true, check: (p) => p.noDamageBossKills >= 3 },
+
+  // カジノ
+  { id: "c_jp5", name: "小当たり名人", desc: "ジャックポット5回", tier: "easy", check: (p) => p.jackpots >= 5 },
+  { id: "c_jp100", name: "カジノの伝説", desc: "ジャックポット100回", tier: "secret", hidden: true, check: (p) => p.jackpots >= 100 },
+  { id: "c_big10", name: "BIG常連", desc: "BIG10回", tier: "easy", check: (p) => p.slotBigCount >= 10 },
+  { id: "c_big50", name: "BIGの覇者", desc: "BIG50回", tier: "hard", check: (p) => p.slotBigCount >= 50 },
+  { id: "c_big200", name: "万枚への道", desc: "BIG200回", tier: "secret", hidden: true, check: (p) => p.slotBigCount >= 200 },
+  { id: "c_coin50k", name: "出玉中級者", desc: "累計50000コイン獲得", tier: "medium", check: (p) => p.totalCoinsWon >= 50000 },
+  { id: "c_coin500k", name: "出玉の魔王", desc: "累計500000コイン獲得", tier: "hard", check: (p) => p.totalCoinsWon >= 500000 },
+  { id: "c_fate10", name: "運命の寵児", desc: "運命の大博打で10回大当たり", tier: "secret", hidden: true, check: (p) => p.fateWins >= 10 },
+  { id: "c_daipan25", name: "問題児", desc: "台パン25回", tier: "secret", hidden: true, check: (p) => p.daipanCount >= 25 },
+  { id: "c_allcasino", name: "カジノ全部入り", desc: "JP・BIG・大博打を全て達成", tier: "medium", check: (p) => p.jackpots >= 1 && p.slotBigCount >= 1 && p.fateWins >= 1 },
+
+  // 鍛冶
+  { id: "fg5", name: "鍛冶の心得", desc: "鍛冶5回成功", tier: "easy", check: (p) => p.forgeCount >= 5 },
+  { id: "fg100", name: "鍛冶の神", desc: "鍛冶100回成功", tier: "hard", check: (p) => p.forgeCount >= 100 },
+  { id: "fg_p8", name: "業物の主", desc: "強化値+8に到達", tier: "medium", check: (p) => p.maxForgeLevel >= 8 },
+  { id: "fg_p12", name: "極致の刃", desc: "強化値+12に到達", tier: "hard", check: (p) => p.maxForgeLevel >= 12 },
+
+  // 職業
+  { id: "cl_3", name: "三足の草鞋", desc: "3職を経験", tier: "easy", check: (p) => p.classesUsed.length >= 3 },
+  { id: "cl_6", name: "六道の探求者", desc: "6職を経験", tier: "medium", check: (p) => p.classesUsed.length >= 6 },
+  { id: "cl_9", name: "九職の達人", desc: "9職を経験", tier: "hard", check: (p) => p.classesUsed.length >= 9 },
+
+  // セット
+  { id: "set2", name: "重ね着の美学", desc: "セット装備を2種完成", tier: "medium", check: (p) => p.setsCompleted.length >= 2 },
+  { id: "set3", name: "三位一体", desc: "セット装備を3種完成", tier: "medium", check: (p) => p.setsCompleted.length >= 3 },
+  { id: "set10", name: "セット蒐集家", desc: "セット装備を10種完成", tier: "hard", check: (p) => p.setsCompleted.length >= 10 },
+
+  // 図鑑
+  { id: "col36", name: "装備目録", desc: "装備を36種発見", tier: "medium", check: (p) => p.discoveredItems.length >= 36 },
+  { id: "col48", name: "装備博士", desc: "装備を48種発見", tier: "hard", check: (p) => p.discoveredItems.length >= 48 },
+  { id: "bes20", name: "魔物観察員", desc: "敵を20種討伐", tier: "easy", check: (p) => p.defeatedEnemies.length >= 20 },
+  { id: "bes40", name: "魔物大全", desc: "敵を40種討伐", tier: "hard", check: (p) => p.defeatedEnemies.length >= 40 },
+
+  // メタ / オンライン / 時間
+  { id: "rb5", name: "五度の輪廻", desc: "5回転生する", tier: "medium", check: (p) => p.rebirths >= 5 },
+  { id: "ng5", name: "五周目の境地", desc: "NG+を5周", tier: "hard", check: (p) => p.ngPlus >= 5 },
+  { id: "echo50", name: "残響の覇者", desc: "エコーバトル50勝", tier: "hard", check: (p) => p.echoWins >= 50 },
+  { id: "echo100", name: "残響を統べる者", desc: "エコーバトル100勝", tier: "secret", hidden: true, check: (p) => p.echoWins >= 100 },
+  { id: "t25h", name: "やり込みの鬼", desc: "累計25時間プレイ", tier: "hard", check: (p) => p.playSeconds >= 90000 },
+
   { id: "completionist", name: "真の称号", desc: "他の称号を全て獲得", tier: "secret", hidden: true, check: (p) => p.claimedTitles.length >= TITLE_GATE },
 ];
 
