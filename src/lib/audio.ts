@@ -413,7 +413,7 @@ const IDOL_LEAD: number[] = [
 /** Per-chapter battle themes (w1…w11) plus the fixed-location themes. */
 export type WorldKey =
   | "w1" | "w2" | "w3" | "w4" | "w5" | "w6" | "w7" | "w8" | "w9" | "w10" | "w11";
-export type BgmTheme = "dungeon" | "casino" | "forge" | "boss" | "idol" | WorldKey;
+export type BgmTheme = "dungeon" | "casino" | "forge" | "boss" | "idol" | "final" | WorldKey;
 
 interface ThemeDef {
   stepMs: number;
@@ -606,8 +606,9 @@ function echoTone(
   for (let i = 0; i <= taps; i++) tone(freq, dur, type, vol * Math.pow(decay, i), when + i * spread);
 }
 
-/** Step length (ms) for the current theme — world themes carry their own tempo. */
+/** Step length (ms) for the current theme — world/final themes carry their own tempo. */
 function themeStepMs(theme: BgmTheme): number {
+  if (theme === "final") return FINAL_STEP_MS;
   const w = WORLD_MUSIC[theme as WorldKey];
   if (w) return w.stepMs;
   return THEMES[theme as keyof typeof THEMES].stepMs;
@@ -617,7 +618,9 @@ function themeStepMs(theme: BgmTheme): number {
 function bgmTick(): void {
   if (muted) return;
   const world = WORLD_MUSIC[bgmTheme as WorldKey];
-  if (world) {
+  if (bgmTheme === "final") {
+    finalTick();
+  } else if (world) {
     worldTick(world);
   } else {
     const def = THEMES[bgmTheme as keyof typeof THEMES];
@@ -742,6 +745,97 @@ function worldTick(cfg: WorldMusic): void {
   }
 
   worldDrums(cfg.drums, inBar, mode, full);
+}
+
+// ===== Final boss theme (1000F: 機神デウス＝エクス＝マキナ) =====
+// The single most hype track: a fast D-major battle anthem. Four-on-the-floor
+// drive, octave bass, wide power-chord stabs, a soaring lead, choir + bell, and
+// risers/crashes into each chorus — the climactic "上がる" theme.
+const FINAL_STEP_MS = 104; // ≈180 BPM (16th notes)
+const FINAL_PROG: Chord[] = [
+  ch(47, "min"), ch(43, "maj"), ch(50, "maj"), ch(45, "maj"), // Bm G D A
+  ch(47, "min"), ch(43, "maj"), ch(45, "maj"), ch(45, "maj"), // Bm G A A
+];
+// Soaring 4-bar hook (64 steps), D major. 0 = rest.
+const D5 = 587.33, E5 = 659.25, Fs5 = 739.99, G5 = 783.99, A5 = 880, B5 = 987.77, Cs6 = 1108.73, D6 = 1174.66;
+const FINAL_LEAD: number[] = [
+  Fs5, 0, 0, 0, A5, 0, 0, 0, B5, 0, 0, 0, A5, 0, Fs5, 0,
+  G5, 0, 0, 0, B5, 0, 0, 0, D6, 0, B5, 0, A5, 0, 0, 0,
+  Fs5, 0, A5, 0, D6, 0, 0, 0, A5, 0, Fs5, 0, E5, 0, 0, 0,
+  E5, 0, 0, 0, A5, 0, 0, 0, Cs6, 0, B5, 0, A5, 0, 0, 0,
+];
+
+function finalTick(): void {
+  if (muted) return;
+  const step = bgmStep;
+  const bar = Math.floor(step / BAR);
+  const inBar = step % BAR;
+  const mode = sectionOf(bar);
+  const chord = FINAL_PROG[bar % FINAL_PROG.length];
+  const secBar = bar % 8;
+  const full = mode === "B";
+
+  // ---- Drums: four-on-the-floor kick + offbeat hats + snare backbeat ----
+  if (inBar % 4 === 0) {
+    noise(0.05, 0.2);
+    slideTone(110, 40, 0.1, "sine", 0.24);
+  }
+  if (mode !== "A" && inBar % 2 === 1) noise(0.02, full ? 0.08 : 0.06);
+  if (inBar === 4 || inBar === 12) {
+    noise(0.13, 0.16);
+    tone(190, 0.1, "triangle", 0.12);
+  }
+
+  // ---- Driving octave bass (8ths) ----
+  if (inBar % 2 === 0) {
+    const bf = inBar % 4 === 0 ? chord.root : chord.root * 2;
+    tone(bf, 0.13, "sawtooth", 0.2);
+    tone(bf, 0.02, "square", 0.12);
+  }
+
+  // ---- Wide power-chord saw stab on the bar head ----
+  if (inBar === 0) {
+    voice(chord.root, 0.4, "sawtooth", 0.09, 0, -0.5, 0.2);
+    voice(chord.fifth, 0.4, "sawtooth", 0.08, 0, 0.5, 0.2);
+    voice(chord.root * 2, 0.4, "sawtooth", 0.06, 0, 0, 0.2);
+  }
+
+  // ---- Choir pad ----
+  if (inBar === 0) {
+    voice(chord.arp[0], 1.6, "sine", 0.04, 0, -0.4, 0.4);
+    voice(chord.arp[1], 1.6, "sine", 0.04, 0.04, 0.4, 0.4);
+  }
+
+  // ---- Fast 16th square arp (kept energetic except in the brief intro) ----
+  if (mode !== "A") {
+    const shape = ARP_SHAPES[secBar % ARP_SHAPES.length];
+    const note = chord.arp[shape[step & 3]];
+    if (note) tone(note, 0.1, "square", full ? 0.09 : 0.07);
+  }
+
+  // ---- Bell sparkle in the chorus ----
+  if (full && inBar % 2 === 0) {
+    const note = chord.arp[(step >> 1) % chord.arp.length] * 2;
+    const pan = (step >> 1) % 2 === 0 ? -0.6 : 0.6;
+    voice(note, 0.25, "sine", 0.05, 0, pan, 0.45);
+  }
+
+  // ---- Soaring lead (echoed), through build + chorus + outro ----
+  if (mode !== "A") {
+    const note = FINAL_LEAD[(bar % 4) * BAR + inBar];
+    if (note) {
+      echoTone(note, 0.24, "square", 0.12, 0, 2, 0.1, 0.4);
+      echoTone(note * 1.005, 0.24, "square", 0.06, 0.01, 1, 0.1, 0.4); // detune thickness
+    }
+  }
+
+  // ---- Riser into the chorus + crash on the chorus head ----
+  if (mode === "A2" && secBar === 7) {
+    const b = inBar / 16;
+    slideTone(300, 1400, 0.1, "sawtooth", 0.04 + b * 0.06);
+    noise(0.04, 0.05 + b * 0.2);
+  }
+  if (full && inBar === 0) noise(0.3, 0.18);
 }
 
 // ===== Casino renderer (落ち着いた煌びやかラウンジ) =====
@@ -1157,6 +1251,7 @@ const WORLD_TRACKS: MusicTrack[] = WORLD_KEYS.map((key, i) => {
 export const MUSIC_TRACKS: MusicTrack[] = [
   { id: "dungeon", name: "迷宮 / 拠点", desc: "メニューで流れる A-minor のダンジョンループ", theme: "dungeon" },
   ...WORLD_TRACKS,
+  { id: "final", name: "機神デウス＝エクス＝マキナ (1000階)", desc: "最終決戦の最高潮テーマ。疾走するD majorの戦闘アンセム", theme: "final" },
   { id: "boss", name: "大ボス戦", desc: "速く緊迫した大ボス階のテーマ", theme: "boss" },
   { id: "casino", name: "カジノ", desc: "落ち着いた煌びやかなラウンジ", theme: "casino" },
   { id: "forge", name: "鍛冶屋", desc: "重厚な D-ドリアン。金床のクランク", theme: "forge" },

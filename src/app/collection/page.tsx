@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ACHIEVEMENTS, achievedCount } from "@/data/achievements";
-import { BOSS_TEMPLATES, ENEMY_ABILITY_LABEL, ENEMY_TEMPLATES } from "@/data/enemies";
+import { BESTIARY_BOSSES, ENEMY_ABILITY_LABEL, ENEMY_TEMPLATES } from "@/data/enemies";
 import { ITEMS } from "@/data/items";
 import {
   FLOOR_ACHIEVEMENTS,
@@ -78,7 +78,7 @@ export default function CollectionPage() {
     );
   }
 
-  const enemies = [...ENEMY_TEMPLATES, ...BOSS_TEMPLATES];
+  const enemies = [...ENEMY_TEMPLATES, ...BESTIARY_BOSSES];
 
   return (
     <main className="flex min-h-dvh flex-col gap-3 p-3">
