@@ -36,8 +36,8 @@ const PachinkoBoard = forwardRef<
       launch() {
         const active = balls.current.filter((b) => b.active).length;
         if (active >= cap()) return false;
-        // pool 上の非アクティブ枠を再利用。
-        const fresh = launchBall(BOARD);
+        // 通常時=左打ち / 当たり時(電サポ=Makina Mode)=右打ち。
+        const fresh = launchBall(BOARD, Math.random, denchuRef.current);
         const slot = balls.current.find((b) => !b.active);
         if (slot) Object.assign(slot, fresh);
         else balls.current.push(fresh);
@@ -76,34 +76,43 @@ const PachinkoBoard = forwardRef<
         ctx.strokeRect(mX, mY, mW, mH);
         ctx.lineWidth = 1;
 
-        // 役物を囲む装飾釘（左右の縁＋役物直下の天釘）。
-        ctx.fillStyle = "#7d97ad";
-        const frameNails: Array<[number, number]> = [];
-        for (let y = mY + 14; y < mY + mH - 8; y += 26) {
-          frameNails.push([14, y], [BOARD.width - 14, y]); // 左右の縁
-        }
-        for (let x = mX + 18; x < mX + mW - 12; x += 30) {
-          frameNails.push([x, mY + mH + 10]); // 役物直下の天釘
-        }
-        for (const [x, y] of frameNails) {
-          ctx.beginPath();
-          ctx.arc(x, y, BOARD.pegRadius, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        // ===== 打ち分けレーン（左=通常時 / 右=当たり時）。役物の左右外側の細い縦樋。 =====
+        const migi = denchuRef.current;
+        const drawLane = (cx: number, top: number, bot: number, hot: boolean) => {
+          ctx.strokeStyle = hot ? "rgba(255,207,51,.85)" : "rgba(120,170,200,.4)";
+          ctx.lineWidth = hot ? 2 : 1.5;
+          for (const dx of [-BOARD.laneHalf, BOARD.laneHalf]) {
+            ctx.beginPath();
+            ctx.moveTo(cx + dx, top);
+            ctx.lineTo(cx + dx, bot);
+            ctx.stroke();
+          }
+          ctx.lineWidth = 1;
+        };
+        // 左打ちレーン（モニター下端まで降りて盤面へ）。
+        drawLane(BOARD.leftLaneX, BOARD.launchY, BOARD.laneExitY, !migi);
+        // 右打ちレーン（大入賞口アタッカーまで）。
+        drawLane(BOARD.rightLaneX, BOARD.launchY, BOARD.attackerY, migi);
 
-        // 左上打ちのレール（左下の発射口 → 左の縁を上って → 天＝役物上へ）。
-        ctx.strokeStyle = "rgba(255,207,51,.4)";
+        // 右下の大入賞口（アタッカー）。右打ち中だけ開いて光る演出。
+        ctx.fillStyle = migi ? "rgba(255,207,51,.3)" : "rgba(124,92,255,.12)";
+        ctx.strokeStyle = migi ? "#ffcf33" : "#5b6b8a";
         ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(8, BOARD.height - 18);
-        ctx.lineTo(8, 12);
-        ctx.quadraticCurveTo(8, 5, BOARD.pocketX - 8, 5);
-        ctx.stroke();
+        ctx.fillRect(BOARD.attackerX - BOARD.attackerW / 2, BOARD.attackerY, BOARD.attackerW, BOARD.attackerH);
+        ctx.strokeRect(BOARD.attackerX - BOARD.attackerW / 2, BOARD.attackerY, BOARD.attackerW, BOARD.attackerH);
         ctx.lineWidth = 1;
-        ctx.fillStyle = "#ffcf33";
-        ctx.beginPath();
-        ctx.arc(8, BOARD.height - 18, 5, 0, Math.PI * 2); // 発射口（左下）
-        ctx.fill();
+        ctx.fillStyle = migi ? "#ffe9a3" : "#8a96b5";
+        ctx.font = "8px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("大入賞", BOARD.attackerX, BOARD.attackerY + 12);
+
+        // 「右打ち→」表示（当たり中のみ）。
+        if (migi) {
+          ctx.fillStyle = "#ffcf33";
+          ctx.font = "bold 11px sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText("右打ち→", BOARD.rightLaneX - 4, mY + 40);
+        }
 
         // プレイ領域の道釘。
         ctx.fillStyle = "#8fb3d9";

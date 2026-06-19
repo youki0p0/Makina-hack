@@ -332,7 +332,7 @@ export default function PachinkoPage() {
         disabled={balls < BOARD.startCost}
         className="h-14 rounded-2xl bg-amber-500 text-lg font-extrabold text-black active:scale-95 disabled:opacity-40"
       >
-        ● 発射（左上打ち / 玉 -{BOARD.startCost}）
+        ● 発射（{complete ? "右打ち" : "左打ち"} / 玉 -{BOARD.startCost}）
       </button>
 
       <div className="grid grid-cols-3 gap-2 text-[11px]">
@@ -342,8 +342,8 @@ export default function PachinkoPage() {
       </div>
 
       <p className="pb-2 text-center text-[10px] text-gray-500">
-        左上打ち→釘を流れて中央へ→ステージ＆ワープでヘソIN→図柄変動。
-        4/5/6/7当たりで確変(Makina Mode)＝右打ち高速回転。
+        通常時は左打ち（左の細いレーン→寄せ釘→中央ヘソ）。ステージ＆ワープでヘソIN→図柄変動。
+        4/5/6/7当たりで確変(Makina Mode)＝右打ちで大入賞口へ高速回転。
       </p>
     </main>
   );

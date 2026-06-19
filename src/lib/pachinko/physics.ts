@@ -11,8 +11,14 @@ export interface Ball {
   vx: number;
   vy: number;
   active: boolean;
+  /** 打ち分けレーンを降下中か（"left"=通常時左打ち / "right"=当たり時右打ち）。 */
+  lane?: "left" | "right";
   /** ステージ上を転がっている最中か。 */
   onStage?: boolean;
+  /** 左打ちの寄せスロープを滑走中か（レーン出口→中央ステージ手前）。 */
+  chute?: boolean;
+  /** 個体差（0..1）。スロープ放出時の勢いに反映し、ステージ入賞/こぼれを散らす。 */
+  wobble?: number;
   /** ステージ滞留フレーム数（詰まり防止の強制排出に使う）。 */
   stageFrames?: number;
   /** ヘソ吸い込みアニメの進捗（0→1）。描画用。 */
@@ -28,22 +34,33 @@ export interface Peg {
 export type BallEvent = "pocket" | "fall" | null;
 
 /**
- * ピン配置。役物直下〜ヘソの「見えるプレイ領域」に道釘の千鳥格子、ステージ脇の
- * こぼし釘、ヘソ直上の風車釘を置く。役物の上(天)は空けて玉を落とす。
+ * ピン配置（実機準拠の海物語レイアウト）。
+ * - 寄せ釘ランプ：左レーン出口から中央ステージへ玉を振り分ける下り斜め釘列。
+ * - 道釘の散らし：中央寄りの千鳥でステージ手前の出目を作る。
+ * - こぼし釘：ステージ脇（端から落ちた玉を外へ＝ハズレ動線）。
+ * - 命釘＋風車：ヘソ直上の最後の関門。ワープの中央落下だけが抜ける。
+ * 役物(モニター)の裏は釘を置かず、玉はレーンと直下のプレイ領域だけを通る。
  */
 export function buildPegs(board: BoardGeom = BOARD): Peg[] {
   const pegs: Peg[] = [];
-  const monBottom = board.monitorY + board.monitorH;
-  // 道釘（役物直下からステージ手前まで）。
-  const top = monBottom + 8;
-  const bottom = board.stageY - 16;
-  const rows = 3;
-  const rowGap = (bottom - top) / (rows - 1);
-  const colGap = 30;
-  for (let r = 0; r < rows; r++) {
-    const y = top + r * rowGap;
-    const offset = r % 2 === 0 ? 0 : colGap / 2;
-    for (let x = 24 + offset; x < board.width - 18; x += colGap) {
+  // ① 寄せ釘ランプ：左レーン出口の真下(≈16,186) → 中央上(≈150,236) への下り斜め釘列。
+  //    レーンを降りた玉(x≈21)がランプ上面に乗り、間隔を詰めた“壁”で中央ヘソ方向へ滑る。
+  //    （実際の左→中央の送りはスロープ物理が担うので、釘はまばらな“飾り”。密にすると
+  //    放出後に左へ戻った玉が乗って詰まるため、間隔を空ける。）
+  {
+    const x0 = 24, y0 = 190, x1 = 110, y1 = 210;
+    const steps = 4;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      pegs.push({ x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t });
+    }
+  }
+  // ② 道釘の散らし（中央を覆う千鳥2列。スロープ放出後の玉を散らし、命釘で絞る）。
+  //    放出点(≈138,206)の真下は空けて“かご詰まり”を防ぐ。
+  for (let r = 0; r < 2; r++) {
+    const y = 222 + r * 16;
+    const offset = r % 2 === 0 ? 0 : 16;
+    for (let x = 86 + offset; x < 256; x += 32) {
       const jitter = (((r * 7 + x) % 5) - 2) * 0.8;
       pegs.push({ x: x + jitter, y });
     }
@@ -55,26 +72,36 @@ export function buildPegs(board: BoardGeom = BOARD): Peg[] {
   pegs.push({ x: board.pocketX + board.stageHalf + 34, y: board.stageY + 40 });
   // ヘソ直上の命釘2本（最後の関門）。間隔は玉が中央を通れるギリギリに絞り、
   // 中央でないズレた玉(=道釘ルート)はここで弾かれて入らない。ワープの中央落下だけが抜ける。
-  const gate = board.ballRadius + board.pegRadius + 1.6; // ≒9.2
+  const gate = board.ballRadius + board.pegRadius + 0.0; // ≒7.6（玉が中央を通れるギリギリ）
+  // 左右を上下にずらして対称な“挟み込み詰まり”を防ぐ（片方を先に当てて弾く）。
   pegs.push({ x: board.pocketX - gate, y: board.pocketY - 13 });
-  pegs.push({ x: board.pocketX + gate, y: board.pocketY - 13 });
+  pegs.push({ x: board.pocketX + gate, y: board.pocketY - 20 });
   // その外側に風車釘（散らし）。
   pegs.push({ x: board.pocketX - gate - 16, y: board.pocketY - 24 });
   pegs.push({ x: board.pocketX + gate + 16, y: board.pocketY - 24 });
   return pegs;
 }
 
-/** 1球を生成。左上打ち→レール(描画演出)で天へ→中央寄りに落下。 */
-export function launchBall(board: BoardGeom = BOARD, rng: () => number = Math.random): Ball {
-  const spread = 240; // 広めに散らし、中央のステージ/命釘へ集まる玉を絞る（≈20%入賞）
-  const dropX = board.pocketX - 6 + (rng() - 0.5) * spread;
+/**
+ * 1球を生成。`migiUchi`=false（通常時=左打ち）は左の細い縦レーン上端から、
+ * true（当たり時=右打ち）は右の細い縦レーン上端から発射。いずれもモニター裏は通らない。
+ * rng は決定的テスト用に差し替え可能（第2引数で互換）。
+ */
+export function launchBall(
+  board: BoardGeom = BOARD,
+  rng: () => number = Math.random,
+  migiUchi = false,
+): Ball {
+  const laneX = migiUchi ? board.rightLaneX : board.leftLaneX;
   return {
-    x: Math.max(14, Math.min(board.width - 14, dropX)),
+    x: laneX + (rng() - 0.5) * 4,
     y: board.launchY,
-    vx: (rng() - 0.5) * 0.9,
-    vy: 0.4 + rng() * 0.3,
+    vx: 0,
+    vy: 0.5 + rng() * 0.3,
     active: true,
     onStage: false,
+    lane: migiUchi ? "right" : "left",
+    wobble: rng(),
   };
 }
 
@@ -90,6 +117,58 @@ export function stepBall(
 ): BallEvent {
   const r = board.ballRadius;
   const pr = board.pegRadius;
+
+  // ===== 打ち分けレーン（細い縦樋を降下。モニター裏は通らない） =====
+  if (ball.lane) {
+    const laneX = ball.lane === "left" ? board.leftLaneX : board.rightLaneX;
+    ball.vy += board.gravity;
+    ball.vx *= board.friction;
+    ball.y += ball.vy;
+    ball.x += ball.vx;
+    // レーン壁で反射（樋を流れる）。
+    const innerL = laneX - board.laneHalf + r;
+    const innerR = laneX + board.laneHalf - r;
+    if (ball.x < innerL) {
+      ball.x = innerL;
+      ball.vx = Math.abs(ball.vx) * 0.4 + 0.05;
+    } else if (ball.x > innerR) {
+      ball.x = innerR;
+      ball.vx = -Math.abs(ball.vx) * 0.4 - 0.05;
+    }
+    if (ball.lane === "left") {
+      if (ball.y >= board.laneExitY) {
+        // レーン出口：寄せスロープに乗せる（寄せ釘ランプ沿いに中央へ滑走）。
+        ball.lane = undefined;
+        ball.chute = true;
+        ball.x = board.chuteX0;
+        ball.vx = 0.5;
+      }
+      return null;
+    }
+    // 右打ち：右下の大入賞口(アタッカー)へ吸い込む＝当たり中の出玉演出。
+    if (ball.y >= board.attackerY) {
+      ball.active = false;
+      return "fall"; // ヘソではないので変動はしない（Makina はタイマー駆動）
+    }
+    return null;
+  }
+
+  // ===== 左打ちの寄せスロープ（傾斜を下り加速し、末端で中央ステージ手前へ放出） =====
+  if (ball.chute) {
+    ball.vx += board.chuteAccel; // 下り（右）加速
+    ball.vx *= 0.99;
+    ball.x += ball.vx;
+    const t = (ball.x - board.chuteX0) / (board.chuteX1 - board.chuteX0);
+    ball.y = board.chuteY0 + (board.chuteY1 - board.chuteY0) * Math.max(0, Math.min(1, t));
+    if (ball.x >= board.chuteX1) {
+      // 放出：個体差で左右へ散らす。道釘→命釘で絞られ、中央のステージ/ワープに
+      // 乗れた玉だけがヘソ濃厚（多くは弾かれてハズレ）。
+      ball.chute = false;
+      ball.vx = 0.7 + 1.8 * (ball.wobble ?? 0.5); // 必ず右へ散らす（左の飾り釘へ戻さない）
+      ball.vy = 0.5;
+    }
+    return null;
+  }
 
   // ===== ステージ＆ワープ（減衰振り子。中央でヌルッと吸い込むか、勢い余って前にこぼれる） =====
   if (ball.onStage) {
