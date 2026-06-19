@@ -41,9 +41,9 @@ export interface ReelResult {
 
 type Rng = () => number;
 
-// 初当たりは希少に（当たりづらく＝高ボラ）。確変中は当たりやすく＝連チャンが続く
-// （跳ねたら止まらない）。確変の継続は page.tsx 側の ST リセットで制御し、RTP を有限化。
-const WIN_CHANCE: Record<Mode, number> = { normal: 1 / 66, complete: 0.28 };
+// 初当たりは希少に（当たりづらく＝高ボラ）。1回の当たりが大きい（保証枚数×連チャン）ため
+// 初当たりを 1/130 まで絞り（玉単位≈1/395）、総RTP≈2.8（一撃特化）。complete は演出用（出玉は bonus.ts）。
+const WIN_CHANCE: Record<Mode, number> = { normal: 1 / 130, complete: 0.28 };
 
 // 当たり図柄の重み（id 1..7）。上位ほどレア。complete では上位寄り。
 const WEIGHTS: Record<Mode, number[]> = {
@@ -69,9 +69,10 @@ function distinctPair(winId: number, rng: Rng): [number, number] {
   return [a, b];
 }
 
-/** 当たり/ハズレ・テンパイ・群予告・昇格まで含めて1変動を決定する。 */
-export function spinReels(mode: Mode, rng: Rng = Math.random): ReelResult {
-  const win = rng() < WIN_CHANCE[mode];
+/** 当たり/ハズレ・テンパイ・群予告・昇格まで含めて1変動を決定する。
+ *  forceWin=true で天井(規定回転ノーヒット)による強制当たりを発生させる。 */
+export function spinReels(mode: Mode, rng: Rng = Math.random, forceWin = false): ReelResult {
+  const win = forceWin || rng() < WIN_CHANCE[mode];
 
   if (!win) {
     // ハズレ。一定確率でテンパイ（2つ揃い）を作って煽る（リーチは希少に）。

@@ -31,7 +31,7 @@ export interface Peg {
 }
 
 /** 入賞か落下か。null は継続中。 */
-export type BallEvent = "pocket" | "fall" | null;
+export type BallEvent = "pocket" | "attacker" | "fall" | null;
 
 /**
  * ピン配置（実機準拠の海物語レイアウト）。
@@ -145,10 +145,11 @@ export function stepBall(
       }
       return null;
     }
-    // 右打ち：右下の大入賞口(アタッカー)へ吸い込む＝当たり中の出玉演出。
+    // 右打ち：右下の大入賞口(アタッカー)へ。口の幅に入れば "attacker"=出玉、外れは "fall"。
     if (ball.y >= board.attackerY) {
       ball.active = false;
-      return "fall"; // ヘソではないので変動はしない（Makina はタイマー駆動）
+      const inMouth = Math.abs(ball.x - board.attackerX) <= board.attackerW / 2 + board.ballRadius;
+      return inMouth ? "attacker" : "fall";
     }
     return null;
   }

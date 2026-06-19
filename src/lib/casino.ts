@@ -186,15 +186,15 @@ export function atSpinPayout(): number {
 /**
  * Chance per AT game of an 上乗せ (extra games). Returns the games added (0=none).
  * 重要: 1ゲームの期待上乗せが消化(-1G)を下回らないとATが発散して「終わらない」。
- * 通常上乗せ 2%×平均10 + 特大上乗せ 0.05%×平均475 = 約0.44G/G ＜ 1 なので必ず収束。
- * ただし特大上乗せ(+350〜600G)は約1割のATで降ってくるので、運がいいと700G級まで伸びる。
+ * 通常上乗せ 2%×平均10 + 特大上乗せ 0.05%×平均850 = 約0.625G/G ＜ 1 なので必ず収束。
+ * 特大上乗せ(+500〜1200G)は約1割のATで降る“鬼連チャン”枠＝伸びを強化（運がいいと1500G級）。
  */
 export const AT_RENSHO_CHANCE = 0.02;
-/** 特大上乗せ(運がいいと700G級)の発生率。 */
+/** 特大上乗せ(鬼連チャン＝運がいいと1500G級)の発生率。 */
 export const AT_JACKPOT_CHANCE = 0.0005;
 export function atRensho(): number {
   const r = Math.random();
-  if (r < AT_JACKPOT_CHANCE) return 350 + Math.floor(Math.random() * 251); // +350–600G(特大)
+  if (r < AT_JACKPOT_CHANCE) return 500 + Math.floor(Math.random() * 701); // +500–1200G(特大=鬼連チャン)
   if (r < AT_JACKPOT_CHANCE + AT_RENSHO_CHANCE) return 5 + Math.floor(Math.random() * 11); // +5–15G
   return 0;
 }

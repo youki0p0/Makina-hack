@@ -44,8 +44,8 @@ function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, color: str
  */
 const PachinkoBoard = forwardRef<
   PachinkoBoardHandle,
-  { onPocket: () => void; reduced?: boolean; denchu?: boolean }
->(function PachinkoBoard({ onPocket, reduced = false, denchu = false }, ref) {
+  { onPocket: () => void; onAttacker?: () => void; reduced?: boolean; denchu?: boolean }
+>(function PachinkoBoard({ onPocket, onAttacker, reduced = false, denchu = false }, ref) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const balls = useRef<Ball[]>([]);
     const pegs = useRef<Peg[]>([]);
@@ -53,6 +53,8 @@ const PachinkoBoard = forwardRef<
     const visible = useRef(true);
     const onPocketRef = useRef(onPocket);
     onPocketRef.current = onPocket;
+    const onAttackerRef = useRef(onAttacker);
+    onAttackerRef.current = onAttacker;
     const denchuRef = useRef(denchu);
     denchuRef.current = denchu;
 
@@ -280,6 +282,8 @@ const PachinkoBoard = forwardRef<
           if (ev === "pocket") {
             b.sinking = 0; // ヘソへ吸い込まれる“間”を描く
             onPocketRef.current();
+          } else if (ev === "attacker") {
+            onAttackerRef.current?.(); // 大入賞口入賞＝出玉(当たり中)
           }
         }
         draw();
