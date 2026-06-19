@@ -13,26 +13,47 @@ export interface PachinkoReelsHandle {
   busy: () => boolean;
 }
 
+interface Tween {
+  from: number;
+  to: number;
+  start: number;
+  dur: number;
+  final: boolean;
+}
+
+// ドラム位置(コマ単位) → 図柄 17..7（1..7 の固定並び）。
+const idAt = (off: number) => ((((Math.round(off) % 7) + 7) % 7) + 1) as number;
+const ROW = 100 / 3; // 1コマ＝表示高の1/3（縦3コマ表示）
+
 /**
- * 中央の巨大図柄表示。絵柄は既存の固有武器＋神機マキナの procedural ドット絵を流用。
- * 3図柄を左→右に停止、テンパイ(リーチ)・群予告・昇格を演出。effects=false / reduced で短縮。
+ * 中央の巨大ドラム表示（海物語式）。
+ * - 3列×縦3コマ（上段/中段/下段）。判定ラインは中段。
+ * - 上から下への垂直回転。停止順は「左 → 右 → 中」。
+ * - 左右が揃うとテンパイ＝中リールだけ変則動作:
+ *   ノーマル=±1コマからのコマ送り / 激アツ(神機マキナ群)=逆回転スロー。
+ * - ハズレは中リールがトリガーの±1コマでズレて止まる。
+ * effects=false / reduced では短縮。
  */
 const PachinkoReels = forwardRef<
   PachinkoReelsHandle,
   { effects?: boolean; reduced?: boolean }
 >(function PachinkoReels({ effects = true, reduced = false }, ref) {
-  const [cells, setCells] = useState<number[]>([1, 2, 3]);
-  const [stopped, setStopped] = useState<boolean[]>([true, true, true]);
+  const [urls, setUrls] = useState<Record<number, string>>({});
+  const [, force] = useState(0); // スクロール再描画 tick
+  const [moving, setMoving] = useState<boolean[]>([false, false, false]);
   const [reach, setReach] = useState(false);
   const [group, setGroup] = useState<ReelResult["group"]>(null);
   const [bonus, setBonus] = useState<string | null>(null);
   const [promo, setPromo] = useState<number[]>([]);
-  // 図柄 id → 固有武器のドット絵 data URL（クライアントで一度だけ生成）。
-  const [urls, setUrls] = useState<Record<number, string>>({});
 
-  const busy = useRef(false);
+  // ドラム位置（ref で 60fps 駆動）。初期は中段に id 1,2,3。
+  const offsets = useRef<number[]>([0, 1, 2]);
+  const tweens = useRef<(Tween | null)[]>([null, null, null]);
+  const stopped = useRef<boolean[]>([true, true, true]);
+  const spinning = useRef(false);
+  const raf = useRef<number | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const cycler = useRef<ReturnType<typeof setInterval> | null>(null);
+  const busy = useRef(false);
 
   useEffect(() => {
     const out: Record<number, string> = {};
@@ -46,12 +67,48 @@ const PachinkoReels = forwardRef<
   const clearTimers = () => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
-    if (cycler.current) {
-      clearInterval(cycler.current);
-      cycler.current = null;
+    if (raf.current != null) {
+      cancelAnimationFrame(raf.current);
+      raf.current = null;
     }
   };
   useEffect(() => () => clearTimers(), []);
+
+  const FREE_SPEED = 0.34; // コマ/フレーム（上→下の高速回転）
+
+  const animate = (now: number) => {
+    for (let i = 0; i < 3; i++) {
+      if (stopped.current[i]) continue;
+      const tw = tweens.current[i];
+      if (tw) {
+        const t = Math.min(1, (now - tw.start) / tw.dur);
+        const e = 1 - Math.pow(1 - t, 3); // easeOutCubic（減速）
+        offsets.current[i] = tw.from + (tw.to - tw.from) * e;
+        if (t >= 1) {
+          offsets.current[i] = tw.to;
+          tweens.current[i] = null;
+          stopped.current[i] = true; // 中間停止も一旦保持（次の段で再始動）
+        }
+      } else {
+        offsets.current[i] += FREE_SPEED;
+      }
+    }
+    force((v) => (v + 1) & 0xffff);
+    if (spinning.current) raf.current = requestAnimationFrame(animate);
+    else raf.current = null;
+  };
+
+  const at = (ms: number, fn: () => void) => timers.current.push(setTimeout(fn, ms));
+  const tweenTo = (i: number, to: number, dur: number, final: boolean) => {
+    tweens.current[i] = { from: offsets.current[i], to, start: performance.now(), dur, final };
+    stopped.current[i] = false;
+  };
+  // base 以降で図柄 id に止まる最小コマ位置。
+  const nextK = (base: number, id: number) => {
+    let k = Math.ceil(base);
+    while (idAt(k) !== id) k++;
+    return k;
+  };
 
   useImperativeHandle(ref, () => ({
     busy: () => busy.current,
@@ -63,96 +120,106 @@ const PachinkoReels = forwardRef<
       setPromo([]);
       setReach(false);
       setGroup(result.group);
-      const stoppedNow = [false, false, false];
-      setStopped([...stoppedNow]);
+      setMoving([true, true, true]);
 
+      const [lId, cId, rId] = result.symbols; // 中段ライン [左, 中, 右]
+      const isReach = lId === rId; // 海物語式: 左右が揃えばテンパイ
+      const hot = result.group === "makina"; // 激アツ→逆回転リーチ
       const fast = !effects || reduced;
-      const base = fast ? 110 : 460;
-      const step = fast ? 110 : 430;
-      // テンパイ前の“沈黙”。神機マキナ群(激熱)ほど長く溜める。
-      const reachExtra = fast ? 0 : result.group === "makina" ? 2200 : 1100;
 
-      cycler.current = setInterval(
-        () => {
-          setCells((prev) => prev.map((v, i) => (stoppedNow[i] ? v : ((v + 1 + i) % 7) + 1)));
-        },
-        fast ? 60 : 70,
-      );
+      // フェーズ①加速: 3列同時にフリー回転開始。
+      stopped.current = [false, false, false];
+      tweens.current = [null, null, null];
+      spinning.current = true;
+      raf.current = requestAnimationFrame(animate);
 
-      const stop = (col: number, delay: number) => {
-        const t = setTimeout(() => {
-          stoppedNow[col] = true;
-          setStopped([...stoppedNow]);
-          setCells((prev) => {
-            const next = [...prev];
-            next[col] = result.symbols[col];
-            return next;
-          });
-          if (col === 1 && result.symbols[0] === result.symbols[1]) setReach(true);
-        }, delay);
-        timers.current.push(t);
-      };
+      // フェーズ③順次減速: 左 → 右。
+      const t0 = fast ? 90 : 380;
+      const stepT = fast ? 80 : 320;
+      const dur = fast ? 90 : 380;
+      at(t0, () => tweenTo(0, nextK(offsets.current[0] + (fast ? 3 : 7), lId), dur, true));
+      at(t0 + stepT, () => {
+        tweenTo(2, nextK(offsets.current[2] + (fast ? 3 : 6), rId), dur, true);
+        if (isReach) setReach(true);
+      });
 
-      stop(0, base);
-      stop(1, base + step);
-      const isReach = result.symbols[0] === result.symbols[1];
-      const reachDelay = isReach ? reachExtra : 0;
-      const thirdAt = base + step * 2 + reachDelay;
+      // フェーズ④中リール: テンパイなら変則、非テンパイは普通に停止。
+      const reachWait = fast ? 0 : hot ? 1500 : isReach ? 700 : 0;
+      const centerAt = t0 + stepT * 2 + reachWait;
+      let centerEnd = centerAt + dur;
 
-      let settleAt: number;
-      if (!fast && isReach) {
-        // スベリ：1コマ手前で一旦止め、ためてから本停止（当たりほど効く煽り）。
-        const slipSym = (result.symbols[2] % 7) + 1;
-        const t1 = setTimeout(() => {
-          stoppedNow[2] = true;
-          setStopped([...stoppedNow]);
-          setCells((prev) => {
-            const n = [...prev];
-            n[2] = slipSym;
-            return n;
-          });
-        }, thirdAt);
-        const t2 = setTimeout(() => {
-          setCells((prev) => {
-            const n = [...prev];
-            n[2] = result.symbols[2];
-            return n;
-          });
-        }, thirdAt + 480);
-        timers.current.push(t1, t2);
-        settleAt = thirdAt + 480 + 260;
+      if (fast || !isReach) {
+        at(centerAt, () => tweenTo(1, nextK(offsets.current[1] + (fast ? 3 : 6), cId), dur, true));
+      } else if (hot) {
+        // パターンB: 黒潮(逆回転)リーチ。行き過ぎて止まり、下→上へスロー逆回転で本停止。
+        at(centerAt, () => {
+          const kf = nextK(offsets.current[1] + 8, cId);
+          tweenTo(1, kf + 1, 380, false); // 1コマ行き過ぎ
+          at(380 + 320, () => tweenTo(1, kf, 760, true)); // 逆回転スロー
+        });
+        centerEnd = centerAt + 380 + 320 + 760;
       } else {
-        stop(2, thirdAt);
-        settleAt = thirdAt + 260;
+        // パターンA: ノーマル。±1コマ手前からカチ・カチとコマ送りして本停止。
+        at(centerAt, () => {
+          const kf = nextK(offsets.current[1] + 8, cId);
+          tweenTo(1, kf - 2, 340, false);
+          at(340 + 160, () => tweenTo(1, kf - 1, 200, false));
+          at(340 + 160 + 200 + 160, () => tweenTo(1, kf, 220, true));
+        });
+        centerEnd = centerAt + 340 + 160 + 200 + 160 + 220;
       }
-      const finish = setTimeout(() => {
-        if (cycler.current) {
-          clearInterval(cycler.current);
-          cycler.current = null;
-        }
+
+      // 確定（出目・onDone）。
+      at(centerEnd + (fast ? 60 : 300), () => {
+        spinning.current = false;
+        setMoving([false, false, false]);
         if (result.win) {
           if (result.promotion.length > 1) setPromo(result.promotion);
           setBonus(getSymbol(result.symbolId ?? 1).bonus);
         }
-        const doneT = setTimeout(
-          () => {
-            busy.current = false;
-            onDone();
-          },
-          fast ? 60 : 420,
-        );
-        timers.current.push(doneT);
-      }, settleAt);
-      timers.current.push(finish);
+        at(fast ? 60 : 380, () => {
+          busy.current = false;
+          onDone();
+        });
+      });
       return true;
     },
   }));
+
+  // 1列を描画（中段=判定ライン。上→下スクロールで縦3コマ＋上下バッファ）。
+  const renderReel = (i: number) => {
+    const p = offsets.current[i];
+    const k = Math.floor(p);
+    const isMoving = moving[i];
+    const midId = idAt(p);
+    const s = getSymbol(midId);
+    const tiles = [];
+    for (let n = k - 2; n <= k + 2; n++) {
+      // y_center%: 中段(50%) を基準に、p 増加で下へ流れる。
+      const yc = 50 + (p - n) * ROW;
+      tiles.push(
+        <Tile key={n} id={idAt(n)} yc={yc} url={urls[idAt(n)]} blur={isMoving} />,
+      );
+    }
+    return (
+      <div
+        key={i}
+        className={`relative flex-1 overflow-hidden rounded-lg border-2 ${
+          reach && i === 1 && isMoving ? "animate-pulse" : ""
+        }`}
+        style={{ borderColor: s.color, background: `${s.color}1f` }}
+      >
+        {tiles}
+        {/* 中段ライン（判定ライン）の目印。 */}
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-amber-300/30" />
+      </div>
+    );
+  };
 
   return (
     <div className="relative flex h-full w-full flex-col rounded-xl bg-[#04101c]/80 p-2">
       <p className="text-center text-[8px] tracking-widest text-cyan-400/70">▼ MONITOR ▼</p>
       {group === "makina" ? (
-        // 神機マキナ群＝魚群相当の全画面カットイン（激熱/当確級）。
         <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-black/55 animate-pulse">
           <span className="rounded-lg border-2 border-amber-300 bg-amber-400/15 px-4 py-2 text-lg font-black tracking-wide text-amber-200">
             ✦ 神機マキナ群 ✦<br />
@@ -160,56 +227,27 @@ const PachinkoReels = forwardRef<
           </span>
         </div>
       ) : group ? (
-        <div className="absolute inset-x-0 top-6 z-10 text-center text-sm font-extrabold text-cyan-200">
+        <div className="absolute inset-x-0 top-5 z-10 text-center text-sm font-extrabold text-cyan-200">
           ✦ {GROUP_LABEL[group]}
         </div>
       ) : null}
 
       <div className="flex min-h-0 flex-1 items-stretch justify-center gap-1.5 pt-1">
-        {cells.map((id, i) => {
-          const s = getSymbol(id);
-          const isStopped = stopped[i];
-          const url = urls[id];
-          return (
-            <div
-              key={i}
-              className={`flex h-full flex-1 flex-col items-center justify-center rounded-lg border-2 ${
-                isStopped ? "" : "blur-[1.5px]"
-              } ${reach && i === 2 && !isStopped ? "animate-pulse" : ""}`}
-              style={{ borderColor: s.color, background: `${s.color}22` }}
-            >
-              {url ? (
-                <img
-                  src={url}
-                  alt={s.name}
-                  width={44}
-                  height={44}
-                  draggable={false}
-                  style={{ width: 44, height: 44, imageRendering: "pixelated" }}
-                />
-              ) : (
-                <span className="block h-11 w-11 rounded bg-white/5" />
-              )}
-              <span className="mt-0.5 text-[8px] font-bold text-gray-200">{s.name}</span>
-            </div>
-          );
-        })}
+        {renderReel(0)}
+        {renderReel(1)}
+        {renderReel(2)}
       </div>
 
       {reach && !bonus && (
         <p className="mt-1 text-center text-xs font-extrabold text-rose-300">★ リーチ！ ★</p>
       )}
-
       {promo.length > 1 && (
-        <p className="mt-1 text-center text-[11px] text-amber-300">
-          昇格！ {promo.join(" → ")}
-        </p>
+        <p className="mt-1 text-center text-[11px] text-amber-300">昇格！ {promo.join(" → ")}</p>
       )}
-
       {bonus && (
         <p
           className="mt-1 animate-pop text-center text-base font-black"
-          style={{ color: getSymbol(cells[1]).color }}
+          style={{ color: getSymbol(idAt(offsets.current[1])).color }}
         >
           ✦ {bonus} ✦
         </p>
@@ -217,5 +255,28 @@ const PachinkoReels = forwardRef<
     </div>
   );
 });
+
+function Tile({ id, yc, url, blur }: { id: number; yc: number; url?: string; blur: boolean }) {
+  const s = getSymbol(id);
+  return (
+    <div
+      className="absolute inset-x-0 flex items-center justify-center"
+      style={{ top: `${yc - ROW / 2}%`, height: `${ROW}%` }}
+    >
+      {url ? (
+        <img
+          src={url}
+          alt={s.name}
+          width={38}
+          height={38}
+          draggable={false}
+          style={{ width: 38, height: 38, imageRendering: "pixelated", filter: blur ? "blur(1px)" : "none" }}
+        />
+      ) : (
+        <span className="block h-9 w-9 rounded bg-white/5" />
+      )}
+    </div>
+  );
+}
 
 export default PachinkoReels;

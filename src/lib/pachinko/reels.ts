@@ -64,10 +64,12 @@ export function spinReels(mode: Mode, rng: Rng = Math.random): ReelResult {
     const reach = rng() < 0.13;
     let symbols: [number, number, number];
     if (reach) {
+      // 海物語式テンパイ: 左右が揃い、中図柄は「トリガーの±1コマ（隣の図柄）」で
+      // 惜しく外す（[左, 中, 右] = [t, t±1, t]）。
       const t = pick(WEIGHTS[mode], rng);
-      let last = (((Math.floor(rng() * 6) + t) % 7) + 1) as number;
-      if (last === t) last = (last % 7) + 1;
-      symbols = [t, t, last];
+      const step = rng() < 0.5 ? 1 : 6; // +1コマ or -1コマ（mod 7）
+      const last = ((t - 1 + step) % 7) + 1;
+      symbols = [t, last, t];
     } else {
       const [a, b] = distinctPair(Math.floor(rng() * 7) + 1, rng);
       let c = ((Math.floor(rng() * 6) + b) % 7) + 1;
