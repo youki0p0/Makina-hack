@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import PachinkoBoard, { type PachinkoBoardHandle } from "@/components/casino/PachinkoBoard";
 import PachinkoReels, { type PachinkoReelsHandle } from "@/components/casino/PachinkoReels";
 import PayoutParticles, { type PayoutParticlesHandle } from "@/components/casino/PayoutParticles";
+import EventBadge from "@/components/EventBadge";
 import { PACHINKO_CONFIG, BOARD } from "@/lib/pachinko/config";
 import { spinReels, type Mode, type ReelResult } from "@/lib/pachinko/reels";
 import { getSymbol } from "@/lib/pachinko/symbols";
@@ -13,9 +14,10 @@ import { rollBonus, rollContinue, ATTACKER_PRIZE, type BonusType } from "@/lib/p
 import {
   MACHINE_COUNT,
   settingBucket,
-  pachiMachineSettings,
+  effectivePachiSettings,
   pachiSettingMult,
   pachiCeilingSpins,
+  casinoEvent,
 } from "@/lib/casino";
 import { useGameStore } from "@/store/gameStore";
 import { initAudio, slotSfx, isMuted, setMuted, setBgmTheme, startBgm, stopBgm } from "@/lib/audio";
@@ -101,7 +103,8 @@ export default function PachinkoPage() {
     const saved = Number(window.localStorage.getItem(PACHI_MACHINE_KEY));
     if (Number.isInteger(saved) && saved >= 0 && saved < MACHINE_COUNT) setMachine(saved);
   }, []);
-  const setting = pachiMachineSettings(settingBucket())[machine] ?? 1;
+  // イベントデー中は実効設定(上書き後)で初当たり率・天井を決める。
+  const setting = effectivePachiSettings(settingBucket())[machine] ?? 1;
   const winMult = pachiSettingMult(setting);
   const winMultRef = useRef(winMult);
   winMultRef.current = winMult;
@@ -353,7 +356,10 @@ export default function PachinkoPage() {
         <Link href="/casino" className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">
           ← カジノ
         </Link>
-        <span className="text-sm font-black tracking-wide text-amber-200">🎲 甘ダイス</span>
+        <span className="flex items-center gap-1 text-sm font-black tracking-wide text-amber-200">
+          🎲 甘ダイス
+          {casinoEvent().pachinko && <EventBadge />}
+        </span>
         <span
           className={`text-xs font-bold ${
             complete ? "animate-pulse text-amber-300" : nearCeiling ? "animate-pulse text-rose-300" : "text-cyan-200"
