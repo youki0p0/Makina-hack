@@ -63,6 +63,39 @@ describe("spinReels", () => {
     }
   });
 
+  it("reach production metadata is self-consistent and acts as a reliability gauge", () => {
+    const rng = seeded(31337);
+    let winSuSum = 0,
+      winN = 0,
+      missSuSum = 0,
+      missN = 0;
+    for (let i = 0; i < 6000; i++) {
+      const r = spinReels(i % 2 === 0 ? "normal" : "complete", rng);
+      // su は 0..4。
+      expect(r.su).toBeGreaterThanOrEqual(0);
+      expect(r.su).toBeLessThanOrEqual(4);
+      // reachKind は reach と整合（テンパイなしなら none、テンパイありなら none 以外）。
+      expect(r.reachKind === "none").toBe(!r.reach);
+      // spName / chanceUp は SP のときだけ。
+      if (r.reachKind === "sp") expect(r.spName).toBeTruthy();
+      else {
+        expect(r.spName).toBeNull();
+        expect(r.chanceUp).toBe(0);
+      }
+      // プレミアは当たりのときだけ（出たら当確の世界観）。
+      if (r.premium) expect(r.win).toBe(true);
+      if (r.win) {
+        winSuSum += r.su;
+        winN++;
+      } else {
+        missSuSum += r.su;
+        missN++;
+      }
+    }
+    // 信頼度ゲージ: 当たりの平均SUステップはハズレより明確に高い。
+    expect(winSuSum / winN).toBeGreaterThan(missSuSum / missN);
+  });
+
   it("promotion chains start at the rolled symbol and only climb", () => {
     const rng = seeded(2024);
     for (let i = 0; i < 5000; i++) {
@@ -108,6 +141,11 @@ describe("payout", () => {
       enterComplete: true,
       jackpot: true,
       promotion: [7],
+      su: 4,
+      reachKind: "sp" as const,
+      spName: "神機降臨SPリーチ",
+      chanceUp: 3,
+      premium: true,
     };
     const plan = planPayout(fake)!;
     expect(plan.rainbow).toBe(true);

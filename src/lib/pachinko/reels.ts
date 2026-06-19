@@ -24,6 +24,19 @@ export interface ReelResult {
   jackpot: boolean;
   /** 昇格チェイン（例: [3,6] や [3,6,7]）。先頭が初期図柄。 */
   promotion: number[];
+  /**
+   * ===== 海物語式リーチ演出メタ（信頼度の階段）。数値が高い/SP/プレミアほど当たり濃厚。 =====
+   */
+  /** SU予告（ステップアップ予告）の到達ステップ 0..4。高いほど信頼度↑。 */
+  su: number;
+  /** リーチ種別: none（テンパイなし）/ normal（ノーマル）/ sp（SP発展＝激アツ）。 */
+  reachKind: "none" | "normal" | "sp";
+  /** SPリーチ名（reachKind==="sp" のときのみ）。 */
+  spName: string | null;
+  /** チャンスアップ回数 0..3（多いほど信頼度↑）。 */
+  chanceUp: number;
+  /** プレミア演出（激レア・ほぼ当確）。 */
+  premium: boolean;
 }
 
 type Rng = () => number;
@@ -76,6 +89,12 @@ export function spinReels(mode: Mode, rng: Rng = Math.random): ReelResult {
       if (c === a || c === b) c = (c % 7) + 1;
       symbols = [a, b, c];
     }
+    // リーチ演出: ハズレリーチは SP に発展しても外す“SP外し”（信頼度は低め）。
+    const reachKind: ReelResult["reachKind"] = reach
+      ? rng() < 0.3
+        ? "sp"
+        : "normal"
+      : "none";
     return {
       symbols,
       win: false,
@@ -88,6 +107,11 @@ export function spinReels(mode: Mode, rng: Rng = Math.random): ReelResult {
       enterComplete: false,
       jackpot: false,
       promotion: [],
+      su: suFor(false, reach, rng),
+      reachKind,
+      spName: reachKind === "sp" ? spNameFor(symbols[0]) : null,
+      chanceUp: reachKind === "sp" ? chanceUpFor(false, rng) : 0,
+      premium: false, // プレミアは当確の世界観＝ハズレでは出さない
     };
   }
 
@@ -109,6 +133,10 @@ export function spinReels(mode: Mode, rng: Rng = Math.random): ReelResult {
   }
 
   const sym = getSymbol(id);
+  // 当たりのリーチ演出: big/JP はほぼ SP 発展。プレミアは激レア（7はやや出やすい）。
+  const isBig = id >= 4;
+  const reachKind: ReelResult["reachKind"] = isBig || rng() < 0.6 ? "sp" : "normal";
+  const premium = id === 7 ? rng() < 0.12 : rng() < 0.01;
   return {
     symbols: [id, id, id],
     win: true,
@@ -121,6 +149,11 @@ export function spinReels(mode: Mode, rng: Rng = Math.random): ReelResult {
     enterComplete: sym.enterComplete,
     jackpot: id === 7,
     promotion,
+    su: suFor(true, true, rng),
+    reachKind,
+    spName: reachKind === "sp" ? spNameFor(id) : null,
+    chanceUp: reachKind === "sp" ? chanceUpFor(true, rng) : 0,
+    premium,
   };
 }
 
@@ -144,4 +177,36 @@ function groupForWin(id: number, rng: Rng): GroupKind | null {
   if (id >= 4) return rng() < 0.62 ? "makina" : lowGroup(rng); // big はほぼ激アツ
   if (id >= 2) return rng() < 0.18 ? "makina" : rng() < 0.55 ? lowGroup(rng) : null;
   return rng() < 0.4 ? lowGroup(rng) : null; // 最小当たりは弱め
+}
+
+// ===== 海物語式リーチ演出の信頼度カーブ（当たりほど強い演出が出やすい） =====
+
+/** SU予告（ステップアップ予告）の到達ステップ。当たり=高ステップ寄り、ガセは低ステップ。 */
+function suFor(win: boolean, reach: boolean, rng: Rng): number {
+  if (win) {
+    const r = rng();
+    return r < 0.5 ? 4 : r < 0.8 ? 3 : 2; // 当たりは 2〜4（高ステップ濃厚）
+  }
+  if (reach) {
+    const r = rng();
+    return r < 0.1 ? 4 : r < 0.4 ? 3 : r < 0.8 ? 2 : 1; // リーチハズレは 1〜3（まれに4=ガセ）
+  }
+  const r = rng();
+  return r < 0.75 ? 0 : r < 0.95 ? 1 : 2; // 非リーチは基本なし、たまに弱い煽り
+}
+
+/** SP中のチャンスアップ回数。当たりほど多い（多いほど信頼度↑）。 */
+function chanceUpFor(win: boolean, rng: Rng): number {
+  if (win) {
+    const r = rng();
+    return r < 0.4 ? 2 : r < 0.7 ? 3 : r < 0.9 ? 1 : 0;
+  }
+  const r = rng();
+  return r < 0.5 ? 0 : r < 0.85 ? 1 : 2;
+}
+
+/** SPリーチ名（テンパイ図柄の固有武器/神機にちなむ）。 */
+function spNameFor(id: number): string {
+  if (id === 7) return "神機降臨SPリーチ";
+  return `${getSymbol(id).name}SPリーチ`;
 }

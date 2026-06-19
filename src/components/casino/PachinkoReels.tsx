@@ -24,6 +24,9 @@ interface Tween {
 // ドラム位置(コマ単位) → 図柄 1..7（固定並び）。
 const idAt = (off: number) => ((((Math.round(off) % 7) + 7) % 7) + 1) as number;
 const CELL = 100 / 3; // 1コマ＝表示幅の1/3（横3コマ表示）
+// SU予告（ステップアップ予告）の段階色（1→4で青→緑→赤→金にエスカレート）。
+const SU_FILL = ["bg-sky-300", "bg-emerald-300", "bg-rose-400", "bg-amber-300"];
+const SU_TEXT = ["text-sky-200", "text-emerald-200", "text-rose-200", "text-amber-200"];
 
 /**
  * 中央の巨大ドラム表示（海物語式・横ドラム）。
@@ -45,6 +48,11 @@ const PachinkoReels = forwardRef<
   const [group, setGroup] = useState<ReelResult["group"]>(null);
   const [bonus, setBonus] = useState<string | null>(null);
   const [promo, setPromo] = useState<number[]>([]);
+  // 海物語式リーチ演出の段階表示。
+  const [su, setSu] = useState(0); // SU予告ステップ（0=非表示）
+  const [spName, setSpName] = useState<string | null>(null); // SP発展タイトル
+  const [cu, setCu] = useState(0); // チャンスアップ点滅トリガ
+  const [premium, setPremium] = useState(false); // プレミア（当確）
 
   // ドラム位置（ref で 60fps 駆動）。初期は中段に id 1,2,3。
   const offsets = useRef<number[]>([0, 1, 2]);
@@ -120,11 +128,15 @@ const PachinkoReels = forwardRef<
       setPromo([]);
       setReach(false);
       setGroup(result.group);
+      setSu(0);
+      setSpName(null);
+      setCu(0);
+      setPremium(false);
       setMoving([true, true, true]);
 
       const [topId, cId, botId] = result.symbols; // 中央列ライン [上, 中, 下]
       const isReach = topId === botId; // 横ドラム: 上下が揃えばテンパイ
-      const hot = result.group === "makina"; // 激アツ→逆回転リーチ
+      const sp = result.reachKind === "sp"; // SP発展＝激アツ（逆回転スロー）
       const fast = !effects || reduced;
 
       // フェーズ①加速: 3段同時にフリー回転開始。
@@ -132,6 +144,11 @@ const PachinkoReels = forwardRef<
       tweens.current = [null, null, null];
       spinning.current = true;
       raf.current = requestAnimationFrame(animate);
+
+      // フェーズ②予告: SU予告（ステップアップ）を順に点灯（テンパイ前の煽り）。
+      if (!fast && result.su > 0) {
+        for (let s = 1; s <= result.su; s++) at(60 + s * 150, () => setSu(s));
+      }
 
       // フェーズ③順次減速: 上 → 下。
       const t0 = fast ? 90 : 380;
@@ -144,14 +161,16 @@ const PachinkoReels = forwardRef<
       });
 
       // フェーズ④中リール: テンパイなら変則、非テンパイは普通に停止。
-      const reachWait = fast ? 0 : hot ? 1500 : isReach ? 700 : 0;
+      const reachWait = fast ? 0 : sp ? 1500 : isReach ? 700 : 0;
       const centerAt = t0 + stepT * 2 + reachWait;
       let centerEnd = centerAt + dur;
 
       if (fast || !isReach) {
         at(centerAt, () => tweenTo(1, nextK(offsets.current[1] + (fast ? 3 : 6), cId), dur, true));
-      } else if (hot) {
-        // パターンB: 黒潮(逆回転)リーチ。行き過ぎて止まり、下→上へスロー逆回転で本停止。
+      } else if (sp) {
+        // パターンB: SP発展（黒潮＝逆回転スロー）。SPタイトル→チャンスアップ→当落。
+        at(Math.max(0, centerAt - 600), () => setSpName(result.spName));
+        for (let j = 1; j <= result.chanceUp; j++) at(centerAt + 200 + j * 460, () => setCu(j));
         at(centerAt, () => {
           const kf = nextK(offsets.current[1] + 8, cId);
           tweenTo(1, kf + 1, 380, false); // 1コマ行き過ぎ
@@ -169,10 +188,14 @@ const PachinkoReels = forwardRef<
         centerEnd = centerAt + 340 + 160 + 200 + 160 + 220;
       }
 
+      // プレミア（当確）。演出ありなら本停止手前で“割り込み”、なければ確定時に。
+      if (result.premium && !fast) at(Math.max(centerAt, centerEnd - 700), () => setPremium(true));
+
       // 確定（出目・onDone）。
       at(centerEnd + (fast ? 60 : 300), () => {
         spinning.current = false;
         setMoving([false, false, false]);
+        if (result.premium) setPremium(true);
         if (result.win) {
           if (result.promotion.length > 1) setPromo(result.promotion);
           setBonus(getSymbol(result.symbolId ?? 1).bonus);
@@ -219,6 +242,49 @@ const PachinkoReels = forwardRef<
   return (
     <div className="relative flex h-full w-full flex-col rounded-xl bg-[#04101c]/80 p-2">
       <p className="text-center text-[8px] tracking-widest text-cyan-400/70">▼ MONITOR ▼</p>
+
+      {/* SU予告（ステップアップ予告）。段階が上がるほど信頼度↑。 */}
+      {su > 0 && !bonus && (
+        <div className="absolute left-1.5 top-1.5 z-30 flex items-center gap-0.5">
+          {Array.from({ length: 4 }, (_, i) => (
+            <span
+              key={i}
+              className={`h-1.5 w-3 rounded-full ${i < su ? SU_FILL[su - 1] : "bg-white/15"}`}
+            />
+          ))}
+          <span className={`ml-0.5 text-[9px] font-black ${SU_TEXT[su - 1]}`}>SU{su}</span>
+        </div>
+      )}
+
+      {/* SP発展タイトル（ノーマル→SPリーチ昇格）。 */}
+      {spName && !bonus && (
+        <div className="absolute inset-x-0 top-7 z-30 text-center">
+          <span className="inline-block animate-pop rounded-md border border-rose-300 bg-rose-500/25 px-3 py-0.5 text-sm font-black text-rose-100">
+            ⚔ {spName} 発展！
+          </span>
+        </div>
+      )}
+
+      {/* チャンスアップ（SP中に追加で信頼度↑）。cu をキーに点滅再生。 */}
+      {cu > 0 && !bonus && (
+        <div key={cu} className="pointer-events-none absolute right-1.5 top-1/3 z-30 animate-pop">
+          <span className="rounded bg-amber-400/90 px-2 py-0.5 text-[11px] font-black text-black">
+            チャンスアップ！
+          </span>
+        </div>
+      )}
+
+      {/* プレミア演出（激レア・ほぼ当確）。 */}
+      {premium && (
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center rounded-2xl bg-black/60 animate-pulse">
+          <span className="rounded-xl border-2 border-amber-200 bg-amber-300/20 px-5 py-2 text-center text-lg font-black text-amber-100">
+            ✦ プレミア ✦
+            <br />
+            <span className="text-base">当 確 ！</span>
+          </span>
+        </div>
+      )}
+
       {group === "makina" ? (
         <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-black/55 animate-pulse">
           <span className="rounded-lg border-2 border-amber-300 bg-amber-400/15 px-4 py-2 text-lg font-black tracking-wide text-amber-200">
