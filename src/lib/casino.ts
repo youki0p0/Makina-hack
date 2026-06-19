@@ -123,6 +123,31 @@ export function ceilingSpins(setting: number): number {
   return 900 - Math.max(1, Math.min(6, setting)) * 60; // 1→840 … 6→540
 }
 
+// ===== 甘ダイス(パチンコ)用の台・設定 =====
+// スロットと同じ「4台・隠し設定1-6・6時間シャッフル」だが、別シードで独立し、
+// 設定差(機械割の幅)はスロットより少し広い（看破の沼を深く）。
+
+/** 甘ダイス4台の隠し設定(1-6)。スロットとは別シードで独立に決まる。 */
+export function pachiMachineSettings(bucket: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < MACHINE_COUNT; i++) {
+    const h = Math.abs(Math.sin((bucket + 1) * 24.137 + (i + 1) * 51.77) * 91271.13);
+    out.push(1 + Math.floor((h % 1) * 6)); // 1..6
+  }
+  return out;
+}
+
+/** 甘ダイスの設定倍率（初当たり率に乗算）。スロット(0.88〜1.28・幅0.40)より広い 0.70〜1.30(幅0.60)。
+ *  3.5を中心に対称＝平均は等倍（基準RTPを保ちつつ台ごとの差を大きく）。 */
+export function pachiSettingMult(setting: number): number {
+  return 1 + (Math.max(1, Math.min(6, setting)) - 3.5) * 0.12; // 1→0.70 … 6→1.30
+}
+
+/** 甘ダイスの天井(回転)。高設定ほど浅い。 */
+export function pachiCeilingSpins(setting: number): number {
+  return 600 - Math.max(1, Math.min(6, setting)) * 30; // 1→570 … 6→420
+}
+
 /** 連チャンゾーン: length and BIG/REG odds boost right after an AT ends.
  * 連チャン率は控えめに(倍率・長さを下げた)。 */
 export const ZONE_SPINS = 24;
@@ -140,6 +165,8 @@ export const BAN_BOSSES = 10;
 // 超高額のカジノコインで強力なセット武器・転生ポイントと交換できる(射幸性の出口)。
 /** Coins to exchange for one set-piece weapon. */
 export const SET_WEAPON_COIN = 8000;
+/** おじさんに甘ダイスの台の設定をランダムに1つ聞く値段。 */
+export const SETTING_TIP_COIN = 2000;
 /** Coins per 転生ポイント (deliberately pricier). */
 export const SOULS_COIN = 3000;
 /** Coins to exchange for one random 固有(signature) weapon. */

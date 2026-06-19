@@ -70,9 +70,9 @@ function distinctPair(winId: number, rng: Rng): [number, number] {
 }
 
 /** 当たり/ハズレ・テンパイ・群予告・昇格まで含めて1変動を決定する。
- *  forceWin=true で天井(規定回転ノーヒット)による強制当たりを発生させる。 */
-export function spinReels(mode: Mode, rng: Rng = Math.random, forceWin = false): ReelResult {
-  const win = forceWin || rng() < WIN_CHANCE[mode];
+ *  forceWin=true で天井(規定回転ノーヒット)による強制当たり。winMult で初当たり率を設定差ぶん補正。 */
+export function spinReels(mode: Mode, rng: Rng = Math.random, forceWin = false, winMult = 1): ReelResult {
+  const win = forceWin || rng() < WIN_CHANCE[mode] * winMult;
 
   if (!win) {
     // ハズレ。一定確率でテンパイ（2つ揃い）を作って煽る（リーチは希少に）。

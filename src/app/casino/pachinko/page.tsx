@@ -10,6 +10,13 @@ import { PACHINKO_CONFIG, BOARD } from "@/lib/pachinko/config";
 import { spinReels, type Mode, type ReelResult } from "@/lib/pachinko/reels";
 import { getSymbol } from "@/lib/pachinko/symbols";
 import { rollBonus, rollContinue, ATTACKER_PRIZE, type BonusType } from "@/lib/pachinko/bonus";
+import {
+  MACHINE_COUNT,
+  settingBucket,
+  pachiMachineSettings,
+  pachiSettingMult,
+  pachiCeilingSpins,
+} from "@/lib/casino";
 import { useGameStore } from "@/store/gameStore";
 import { initAudio, slotSfx, isMuted, setMuted, setBgmTheme, startBgm, stopBgm } from "@/lib/audio";
 import { fmt } from "@/lib/ui";
@@ -19,8 +26,7 @@ const HOLD_MAX = 8;
 const REVEAL_MS = 800;
 // ボーナス1ゲーム(回転)の長さ。保証G ぶん消化したらラウンド終了→継続抽選。
 const GAME_MS = 420;
-// 天井：通常時この回転数ノーヒットで強制初当たり（激辛なハマりの救済）。
-const CEILING_SPINS = 500;
+const PACHI_MACHINE_KEY = "pachiMachine";
 
 // ボーナス(RUSH)の進行状態。出玉は大入賞口に入った玉で payRemaining を削って加算。
 interface Rush {
@@ -88,6 +94,54 @@ export default function PachinkoPage() {
   // 天井カウンタ（通常時の連続ノーヒット回転数）。初当たりで0へ。
   const [spins, setSpins] = useState(0);
   const spinsRef = useRef(0);
+
+  // 台選択（4台・隠し設定1-6・6時間ごとシャッフル＝看破の沼）。
+  const [machine, setMachine] = useState(0);
+  useEffect(() => {
+    const saved = Number(window.localStorage.getItem(PACHI_MACHINE_KEY));
+    if (Number.isInteger(saved) && saved >= 0 && saved < MACHINE_COUNT) setMachine(saved);
+  }, []);
+  const setting = pachiMachineSettings(settingBucket())[machine] ?? 1;
+  const winMult = pachiSettingMult(setting);
+  const winMultRef = useRef(winMult);
+  winMultRef.current = winMult;
+  const ceiling = pachiCeilingSpins(setting);
+  const ceilingRef = useRef(ceiling);
+  ceilingRef.current = ceiling;
+  // 別の台に座る＝新台なので天井ハマりをリセット（隠し設定はそのまま）。
+  const sitMachine = (i: number) => {
+    setMachine(i);
+    window.localStorage.setItem(PACHI_MACHINE_KEY, String(i));
+    spinsRef.current = 0;
+    setSpins(0);
+  };
+
+  // おじさん（交換所）に暴かれた甘ダイス各台の設定。購入に追従して台ボタンに表示。
+  const [tips, setTips] = useState<Record<number, number>>({});
+  useEffect(() => {
+    const load = () => {
+      try {
+        const raw = window.localStorage.getItem("casinoTips");
+        if (raw) {
+          const p = JSON.parse(raw);
+          if (p && p.bucket === settingBucket()) {
+            setTips(p.pachi ?? {});
+            return;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+      setTips({});
+    };
+    load();
+    window.addEventListener("casinoTips", load);
+    window.addEventListener("storage", load);
+    return () => {
+      window.removeEventListener("casinoTips", load);
+      window.removeEventListener("storage", load);
+    };
+  }, []);
 
   // 獲得枚数の“その場表示”（ヘソ/大入賞の上に +N がふわっと浮く）。
   const [floats, setFloats] = useState<{ id: number; x: number; y: number; text: string; color: string }[]>([]);
@@ -230,11 +284,11 @@ export default function PachinkoPage() {
     if (effects && typeof navigator !== "undefined") navigator.vibrate?.(8);
     addCoins(BOARD.hesoPrize); // ヘソ賞球（玉持ち＝回転率改善。通常時のみ）
     spawnFloat(BOARD.pocketX, BOARD.pocketY - 4, `+${BOARD.hesoPrize}`, "#7dd3fc"); // ヘソの上に+2
-    // 天井：この回転でカウンタが規定数に達するなら強制初当たり（救済）。
+    // 天井：この回転でカウンタが台の天井に達するなら強制初当たり（救済）。初当たり率は設定差で補正。
     const next = spinsRef.current + 1;
     spinsRef.current = next;
     setSpins(next);
-    const result = spinReels("normal", Math.random, next >= CEILING_SPINS);
+    const result = spinReels("normal", Math.random, next >= ceilingRef.current, winMultRef.current);
     if (reelsRef.current?.busy()) {
       if (holdsRef.current.length >= HOLD_MAX) return; // 保留満タンは入賞のみ（変動せず）
       const hold: Hold = { result, color: HOLD_COLORS[holdColorFor(result)] };
@@ -276,12 +330,12 @@ export default function PachinkoPage() {
   }, [auto, mode, launch]);
 
   const complete = mode === "complete";
-  const nearCeiling = spins >= CEILING_SPINS - 50;
+  const nearCeiling = spins >= ceiling - 50;
   const statusLabel = complete
     ? rush
       ? `RUSH ${rush.ren}連`
       : "大当たり！"
-    : `${spins}回転 / 天井${CEILING_SPINS}`;
+    : `${spins}回転`;
 
   return (
     <main className="flex min-h-dvh flex-col gap-2 p-3">
@@ -330,6 +384,31 @@ export default function PachinkoPage() {
           </div>
         </div>
         <span className="text-lg font-black text-amber-300">🎲 コイン {fmt(coins)}</span>
+      </div>
+
+      {/* 台選択（4台・設定は隠し・6時間ごとにシャッフル＝看破の沼）。当たり中は移動不可。 */}
+      <div className="flex items-center gap-1.5">
+        <span className="shrink-0 text-[10px] text-gray-400">台</span>
+        {Array.from({ length: MACHINE_COUNT }, (_, i) => (
+          <button
+            key={i}
+            disabled={complete}
+            onClick={() => sitMachine(i)}
+            className={`flex flex-1 flex-col items-center justify-center rounded-lg py-1 text-xs font-bold leading-none active:scale-95 disabled:opacity-40 ${
+              i === machine ? "bg-amber-500 text-black" : "bg-white/10 text-gray-300"
+            }`}
+          >
+            台{i + 1}
+            {tips[i] != null && (
+              <span className={`mt-0.5 text-[9px] ${i === machine ? "text-black/70" : "text-cyan-300"}`}>
+                設定{tips[i]}
+              </span>
+            )}
+          </button>
+        ))}
+        <span className="shrink-0 text-[9px] leading-tight text-gray-500">設定・天井
+          <br />は隠し
+        </span>
       </div>
 
       {/* 盤面が中央モニターを囲む“ひとつの台”。役物の窪みに図柄オーバーレイを重ねる。 */}
@@ -426,7 +505,7 @@ export default function PachinkoPage() {
       <p className="pb-2 text-center text-[10px] text-gray-500">
         通常時は左打ち（ヘソINで図柄変動＆賞球+{BOARD.hesoPrize}で玉持ちUP）。当たると保証枚数(100〜400)×保証G(10/16)の
         RUSHへ＝右打ち・発射無料で大入賞口に出玉。継続でループ（10G≈78%/16G≈88%・平均≈5連）。
-        {CEILING_SPINS}回転ノーヒットで天井＝強制初当たり。
+        ハマっても救済の強制初当たりあり（条件＝天井は秘密）。4台から座って設定を見極めよう。
       </p>
     </main>
   );

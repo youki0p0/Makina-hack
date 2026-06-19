@@ -15,9 +15,13 @@ import {
   SET_WEAPON_COIN,
   SIGNATURE_WEAPON_COIN,
   SOULS_COIN,
+  SETTING_TIP_COIN,
   HIT_WINDOW_MS,
   coinBuyCost,
   coinBuyMax,
+  settingBucket,
+  machineSettings,
+  pachiMachineSettings,
   type BjOutcome,
 } from "@/lib/casino";
 import { estimateTier } from "@/data/items";
@@ -300,6 +304,19 @@ function Slots({ onPan }: { onPan: () => void }) {
   const [foe, setFoe] = useState<ReachFoe | null>(null);
   const [result, setResult] = useState<SlotSpinResult | null>(null);
   const [auto, setAuto] = useState(false);
+
+  // おじさんに暴かれたこの台群(スロット)の設定。交換所での購入に追従。
+  const [slotTips, setSlotTips] = useState<Record<number, number>>({});
+  useEffect(() => {
+    const load = () => setSlotTips(readCasinoTips().slot);
+    load();
+    window.addEventListener("casinoTips", load);
+    window.addEventListener("storage", load);
+    return () => {
+      window.removeEventListener("casinoTips", load);
+      window.removeEventListener("storage", load);
+    };
+  }, []);
   const [flash, setFlash] = useState(false); // 確定当たりリーチの虹色明滅
 
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -500,11 +517,12 @@ function Slots({ onPan }: { onPan: () => void }) {
             key={i}
             onClick={() => selectMachine(i)}
             disabled={spinning || atActive}
-            className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 disabled:opacity-40 ${
+            className={`flex h-9 flex-1 flex-col items-center justify-center rounded-lg text-[11px] font-bold leading-none active:scale-95 disabled:opacity-40 ${
               machine === i ? "bg-fuchsia-600 text-white" : "bg-white/10 text-gray-300"
             }`}
           >
             台{i + 1}
+            {slotTips[i] != null && <span className="mt-0.5 text-[9px] text-amber-300">設定{slotTips[i]}</span>}
           </button>
         ))}
       </div>
@@ -806,12 +824,60 @@ function Blackjack() {
 
 // ===== カジノコイン交換所 =====
 
+/** おじさんに聞いて暴いた台の設定（当該6時間バケットぶん）を読む。 */
+function readCasinoTips(): { slot: Record<number, number>; pachi: Record<number, number> } {
+  if (typeof window === "undefined") return { slot: {}, pachi: {} };
+  try {
+    const raw = window.localStorage.getItem("casinoTips");
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && p.bucket === settingBucket()) return { slot: p.slot ?? {}, pachi: p.pachi ?? {} };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { slot: {}, pachi: {} };
+}
+
 function CoinShop() {
   const coins = useGameStore((s) => s.coins);
   const souls = useGameStore((s) => s.souls);
+  const addCoins = useGameStore((s) => s.addCoins);
   const buyWeapon = useGameStore((s) => s.coinBuySetWeapon);
   const buySignature = useGameStore((s) => s.coinBuySignatureWeapon);
   const buySouls = useGameStore((s) => s.coinBuySouls);
+
+  // 怪しいおじさん: 2000コインで「スロット4台＋甘ダイス4台＝計8台」からランダムに1台の設定を
+  // “こっそり”教える。暴いた設定は localStorage(当該バケット)に貯まり、各台ボタンに表示される。
+  const buyTip = () => {
+    if (coins < SETTING_TIP_COIN) return;
+    addCoins(-SETTING_TIP_COIN);
+    const bucket = settingBucket();
+    const pick = Math.floor(Math.random() * (MACHINE_COUNT * 2)); // 0..7
+    const isSlot = pick < MACHINE_COUNT;
+    const m = pick % MACHINE_COUNT;
+    const s = (isSlot ? machineSettings(bucket) : pachiMachineSettings(bucket))[m];
+    try {
+      let store: { bucket: number; slot: Record<number, number>; pachi: Record<number, number> } = {
+        bucket,
+        slot: {},
+        pachi: {},
+      };
+      const raw = window.localStorage.getItem("casinoTips");
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && p.bucket === bucket) store = { bucket, slot: p.slot ?? {}, pachi: p.pachi ?? {} };
+      }
+      (isSlot ? store.slot : store.pachi)[m] = s;
+      window.localStorage.setItem("casinoTips", JSON.stringify(store));
+      window.dispatchEvent(new Event("casinoTips"));
+    } catch {
+      /* localStorage 不可でも会話は成立させる */
+    }
+    slotSfx("small");
+    setMsg(`🕵️ おじさん「${isSlot ? "スロット" : "甘ダイス"}の台${m + 1}は…たぶん設定${s}だよ。たぶんね」`);
+    setTimeout(() => setMsg(null), 4500);
+  };
 
   // The exchange offers the hand-tuned named sets (a deliberate coin grind sink).
   // Weapon tier scales to the player's gear, so floor-gating isn't needed here.
@@ -930,6 +996,21 @@ function CoinShop() {
             +5（🪙{fmt(SOULS_COIN * 5)}）
           </button>
         </div>
+      </div>
+
+      {/* 怪しいおじさん（設定看破の裏ルート） */}
+      <div className="rounded-2xl border border-cyan-500/40 bg-cyan-500/5 p-3">
+        <p className="flex items-center gap-1 text-sm font-bold text-cyan-200">🕵️ 設定を聞く（おじさん）</p>
+        <p className="mt-0.5 text-[10px] text-gray-400">
+          スロット＆甘ダイスの計8台から、ランダムで1台の隠し設定をこっそり教えてもらう（当たり台ボタンに表示）。
+        </p>
+        <button
+          onClick={buyTip}
+          disabled={coins < SETTING_TIP_COIN}
+          className="mt-2 h-12 w-full rounded-xl bg-cyan-600 text-sm font-extrabold text-white active:scale-95 disabled:opacity-40"
+        >
+          聞く（🪙{fmt(SETTING_TIP_COIN)}）
+        </button>
       </div>
 
       <p className="text-center text-[10px] text-gray-500">
