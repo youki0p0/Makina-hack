@@ -30,13 +30,13 @@ export interface PachiSymbol {
  * itemId は src/data/items.ts に実在する固有武器（神機マキナ）。
  */
 export const SYMBOLS: readonly PachiSymbol[] = [
-  { id: 1, name: "吸血の剣", bonus: "吸血BONUS", itemId: "vampiric_sword", color: "#c084fc", payout: 14, durationMs: 1000, tier: "small", enterComplete: false },
-  { id: 2, name: "毒牙の短剣", bonus: "毒牙BONUS", itemId: "venom_fang", color: "#84cc16", payout: 48, durationMs: 3000, tier: "normal", enterComplete: false },
-  { id: 3, name: "雷神の鎚", bonus: "雷神BONUS", itemId: "thunder_hammer", color: "#facc15", payout: 64, durationMs: 3500, tier: "normal", enterComplete: false },
-  { id: 4, name: "業火の剣", bonus: "業火BONUS", itemId: "flame_brand", color: "#fb923c", payout: 100, durationMs: 4000, tier: "big", enterComplete: true },
-  { id: 5, name: "氷結の槍", bonus: "氷結BONUS", itemId: "glacial_spear", color: "#38bdf8", payout: 100, durationMs: 4000, tier: "big", enterComplete: true },
-  { id: 6, name: "獄炎の薙刀", bonus: "獄炎BONUS", itemId: "inferno_glaive", color: "#ef4444", payout: 130, durationMs: 5000, tier: "big", enterComplete: true },
-  { id: 7, name: "神機マキナ", bonus: "神機BONUS", itemId: "makina_god", color: "#ffcf33", payout: 330, durationMs: 8000, tier: "jackpot", enterComplete: true },
+  { id: 1, name: "吸血の剣", bonus: "吸血BONUS", itemId: "vampiric_sword", color: "#c084fc", payout: 15, durationMs: 1000, tier: "small", enterComplete: false },
+  { id: 2, name: "毒牙の短剣", bonus: "毒牙BONUS", itemId: "venom_fang", color: "#84cc16", payout: 50, durationMs: 3000, tier: "normal", enterComplete: false },
+  { id: 3, name: "雷神の鎚", bonus: "雷神BONUS", itemId: "thunder_hammer", color: "#facc15", payout: 66, durationMs: 3500, tier: "normal", enterComplete: false },
+  { id: 4, name: "業火の剣", bonus: "業火BONUS", itemId: "flame_brand", color: "#fb923c", payout: 103, durationMs: 4000, tier: "big", enterComplete: true },
+  { id: 5, name: "氷結の槍", bonus: "氷結BONUS", itemId: "glacial_spear", color: "#38bdf8", payout: 103, durationMs: 4000, tier: "big", enterComplete: true },
+  { id: 6, name: "獄炎の薙刀", bonus: "獄炎BONUS", itemId: "inferno_glaive", color: "#ef4444", payout: 134, durationMs: 5000, tier: "big", enterComplete: true },
+  { id: 7, name: "神機マキナ", bonus: "神機BONUS", itemId: "makina_god", color: "#ffcf33", payout: 340, durationMs: 8000, tier: "jackpot", enterComplete: true },
 ] as const;
 
 const SYMBOL_BY_ID = new Map(SYMBOLS.map((s) => [s.id, s]));
