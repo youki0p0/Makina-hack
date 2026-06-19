@@ -19,32 +19,34 @@ export const PACHINKO_CONFIG = {
 
 /**
  * 盤面ジオメトリ（基準座標。Canvas へ等比スケールして描画）。
- * スマホ縦画面前提なので縦長。
+ * 本質は「中央モニターを見ながら、左上打ちした玉がモニター直下の入賞口に入るか」。
+ * モニターは画面上で大きく主役にし、盤面はその直下の“帯”（横長）にする。
+ * 入賞口(ヘソ)は中央＝モニター直下なので、視線はモニターに置いたまま入賞を見られる。
  */
 export const BOARD = {
   width: 320,
-  height: 440,
+  height: 240,
   ballRadius: 5,
   pegRadius: 2.6,
   /** 1ステップあたりの重力加速。 */
   gravity: 0.16,
   /** 衝突時の反発係数。 */
-  bounce: 0.52,
+  bounce: 0.5,
   /** 速度減衰。 */
   friction: 0.995,
-  /** 発射口（左上）。 */
-  launchX: 22,
-  launchY: 16,
-  /** 発射初速（右下方向へ）。 */
-  launchVX: 1.7,
-  launchVY: 0.6,
-  /** 発射初速のばらつき。 */
-  launchJitter: 0.5,
-  /** スタートチャッカー（中央下の入賞口）。 */
+  /** 発射口（左上＝左上打ち）。 */
+  launchX: 20,
+  launchY: 12,
+  /** 発射初速（右下へ流す＝左上打ち）。 */
+  launchVX: 1.8,
+  launchVY: 0.5,
+  /** 発射初速のばらつき（打ち加減のブレ）。 */
+  launchJitter: 0.6,
+  /** スタートチャッカー（中央下の入賞口=ヘソ。モニター直下）。 */
   pocketX: 160,
-  pocketY: 398,
-  pocketW: 54,
-  pocketH: 26,
+  pocketY: 206,
+  pocketW: 50,
+  pocketH: 20,
   /** 1発の消費玉。 */
   startCost: 1,
 } as const;

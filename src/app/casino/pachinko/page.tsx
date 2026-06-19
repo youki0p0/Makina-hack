@@ -111,11 +111,11 @@ export default function PachinkoPage() {
     reelsRef.current?.spin(result, () => onReelDone(result));
   });
 
-  // 入賞口に球が入った。
+  // 入賞口に球が入った。変動中はキューに積む（バックログ過多を防ぐため上限3）。
   const onPocket = useCallbackRef(() => {
     slotSfx("small");
     if (reelsRef.current?.busy()) {
-      pendingSpins.current += 1;
+      pendingSpins.current = Math.min(3, pendingSpins.current + 1);
     } else {
       doSpin();
     }
@@ -179,13 +179,16 @@ export default function PachinkoPage() {
         <span className="text-xl font-black text-amber-300">{fmt(balls)}</span>
       </div>
 
-      {/* 中央: 図柄変動エリア（固有武器のドット絵） */}
+      {/* 主役: 中央モニター（固有武器のドット絵が変動） */}
       <PachinkoReels ref={reelsRef} effects={effects} reduced={reduced} />
 
-      {/* 盤面（玉・釘はドット描画） */}
+      {/* モニター直下の盤面“帯”。左上打ちした玉が中央のヘソに入るか（玉・釘はドット描画）。 */}
+      <p className="-mb-1 text-center text-[10px] text-cyan-300/70">
+        ▲ 玉がヘソ(中央)に入ると上のモニターが変動！
+      </p>
       <PachinkoBoard ref={boardRef} onPocket={onPocket} reduced={reduced} />
 
-      {/* 下部: 出玉演出 */}
+      {/* 下部: 出玉演出（薄め） */}
       <div className="rounded-xl border border-amber-400/20 bg-black/40">
         <PayoutParticles ref={particlesRef} reduced={reduced} />
       </div>

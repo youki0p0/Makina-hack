@@ -60,16 +60,19 @@ const PachinkoBoard = forwardRef<PachinkoBoardHandle, { onPocket: () => void; re
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, BOARD.width, BOARD.height);
 
-        // 発射口（左上）。
+        // 左上打ちのレール（左下の発射口 → 左を上って → 天＝中央上へ）。
+        ctx.strokeStyle = "rgba(255,207,51,.4)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(10, BOARD.height - 18);
+        ctx.lineTo(10, 14);
+        ctx.quadraticCurveTo(10, 7, BOARD.pocketX - 8, 7);
+        ctx.stroke();
+        ctx.lineWidth = 1;
         ctx.fillStyle = "#ffcf33";
         ctx.beginPath();
-        ctx.arc(BOARD.launchX, BOARD.launchY, 6, 0, Math.PI * 2);
+        ctx.arc(10, BOARD.height - 18, 5, 0, Math.PI * 2); // 発射口（左下）
         ctx.fill();
-        ctx.strokeStyle = "rgba(255,207,51,.5)";
-        ctx.beginPath();
-        ctx.moveTo(BOARD.launchX, BOARD.launchY);
-        ctx.lineTo(BOARD.launchX + 26, BOARD.launchY + 14);
-        ctx.stroke();
 
         // ピン。
         ctx.fillStyle = "#8fb3d9";
