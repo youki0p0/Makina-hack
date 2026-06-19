@@ -328,7 +328,13 @@ export default function PachinkoPage() {
   useEffect(() => {
     if (!auto && mode !== "complete") return;
     const interval = mode === "complete" ? 160 : PACHINKO_CONFIG.launchIntervalMs;
-    const id = setInterval(() => launch(), interval);
+    const id = setInterval(() => {
+      // 盤上の玉が多いときは発射を見送る。発射は実時間・物理はフレーム駆動なので、
+      // FPSが落ちると発射が排出を追い越して玉が溜まり続け重くなる（暴走）。稼働数で
+      // 絞ることでフレーム実態に追従させ、右打ち中の玉が増え続けるのを防ぐ。
+      if ((boardRef.current?.activeCount() ?? 0) >= PACHINKO_CONFIG.autoMaxInflight) return;
+      launch();
+    }, interval);
     return () => clearInterval(id);
   }, [auto, mode, launch]);
 
