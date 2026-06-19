@@ -94,11 +94,21 @@ const PayoutParticles = forwardRef<PayoutParticlesHandle, { reduced?: boolean }>
             continue;
           }
           ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
-          ctx.fillStyle = rainbow.current || p.hue > 60
-            ? `hsl(${p.hue}, 90%, 60%)`
-            : "#ffd54a";
-          // ドット（四角）で描く＝パチンコ玉のピクセル表現。
-          ctx.fillRect(Math.round(p.x) - 2, Math.round(p.y) - 2, 4, 4);
+          const col = rainbow.current || p.hue > 60 ? `hsl(${p.hue}, 90%, 60%)` : "#ffd54a";
+          // 出玉コインは盤面の玉(半径5)より大きく＝コインがジャラジャラ出る満足感。
+          const R = 7;
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
+          ctx.fill();
+          // 縁取り＋ハイライトでコインらしく。
+          ctx.strokeStyle = "rgba(120,80,0,.5)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.fillStyle = "rgba(255,255,255,.55)";
+          ctx.beginPath();
+          ctx.arc(p.x - R * 0.3, p.y - R * 0.3, R * 0.3, 0, Math.PI * 2);
+          ctx.fill();
           ctx.globalAlpha = 1;
         }
       };

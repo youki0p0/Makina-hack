@@ -165,6 +165,8 @@ export const BAN_BOSSES = 10;
 // 超高額のカジノコインで強力なセット武器・転生ポイントと交換できる(射幸性の出口)。
 /** Coins to exchange for one set-piece weapon. */
 export const SET_WEAPON_COIN = 8000;
+/** おじさんに甘ダイスの台の設定をランダムに1つ聞く値段。 */
+export const SETTING_TIP_COIN = 2000;
 /** Coins per 転生ポイント (deliberately pricier). */
 export const SOULS_COIN = 3000;
 /** Coins to exchange for one random 固有(signature) weapon. */

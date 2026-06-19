@@ -116,6 +116,33 @@ export default function PachinkoPage() {
     setSpins(0);
   };
 
+  // おじさん（交換所）に暴かれた甘ダイス各台の設定。購入に追従して台ボタンに表示。
+  const [tips, setTips] = useState<Record<number, number>>({});
+  useEffect(() => {
+    const load = () => {
+      try {
+        const raw = window.localStorage.getItem("casinoTips");
+        if (raw) {
+          const p = JSON.parse(raw);
+          if (p && p.bucket === settingBucket()) {
+            setTips(p.pachi ?? {});
+            return;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+      setTips({});
+    };
+    load();
+    window.addEventListener("casinoTips", load);
+    window.addEventListener("storage", load);
+    return () => {
+      window.removeEventListener("casinoTips", load);
+      window.removeEventListener("storage", load);
+    };
+  }, []);
+
   // 獲得枚数の“その場表示”（ヘソ/大入賞の上に +N がふわっと浮く）。
   const [floats, setFloats] = useState<{ id: number; x: number; y: number; text: string; color: string }[]>([]);
   const floatId = useRef(0);
@@ -367,11 +394,16 @@ export default function PachinkoPage() {
             key={i}
             disabled={complete}
             onClick={() => sitMachine(i)}
-            className={`flex-1 rounded-lg py-1 text-xs font-bold active:scale-95 disabled:opacity-40 ${
+            className={`flex flex-1 flex-col items-center justify-center rounded-lg py-1 text-xs font-bold leading-none active:scale-95 disabled:opacity-40 ${
               i === machine ? "bg-amber-500 text-black" : "bg-white/10 text-gray-300"
             }`}
           >
             台{i + 1}
+            {tips[i] != null && (
+              <span className={`mt-0.5 text-[9px] ${i === machine ? "text-black/70" : "text-cyan-300"}`}>
+                設定{tips[i]}
+              </span>
+            )}
           </button>
         ))}
         <span className="shrink-0 text-[9px] leading-tight text-gray-500">設定・天井
