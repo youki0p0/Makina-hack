@@ -54,6 +54,7 @@ const PachinkoReels = forwardRef<
   const [premium, setPremium] = useState(false); // プレミア（当確）
   const [winId, setWinId] = useState<number | null>(null); // 当たり確定図柄（カットイン）
   const [flash, setFlash] = useState(0); // 全画面フラッシュの再生トリガ
+  const [fullReach, setFullReach] = useState<number | null>(null); // 全画面リーチ（激アツtakeover）の図柄
 
   // ドラム位置（ref で 60fps 駆動）。初期は中段に id 1,2,3。
   const offsets = useRef<number[]>([0, 1, 2]);
@@ -134,6 +135,7 @@ const PachinkoReels = forwardRef<
       setCu(0);
       setPremium(false);
       setWinId(null);
+      setFullReach(null);
       setMoving([true, true, true]);
 
       const [topId, cId, botId] = result.symbols; // 中央列ライン [上, 中, 下]
@@ -174,9 +176,12 @@ const PachinkoReels = forwardRef<
         at(centerAt, () => tweenTo(1, nextK(offsets.current[1] + (fast ? 3 : 6), cId), dur, true));
       } else if (sp) {
         // パターンB: SP発展（黒潮＝逆回転スロー）。図柄カットイン→チャンスアップ→当落。
+        // 激アツ(プレミア or 神機マキナ群)は「全画面リーチ」takeover に発展。
+        const epic = result.premium || result.group === "makina";
         at(Math.max(0, centerAt - 600), () => {
           setSpId(topId); // テンパイ図柄でドンとカットイン
           setFlash((f) => f + 1);
+          if (epic) setFullReach(topId);
         });
         for (let j = 1; j <= result.chanceUp; j++) at(centerAt + 200 + j * 460, () => setCu(j));
         at(centerAt, () => {
@@ -208,6 +213,7 @@ const PachinkoReels = forwardRef<
       at(centerEnd + (fast ? 60 : 300), () => {
         spinning.current = false;
         setMoving([false, false, false]);
+        setFullReach(null); // 全画面リーチ終了→結果（当たりカットイン/プレミア）へ
         if (result.premium) setPremium(true);
         if (result.win) {
           if (result.promotion.length > 1) setPromo(result.promotion);
@@ -266,7 +272,7 @@ const PachinkoReels = forwardRef<
           {group === "makina" && (
             <div className="pointer-events-none absolute inset-0 z-20 rounded-xl bg-black/45" />
           )}
-          <Swarm url={groupUrl} count={group === "makina" ? 9 : 6} hot={group === "makina"} />
+          <Swarm url={groupUrl} count={group === "makina" ? 14 : 7} hot={group === "makina"} />
         </>
       )}
 
@@ -313,13 +319,23 @@ const PachinkoReels = forwardRef<
         </div>
       )}
 
-      {/* プレミア（当確）: 全画面の虹フラッシュ＋神機マキナが巨大回転＋多重リング。 */}
+      {/* プレミア（当確）: 全画面の虹フラッシュ＋光線＋神機マキナが巨大回転＋多重リング。 */}
       {premium && (
-        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center overflow-hidden rounded-xl">
-          <div className="rainbow-flash absolute inset-0 opacity-70" />
-          <div className="fx-ring absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-amber-100" />
+        <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center overflow-hidden">
+          <div className="absolute inset-0 bg-black/70" />
+          <div className="rainbow-flash absolute inset-0 opacity-60" />
           <div
-            className="fx-ring absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-fuchsia-200"
+            className="fx-rays absolute left-1/2 top-1/2 opacity-50"
+            style={{
+              width: "180vmax",
+              height: "180vmax",
+              background:
+                "repeating-conic-gradient(from 0deg, rgba(255,235,160,0) 0deg, rgba(255,235,160,.5) 5deg, rgba(255,235,160,0) 10deg)",
+            }}
+          />
+          <div className="fx-ring absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-amber-100" />
+          <div
+            className="fx-ring absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-fuchsia-200"
             style={{ animationDelay: "0.18s" }}
           />
           {urls[7] && (
@@ -327,7 +343,7 @@ const PachinkoReels = forwardRef<
               src={urls[7]}
               alt=""
               className="fx-huespin relative"
-              style={{ width: 64, height: 64, imageRendering: "pixelated", filter: "drop-shadow(0 0 12px #ffcf33)" }}
+              style={{ width: 112, height: 112, imageRendering: "pixelated", filter: "drop-shadow(0 0 22px #ffcf33)" }}
             />
           )}
         </div>
@@ -365,11 +381,50 @@ const PachinkoReels = forwardRef<
         <CutIn url={urls[winId]} color={getSymbol(winId).color} z={35} big sparks />
       )}
 
-      {/* テンパイ/SP/当たり/プレミアの瞬間フラッシュ（key で毎回再生）＋判定ラインのスイープ光。 */}
+      {/* 全画面リーチ（激アツtakeover）: モニターを飛び出して画面全体を支配。 */}
+      {fullReach != null && (
+        <div className="pointer-events-none fixed inset-0 z-[55] flex items-center justify-center overflow-hidden">
+          <div className="absolute inset-0 bg-black/80" />
+          <div
+            className="fx-rays absolute left-1/2 top-1/2 opacity-40"
+            style={{
+              width: "180vmax",
+              height: "180vmax",
+              background: `repeating-conic-gradient(from 0deg, ${getSymbol(fullReach).color}00 0deg, ${getSymbol(fullReach).color}99 5deg, ${getSymbol(fullReach).color}00 10deg)`,
+            }}
+          />
+          <div className="rainbow-flash absolute inset-0 opacity-25" />
+          <div className="fx-shake relative flex items-center justify-center">
+            <div
+              className="fx-ring absolute h-44 w-44 rounded-full border-4"
+              style={{ borderColor: getSymbol(fullReach).color }}
+            />
+            <div
+              className="fx-ring absolute h-44 w-44 rounded-full border-4"
+              style={{ borderColor: getSymbol(fullReach).color, animationDelay: "0.2s" }}
+            />
+            <div className="fx-zoom">
+              <img
+                src={urls[fullReach]}
+                alt=""
+                className="fx-throb"
+                style={{
+                  width: 120,
+                  height: 120,
+                  imageRendering: "pixelated",
+                  filter: `drop-shadow(0 0 24px ${getSymbol(fullReach).color})`,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* テンパイ/SP/当たり/プレミアの瞬間フラッシュ（key で毎回再生）。白フラッシュは全画面。 */}
       {flash > 0 && (
-        <div key={flash} className="pointer-events-none absolute inset-0 z-50 overflow-hidden">
-          <div className="fx-flash absolute inset-0 bg-white/70" />
-          <div className="fx-line absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+        <div key={flash} className="pointer-events-none">
+          <div className="fx-flash fixed inset-0 z-[62] bg-white/55" />
+          <div className="fx-line absolute inset-y-0 left-0 z-50 w-1/3 bg-gradient-to-r from-transparent via-white/60 to-transparent" />
         </div>
       )}
     </div>
@@ -391,25 +446,29 @@ function CutIn({
   sparks?: boolean;
 }) {
   if (!url) return null;
-  const size = big ? 60 : 48;
+  const size = big ? 76 : 58;
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center" style={{ zIndex: z }}>
       <div
         className="fx-ring absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
-        style={{ width: size + 28, height: size + 28, borderColor: color }}
+        style={{ width: size + 34, height: size + 34, borderColor: color }}
+      />
+      <div
+        className="fx-ring absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
+        style={{ width: size + 34, height: size + 34, borderColor: color, animationDelay: "0.16s" }}
       />
       <img
         src={url}
         alt=""
         className="fx-cutin relative"
-        style={{ width: size, height: size, imageRendering: "pixelated", filter: `drop-shadow(0 0 10px ${color})` }}
+        style={{ width: size, height: size, imageRendering: "pixelated", filter: `drop-shadow(0 0 16px ${color})` }}
       />
       {sparks &&
-        Array.from({ length: 8 }, (_, i) => (
+        Array.from({ length: 10 }, (_, i) => (
           <span
             key={i}
             className="fx-rise absolute left-1/2 top-1/2"
-            style={{ marginLeft: (i - 3.5) * 18, color, fontSize: 12, animationDelay: `${0.1 + (i % 4) * 0.05}s` }}
+            style={{ marginLeft: (i - 4.5) * 18, color, fontSize: 13, animationDelay: `${0.1 + (i % 4) * 0.05}s` }}
           >
             ✦
           </span>
