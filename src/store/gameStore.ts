@@ -28,6 +28,7 @@ import {
   MAKINA_ID,
   rollGenDrop,
   SIGNATURE_WEAPON_IDS,
+  SLOT_LIST,
 } from "@/data/items";
 import { forgeCost, forgeMax, rollForge, starInjectCost, type ForgeKind } from "@/data/forge";
 import { applyModifier, modTierForFloor, rollDropModTier } from "@/data/modifiers";
@@ -1965,17 +1966,19 @@ export const useGameStore = create<GameState>((set, get) => {
       };
       for (const slot of EQUIP_SLOTS) consider(state.equipped[slot]);
       for (const it of state.inventory) consider(it);
-      const weapon = applyModifier(genSetItem(setKey, "weapon", Math.max(refTier, 30)), refMod);
-      const capped = capInventory([...state.inventory, weapon], state.favorites);
+      // 武器に限らず、防具・アクセも含めたランダム部位を交換（セット完成を狙える）。
+      const slot = SLOT_LIST[Math.floor(Math.random() * SLOT_LIST.length)];
+      const piece = applyModifier(genSetItem(setKey, slot, Math.max(refTier, 30)), refMod);
+      const capped = capInventory([...state.inventory, piece], state.favorites);
       set({
         coins: state.coins - SET_WEAPON_COIN,
         inventory: capped.kept,
         gachaPoints: state.gachaPoints + capped.material,
-        lastPull: weapon,
-        progress: { ...state.progress, discoveredItems: discover(state.progress.discoveredItems, weapon.id) },
+        lastPull: piece,
+        progress: { ...state.progress, discoveredItems: discover(state.progress.discoveredItems, piece.id) },
       });
       persist();
-      return weapon;
+      return piece;
     },
 
     coinBuySignatureWeapon: (): Equipment | null => {
