@@ -11,13 +11,13 @@ import { spinReels, type Mode, type ReelResult } from "@/lib/pachinko/reels";
 import { getSymbol } from "@/lib/pachinko/symbols";
 import { planPayout, counterStep, particlesThisFrame } from "@/lib/pachinko/payout";
 import { useGameStore } from "@/store/gameStore";
-import { initAudio, slotSfx } from "@/lib/audio";
+import { initAudio, slotSfx, isMuted, setMuted } from "@/lib/audio";
 import { fmt } from "@/lib/ui";
 
-const HOLD_MAX = 4;
+const HOLD_MAX = 8;
 // 確変/時短(Makina Mode)のST回転数。確変中の当たり(enterComplete)でこの数にリセット＝
-// 継続ループ（跳ねたら止まらない）。確変中の当たり率(0.28)×STでループ率≈0.84に収束し、
-// 玉のRTP≈1.74（スロット≈1.78とほぼ同等＝どちらを打つか悩ましい高ボラ台）。
+// 継続ループ（跳ねたら止まらない）。確変中の当たり率(0.28)×STでループ率≈0.84に収束。
+// 確変は右打ち＝発射無料なので出玉は純増。ヘソ賞球＋無料確変込みで総RTP≈1.9（スロット≈1.78の少し上）。
 const MAKINA_SPINS = { jackpot: 12, big: 8 };
 // ラウンド制アタッカーの表示用ラウンド数。
 const ROUNDS: Record<string, number> = { small: 2, normal: 4, big: 8, jackpot: 16 };
@@ -92,6 +92,10 @@ export default function PachinkoPage() {
   const [reduced, setReduced] = useState(false);
   const [effects, setEffects] = useState(true);
   const [flash, setFlash] = useState(false);
+  const [sound, setSound] = useState(true);
+  useEffect(() => {
+    setSound(!isMuted());
+  }, []);
 
   const payoutBalls = useRef(0);
   const payoutParticles = useRef(0);
@@ -193,6 +197,7 @@ export default function PachinkoPage() {
     slotSfx("small");
     if (effects && typeof navigator !== "undefined") navigator.vibrate?.(8);
     if (modeRef.current === "complete") return;
+    addCoins(BOARD.hesoPrize); // ヘソ賞球（玉持ち＝回転率改善。通常時のみ）
     const result = spinReels("normal");
     if (reelsRef.current?.busy()) {
       if (holdsRef.current.length >= HOLD_MAX) return; // 保留満タンは入賞のみ（変動せず）
@@ -227,12 +232,14 @@ export default function PachinkoPage() {
   }, [mode, doSpinWith]);
 
   // ===== 発射 =====
+  // 確変(Makina=右打ち)中は発射無料＝当たり中は必ず純増。通常時のみ有料。
   const launch = useCallbackRef(() => {
-    if (useGameStore.getState().coins < BOARD.startCost) return;
+    const free = modeRef.current === "complete";
+    if (!free && useGameStore.getState().coins < BOARD.startCost) return;
     initAudio();
     const ok = boardRef.current?.launch();
     if (ok) {
-      addCoins(-BOARD.startCost);
+      if (!free) addCoins(-BOARD.startCost);
       slotSfx("lever");
     }
   });
@@ -328,35 +335,48 @@ export default function PachinkoPage() {
       </div>
 
       <p className="text-center text-[10px] text-cyan-300/70">
-        玉がヘソ(中央)に入ると変動！ ステージ中央のワープに乗ると吸い込み濃厚
+        玉がヘソ(中央)に入ると変動＆賞球+{BOARD.hesoPrize}！ ステージ中央のワープに乗ると吸い込み濃厚
       </p>
 
       <div className="rounded-xl border border-amber-400/20 bg-black/40">
         <PayoutParticles ref={particlesRef} reduced={reduced} />
       </div>
 
+      {/* 当たり(確変)中はオート専用＝ボタンを操作不可にして“見てるだけで増える”に。 */}
       <button
         onClick={() => launch()}
-        disabled={coins < BOARD.startCost}
-        className="h-14 rounded-2xl bg-amber-500 text-lg font-extrabold text-black active:scale-95 disabled:opacity-40"
+        disabled={complete || coins < BOARD.startCost}
+        className={`h-14 rounded-2xl text-lg font-extrabold text-black active:scale-95 disabled:active:scale-100 ${
+          complete ? "animate-pulse bg-amber-300 opacity-90" : "bg-amber-500 disabled:opacity-40"
+        }`}
       >
-        ● 発射（{complete ? "右打ち" : "左打ち"} / コイン -{BOARD.startCost}）
+        {complete ? "🔥 確変中（オート右打ち・発射無料）" : `● 発射（左打ち / コイン -${BOARD.startCost}）`}
       </button>
-      {coins < BOARD.startCost && (
+      {!complete && coins < BOARD.startCost && (
         <p className="text-center text-[11px] text-rose-300">
           コインが足りません。<Link href="/casino" className="underline">カジノ</Link>でゴールドからコインを用意してね（1コイン=1玉）。
         </p>
       )}
 
-      <div className="grid grid-cols-3 gap-2 text-[11px]">
+      <div className="grid grid-cols-2 gap-2 text-[11px]">
         <Toggle label="オート発射" on={auto} onClick={() => setAuto((v) => !v)} />
+        <Toggle
+          label="サウンド"
+          on={sound}
+          onClick={() => {
+            initAudio();
+            const next = !sound;
+            setMuted(!next);
+            setSound(next);
+          }}
+        />
         <Toggle label="軽量モード" on={reduced} onClick={() => setReduced((v) => !v)} />
         <Toggle label="演出" on={effects} onClick={() => setEffects((v) => !v)} />
       </div>
 
       <p className="pb-2 text-center text-[10px] text-gray-500">
-        通常時は左打ち（左の細いレーン→寄せ釘→中央ヘソ）。ステージ＆ワープでヘソIN→図柄変動。
-        4/5/6/7当たりで確変(Makina Mode)＝右打ちで大入賞口へ高速回転。
+        通常時は左打ち（左の細いレーン→寄せ釘→中央ヘソ）。ヘソINで図柄変動＆賞球で玉持ちUP。
+        4/5/6/7当たりで確変(Makina Mode)＝右打ち・発射無料で大入賞口へ高速連チャン（オート専用）。
       </p>
     </main>
   );
