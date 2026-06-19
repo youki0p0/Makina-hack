@@ -33,6 +33,9 @@ const PayoutParticles = forwardRef<PayoutParticlesHandle, { reduced?: boolean }>
     const rainbow = useRef(false);
     const raf = useRef<number | null>(null);
     const visible = useRef(true);
+    // 粒子も保留も無いアイドル時に毎フレーム clearRect/描画し続けると発熱する。
+    // 空になったら1回だけクリアし、以降のフレームは描画をスキップする。
+    const idleCleared = useRef(false);
 
     useImperativeHandle(ref, () => ({
       emit(count: number, rb = false) {
@@ -72,6 +75,22 @@ const PayoutParticles = forwardRef<PayoutParticlesHandle, { reduced?: boolean }>
       const frame = () => {
         raf.current = requestAnimationFrame(frame);
         if (!visible.current) return;
+        // 粒子も保留も無いフレームは描画スキップ（idle時の常時60fps描画＝発熱を断つ）。
+        let anyActive = false;
+        for (let i = 0; i < pool.current.length; i++) {
+          if (pool.current[i].active) {
+            anyActive = true;
+            break;
+          }
+        }
+        if (pending.current <= 0 && !anyActive) {
+          if (!idleCleared.current) {
+            ctx.clearRect(0, 0, W, H);
+            idleCleared.current = true;
+          }
+          return;
+        }
+        idleCleared.current = false;
         // キュー消化（reduced 時は1フレームの放出を抑える）。
         const per = reduced
           ? Math.ceil(PACHINKO_CONFIG.payoutParticlesPerFrame / 2)
