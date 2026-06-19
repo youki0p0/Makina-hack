@@ -21,15 +21,15 @@ interface Tween {
   final: boolean;
 }
 
-// ドラム位置(コマ単位) → 図柄 17..7（1..7 の固定並び）。
+// ドラム位置(コマ単位) → 図柄 1..7（固定並び）。
 const idAt = (off: number) => ((((Math.round(off) % 7) + 7) % 7) + 1) as number;
-const ROW = 100 / 3; // 1コマ＝表示高の1/3（縦3コマ表示）
+const CELL = 100 / 3; // 1コマ＝表示幅の1/3（横3コマ表示）
 
 /**
- * 中央の巨大ドラム表示（海物語式）。
- * - 3列×縦3コマ（上段/中段/下段）。判定ラインは中段。
- * - 上から下への垂直回転。停止順は「左 → 右 → 中」。
- * - 左右が揃うとテンパイ＝中リールだけ変則動作:
+ * 中央の巨大ドラム表示（海物語式・横ドラム）。
+ * - 3リールを縦に3段（上/中/下）。各リールは図柄が左→右へ横スクロール。
+ *   判定ラインは中央の縦列（各段の中央コマ）。
+ * - 停止順は「上 → 下 → 中」。上下が揃うとテンパイ＝中リールだけ変則動作:
  *   ノーマル=±1コマからのコマ送り / 激アツ(神機マキナ群)=逆回転スロー。
  * - ハズレは中リールがトリガーの±1コマでズレて止まる。
  * effects=false / reduced では短縮。
@@ -122,24 +122,24 @@ const PachinkoReels = forwardRef<
       setGroup(result.group);
       setMoving([true, true, true]);
 
-      const [lId, cId, rId] = result.symbols; // 中段ライン [左, 中, 右]
-      const isReach = lId === rId; // 海物語式: 左右が揃えばテンパイ
+      const [topId, cId, botId] = result.symbols; // 中央列ライン [上, 中, 下]
+      const isReach = topId === botId; // 横ドラム: 上下が揃えばテンパイ
       const hot = result.group === "makina"; // 激アツ→逆回転リーチ
       const fast = !effects || reduced;
 
-      // フェーズ①加速: 3列同時にフリー回転開始。
+      // フェーズ①加速: 3段同時にフリー回転開始。
       stopped.current = [false, false, false];
       tweens.current = [null, null, null];
       spinning.current = true;
       raf.current = requestAnimationFrame(animate);
 
-      // フェーズ③順次減速: 左 → 右。
+      // フェーズ③順次減速: 上 → 下。
       const t0 = fast ? 90 : 380;
       const stepT = fast ? 80 : 320;
       const dur = fast ? 90 : 380;
-      at(t0, () => tweenTo(0, nextK(offsets.current[0] + (fast ? 3 : 7), lId), dur, true));
+      at(t0, () => tweenTo(0, nextK(offsets.current[0] + (fast ? 3 : 7), topId), dur, true));
       at(t0 + stepT, () => {
-        tweenTo(2, nextK(offsets.current[2] + (fast ? 3 : 6), rId), dur, true);
+        tweenTo(2, nextK(offsets.current[2] + (fast ? 3 : 6), botId), dur, true);
         if (isReach) setReach(true);
       });
 
@@ -186,7 +186,7 @@ const PachinkoReels = forwardRef<
     },
   }));
 
-  // 1列を描画（中段=判定ライン。上→下スクロールで縦3コマ＋上下バッファ）。
+  // 1段を描画（中央コマ=判定ライン。左→右スクロールで横3コマ＋左右バッファ）。
   const renderReel = (i: number) => {
     const p = offsets.current[i];
     const k = Math.floor(p);
@@ -195,23 +195,23 @@ const PachinkoReels = forwardRef<
     const s = getSymbol(midId);
     const tiles = [];
     for (let n = k - 2; n <= k + 2; n++) {
-      // y_center%: 中段(50%) を基準に、p 増加で下へ流れる。
-      const yc = 50 + (p - n) * ROW;
+      // x_center%: 中央(50%) を基準に、p 増加で右へ流れる。
+      const xc = 50 + (p - n) * CELL;
       tiles.push(
-        <Tile key={n} id={idAt(n)} yc={yc} url={urls[idAt(n)]} blur={isMoving} />,
+        <Tile key={n} id={idAt(n)} xc={xc} url={urls[idAt(n)]} blur={isMoving} />,
       );
     }
     return (
       <div
         key={i}
-        className={`relative flex-1 overflow-hidden rounded-lg border-2 ${
+        className={`relative w-full flex-1 overflow-hidden rounded-lg border-2 ${
           reach && i === 1 && isMoving ? "animate-pulse" : ""
         }`}
         style={{ borderColor: s.color, background: `${s.color}1f` }}
       >
         {tiles}
-        {/* 中段ライン（判定ライン）の目印。 */}
-        <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-amber-300/30" />
+        {/* 中央コマ（判定ライン）の目印（縦線）。 */}
+        <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-amber-300/30" />
       </div>
     );
   };
@@ -232,7 +232,7 @@ const PachinkoReels = forwardRef<
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 items-stretch justify-center gap-1.5 pt-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5 pt-1">
         {renderReel(0)}
         {renderReel(1)}
         {renderReel(2)}
@@ -256,12 +256,12 @@ const PachinkoReels = forwardRef<
   );
 });
 
-function Tile({ id, yc, url, blur }: { id: number; yc: number; url?: string; blur: boolean }) {
+function Tile({ id, xc, url, blur }: { id: number; xc: number; url?: string; blur: boolean }) {
   const s = getSymbol(id);
   return (
     <div
-      className="absolute inset-x-0 flex items-center justify-center"
-      style={{ top: `${yc - ROW / 2}%`, height: `${ROW}%` }}
+      className="absolute inset-y-0 flex items-center justify-center"
+      style={{ left: `${xc - CELL / 2}%`, width: `${CELL}%` }}
     >
       {url ? (
         <img
