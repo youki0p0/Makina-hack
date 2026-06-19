@@ -19,6 +19,8 @@ const HOLD_MAX = 8;
 const REVEAL_MS = 800;
 // ボーナス1ゲーム(回転)の長さ。保証G ぶん消化したらラウンド終了→継続抽選。
 const GAME_MS = 420;
+// 天井：通常時この回転数ノーヒットで強制初当たり（激辛なハマりの救済）。
+const CEILING_SPINS = 500;
 
 // ボーナス(RUSH)の進行状態。出玉は大入賞口に入った玉で payRemaining を削って加算。
 interface Rush {
@@ -83,6 +85,21 @@ export default function PachinkoPage() {
   const [rush, setRush] = useState<Rush | null>(null);
   const rushRef = useRef<Rush | null>(null);
   rushRef.current = rush;
+  // 天井カウンタ（通常時の連続ノーヒット回転数）。初当たりで0へ。
+  const [spins, setSpins] = useState(0);
+  const spinsRef = useRef(0);
+
+  // 獲得枚数の“その場表示”（ヘソ/大入賞の上に +N がふわっと浮く）。
+  const [floats, setFloats] = useState<{ id: number; x: number; y: number; text: string; color: string }[]>([]);
+  const floatId = useRef(0);
+  const lastAtkFloat = useRef(0);
+  const spawnFloat = useCallbackRef((xB: number, yB: number, text: string, color: string) => {
+    const id = ++floatId.current;
+    const x = (xB / BOARD.width) * 100;
+    const y = (yB / BOARD.height) * 100;
+    setFloats((f) => [...f.slice(-11), { id, x, y, text, color }]);
+    window.setTimeout(() => setFloats((f) => f.filter((p) => p.id !== id)), 850);
+  });
   // 当たり確定→ボーナス突入までの停止演出中（その図柄色）。
   const [reveal, setReveal] = useState<string | null>(null);
 
@@ -131,6 +148,12 @@ export default function PachinkoPage() {
     r.payRemaining -= inc;
     addCoins(inc);
     if (effects) particlesRef.current?.emit(3);
+    // 大入賞口の上に +N をふわっと表示（連射で潰れないよう間引き）。
+    const now = Date.now();
+    if (now - lastAtkFloat.current > 110) {
+      lastAtkFloat.current = now;
+      spawnFloat(BOARD.attackerX, BOARD.attackerY - 6, `+${inc}`, "#ffcf33");
+    }
   });
 
   // ===== ボーナス進行（保証G消化→ラウンド終了で残出玉フラッシュ＋継続抽選） =====
@@ -171,6 +194,8 @@ export default function PachinkoPage() {
   // ===== 変動の確定処理 =====
   const onReelDone = useCallbackRef((result: ReelResult) => {
     if (result.win) {
+      spinsRef.current = 0; // 初当たり→天井カウンタをリセット
+      setSpins(0);
       if (effects && typeof navigator !== "undefined") navigator.vibrate?.(20);
       slotSfx("reach");
       // 当たり目で止め、0.5〜1秒“何が起きたか”を見せてからボーナス突入（スロット同様）。
@@ -204,7 +229,12 @@ export default function PachinkoPage() {
     slotSfx("small");
     if (effects && typeof navigator !== "undefined") navigator.vibrate?.(8);
     addCoins(BOARD.hesoPrize); // ヘソ賞球（玉持ち＝回転率改善。通常時のみ）
-    const result = spinReels("normal");
+    spawnFloat(BOARD.pocketX, BOARD.pocketY - 4, `+${BOARD.hesoPrize}`, "#7dd3fc"); // ヘソの上に+2
+    // 天井：この回転でカウンタが規定数に達するなら強制初当たり（救済）。
+    const next = spinsRef.current + 1;
+    spinsRef.current = next;
+    setSpins(next);
+    const result = spinReels("normal", Math.random, next >= CEILING_SPINS);
     if (reelsRef.current?.busy()) {
       if (holdsRef.current.length >= HOLD_MAX) return; // 保留満タンは入賞のみ（変動せず）
       const hold: Hold = { result, color: HOLD_COLORS[holdColorFor(result)] };
@@ -246,7 +276,12 @@ export default function PachinkoPage() {
   }, [auto, mode, launch]);
 
   const complete = mode === "complete";
-  const statusLabel = complete ? (rush ? `RUSH ${rush.ren}連` : "大当たり！") : "通常モード";
+  const nearCeiling = spins >= CEILING_SPINS - 50;
+  const statusLabel = complete
+    ? rush
+      ? `RUSH ${rush.ren}連`
+      : "大当たり！"
+    : `${spins}回転 / 天井${CEILING_SPINS}`;
 
   return (
     <main className="flex min-h-dvh flex-col gap-2 p-3">
@@ -265,7 +300,11 @@ export default function PachinkoPage() {
           ← カジノ
         </Link>
         <span className="text-sm font-black tracking-wide text-amber-200">🎲 甘ダイス</span>
-        <span className={`text-xs font-bold ${complete ? "animate-pulse text-amber-300" : "text-cyan-200"}`}>
+        <span
+          className={`text-xs font-bold ${
+            complete ? "animate-pulse text-amber-300" : nearCeiling ? "animate-pulse text-rose-300" : "text-cyan-200"
+          }`}
+        >
           {statusLabel}
         </span>
       </div>
@@ -296,6 +335,17 @@ export default function PachinkoPage() {
       {/* 盤面が中央モニターを囲む“ひとつの台”。役物の窪みに図柄オーバーレイを重ねる。 */}
       <div className="relative w-full">
         <PachinkoBoard ref={boardRef} onPocket={onPocket} onAttacker={onAttacker} reduced={reduced} denchu={complete} />
+
+        {/* 獲得枚数の“その場表示”：ヘソ/大入賞の上に +N がふわっと浮く。 */}
+        {floats.map((p) => (
+          <span
+            key={p.id}
+            className="coin-float z-30 text-sm"
+            style={{ left: `${p.x}%`, top: `${p.y}%`, color: p.color }}
+          >
+            {p.text}
+          </span>
+        ))}
         <div
           className="absolute"
           style={{
@@ -374,8 +424,9 @@ export default function PachinkoPage() {
       </div>
 
       <p className="pb-2 text-center text-[10px] text-gray-500">
-        通常時は左打ち（ヘソINで図柄変動＆賞球で玉持ちUP）。当たると保証枚数(100〜400)×保証G(10/16)の
-        RUSHへ＝右打ち・発射無料で大入賞口に出玉。保証G中の継続でループ（10G≈78%/16G≈88%・平均≈5連）。
+        通常時は左打ち（ヘソINで図柄変動＆賞球+{BOARD.hesoPrize}で玉持ちUP）。当たると保証枚数(100〜400)×保証G(10/16)の
+        RUSHへ＝右打ち・発射無料で大入賞口に出玉。継続でループ（10G≈78%/16G≈88%・平均≈5連）。
+        {CEILING_SPINS}回転ノーヒットで天井＝強制初当たり。
       </p>
     </main>
   );
