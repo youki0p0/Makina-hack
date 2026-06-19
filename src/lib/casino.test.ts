@@ -12,6 +12,9 @@ import {
   machineSettings,
   settingMult,
   ceilingSpins,
+  pachiMachineSettings,
+  pachiSettingMult,
+  pachiCeilingSpins,
   MACHINE_COUNT,
   SLOT_LUCK,
   coinBuyCost,
@@ -100,6 +103,24 @@ describe("slot machine (パチスロ4号機フレーバー)", () => {
     // 同じバケットなら決定論的、別バケットでは(ほぼ)変わる。
     expect(machineSettings(100)).toEqual(a);
     expect(a.join() === b.join()).toBe(false);
+  });
+
+  it("甘ダイス(パチンコ)も4台・設定1-6＝スロットより設定差が広い", () => {
+    const p = pachiMachineSettings(100);
+    expect(p).toHaveLength(MACHINE_COUNT);
+    for (const s of p) {
+      expect(s).toBeGreaterThanOrEqual(1);
+      expect(s).toBeLessThanOrEqual(6);
+    }
+    expect(pachiMachineSettings(100)).toEqual(p); // 決定論的
+    expect(pachiMachineSettings(100).join() === pachiMachineSettings(101).join()).toBe(false);
+    // スロットとは独立シード（同一バケットで一致しないことが多い）。
+    // 機械割の幅がスロットより広い。
+    const slotSpread = settingMult(6) - settingMult(1);
+    const pachiSpread = pachiSettingMult(6) - pachiSettingMult(1);
+    expect(pachiSpread).toBeGreaterThan(slotSpread);
+    // 高設定ほど天井が浅い。
+    expect(pachiCeilingSpins(6)).toBeLessThan(pachiCeilingSpins(1));
   });
 
   it("カジノコインの買値は所持枚数が多いほど割高(買いづらく)", () => {
