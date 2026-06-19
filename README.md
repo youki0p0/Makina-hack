@@ -61,6 +61,7 @@ Next.js (App Router) + TypeScript + Tailwind CSS + Zustand + localStorage。Verc
 - **手続き生成ピクセルアイコン** — 装備・敵・ボスのアイコンを画像なしでコード生成。→ [docs/icons.md](docs/icons.md)
 - **ランキング / 残響戦** — 深層到達者ログと、記録から生成したゴーストとのEcho Battle（Supabase任意・未設定でも動作）。→ [docs/online.md](docs/online.md)
 - **鍛冶屋 / バランス / 場所別BGM** — 素材で装備を確率強化（GREAT/PERFECT・合成・★注入）、難度カーブ調整、場所別の手続きBGM。→ [docs/blacksmith.md](docs/blacksmith.md)
+- **パチンコ「奈落海 / Abyss Marine」** — カジノ内の演出特化ミニゲーム。左上から発射した玉が釘を流れて中央下の入賞口へ → 固有武器の図柄が変動 → 7以外でも3つ揃えば当たり、当たり時に大量の払い出し玉。軽量物理＋Canvas粒子。→ [docs/pachinko.md](docs/pachinko.md)
 
 ---
 

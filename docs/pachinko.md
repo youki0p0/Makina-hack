@@ -1,0 +1,108 @@
+# パチンコ「奈落海 / Abyss Marine」
+
+カジノ内の**演出特化ミニゲーム**。「本物の賭博」ではなく、海物語系のような
+“玉が流れて・図柄が揃って・出玉がジャラジャラ出る”気持ちよさの再現が目的。
+海物語そのもののコピーはしない。**深海×歯車×ダイス×固有武器×神機マキナ**の世界観。
+
+ルート: `/casino/pachinko`（カジノページからリンク）。
+
+## 画面構図（スマホ縦・視線誘導）
+
+```
+所持玉
+─────────────
+中央: 図柄変動エリア（固有武器のドット絵 3連）   ← 主役
+─────────────
+盤面 Canvas（左上=発射口 → 釘 → 中央下=入賞口）
+─────────────
+下部: 出玉 Canvas（払い出し玉の連続表示）
+─────────────
+発射 / オート発射 / 軽量モード / 演出ON-OFF
+```
+
+視線は **左上の発射 → 盤面を流れる玉 → 中央下の入賞口 → 中央の図柄変動 → 下部の大量払い出し** の順に流れる。
+
+## 図柄（7種＝既存の固有武器＋神機マキナ）
+
+絵柄は新規描画せず、既存アイテムの procedural ドット絵アイコンを流用する
+（`src/data/items.ts` の固有武器 ＋ 神機マキナ）。
+
+| id | 図柄 | 当たり | 規模 |
+| --- | --- | --- | --- |
+| 1 | 吸血の剣 | 吸血BONUS | 小当たり (150玉) |
+| 2 | 毒牙の短剣 | 毒牙BONUS | 通常 (600玉) |
+| 3 | 雷神の鎚 | 雷神BONUS | 通常+ (800玉) |
+| 4 | 業火の剣 | 業火BONUS | 大 / 確変期待 (1200玉) |
+| 5 | 氷結の槍 | 氷結BONUS | 大 / 継続期待 (1200玉) |
+| 6 | 獄炎の薙刀 | 獄炎BONUS | 大当たり (1500玉) |
+| 7 | 神機マキナ | 神機BONUS | **Jackpot (4000玉・虹発光)** |
+
+**7以外でも3つ揃えば当たり。** 777 が最上位。
+
+## 演出
+
+- **リーチ**: 2つ揃いで最後の1つ待ち。
+- **群予告**: 武器群 / ダイス群 / 歯車群 / **神機マキナ群（激熱・当確級）**。
+- **昇格**: 333 →（歯車回転）→ 666 →（低確率）→ 777。
+- **確変 (Makina Mode)**: 4/5/6/7 当たりで突入。当たり確率が上昇し、ハズレで一定確率転落。
+- **Jackpot**: 画面が虹色に発光、払い出し玉が最大量。
+
+## 玉と物理
+
+- **物理玉**: 実際に盤面を転がる。円-円の簡易反射のみ（Matter.js 不使用）。最大 `maxPhysicsBalls`。
+- **払い出し玉**: 見た目用の粒子（物理なし）。Canvas にドット（四角）で描画、object pool で再利用。最大 `maxPayoutParticles`（Jackpot は `jackpotMaxPayoutParticles`）。
+- **玉・釘はドット**で描画。入賞率は約20%（多くの玉はハズレ穴へ＝パチンコらしいリズム）。
+
+## 出玉（払い出し）
+
+当たり時に一瞬で増やさず、`payoutQueue` を数秒かけて消化する。
+玉カウンタが増えつつ、下部に払い出し玉が連続して流れる。
+
+| 規模 | 玉数 | 時間 |
+| --- | --- | --- |
+| 小当たり | 150 | ~1秒 |
+| 通常 | 600 | ~3秒 |
+| 大当たり | 1500 | ~5秒 |
+| Jackpot | 4000 | ~8秒・虹発光・最大量 |
+
+## Config（`src/lib/pachinko/config.ts`）
+
+```ts
+export const PACHINKO_CONFIG = {
+  maxPhysicsBalls: 50,
+  maxPayoutParticles: 600,
+  jackpotMaxPayoutParticles: 800,
+  payoutParticlesPerFrame: 12,
+  counterIncrementPerFrame: 24,
+  launchIntervalMs: 250,
+};
+```
+
+## パフォーマンス
+
+- `requestAnimationFrame` ＋ Canvas 描画。
+- object pool で物理玉・払い出し粒子を再利用（GC 圧を抑制）。
+- 非表示時（`visibilitychange`）は描画ループを停止。
+- `prefers-reduced-motion` で自動的に軽量モード＋演出OFF。
+- 手動の **軽量モード**（玉/粒子の上限と1フレーム放出を抑制）。
+
+## ファイル構成
+
+```
+src/app/casino/pachinko/page.tsx        画面オーケストレーション
+src/components/casino/PachinkoBoard.tsx 盤面（物理玉・釘・入賞口）
+src/components/casino/PachinkoReels.tsx 中央の図柄変動（固有武器アイコン）
+src/components/casino/PayoutParticles.tsx 出玉粒子
+src/lib/pachinko/config.ts   設定・盤面ジオメトリ
+src/lib/pachinko/symbols.ts  7図柄（→ 既存アイテム id）
+src/lib/pachinko/reels.ts    図柄変動ロジック（純粋）
+src/lib/pachinko/payout.ts   出玉計画・カウンタ（純粋）
+src/lib/pachinko/physics.ts  軽量物理（純粋）
+```
+
+純粋ロジック（reels / payout / physics / symbols）は `src/lib/pachinko/pachinko.test.ts` で検証。
+
+## 注意
+
+所持玉はこのミニゲーム内のアーケード資源（演出用）で、セーブには保存しない
+（`SAVE_VERSION` を上げず既存セーブへ影響を与えないため）。リロードで初期値に戻る。

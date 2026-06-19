@@ -112,6 +112,13 @@ export default function CasinoPage() {
         <p className="text-[10px] text-gray-400">カジノコインで遊ぶ。ダイスラッシュで一攫千金。</p>
       </div>
 
+      <Link
+        href="/casino/pachinko"
+        className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-cyan-600/80 font-bold active:scale-95"
+      >
+        🌊 パチンコ「奈落海」へ
+      </Link>
+
       <div className="grid grid-cols-3 gap-2">
         {([
           ["slots", "🎲 スロット"],
