@@ -26,7 +26,7 @@ import {
   type BjOutcome,
 } from "@/lib/casino";
 import { estimateTier } from "@/data/items";
-import { SET_DEFS, getSetDef } from "@/data/sets";
+import { SET_DEFS, getSetDef, availableSetKeys } from "@/data/sets";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { ENEMY_TEMPLATES, BOSS_TEMPLATES } from "@/data/enemies";
 import { getSlotIconDataUrl } from "@/lib/itemIcon";
@@ -894,10 +894,15 @@ function CoinShop() {
     setTimeout(() => setMsg(null), 4500);
   };
 
-  // The exchange offers the hand-tuned named sets (a deliberate coin grind sink).
-  // Weapon tier scales to the player's gear, so floor-gating isn't needed here.
-  const keys = useMemo(() => SET_DEFS.map((s) => s.key), []);
-  const [sel, setSel] = useState(keys[0] ?? "gambler");
+  // 固有セット（常設）＋ 到達済みの「生成セット（深層）」も交換できるように
+  // （欲しい深層セットが買えない不満の解消）。生成セットは highestFloorReached で解放。
+  const highest = useGameStore((s) => s.progress.highestFloorReached);
+  const namedKeys = useMemo(() => SET_DEFS.map((s) => s.key), []);
+  const procKeys = useMemo(
+    () => availableSetKeys(highest).filter((k) => k.startsWith("gset")),
+    [highest],
+  );
+  const [sel, setSel] = useState(namedKeys[0] ?? "gambler");
   const [msg, setMsg] = useState<string | null>(null);
 
   const canWeapon = coins >= SET_WEAPON_COIN;
@@ -948,18 +953,29 @@ function CoinShop() {
           <PixelGlyph kind="drop" size={14} /> セット武器と交換
         </p>
         <p className="mt-0.5 text-[10px] text-gray-400">
-          所持装備に見合うティアのセット武器（ビルドの軸）を入手。
+          所持装備に見合うティアのセット武器（ビルドの軸）を入手。深層で出会った生成セットも選べる。
         </p>
         <select
           value={sel}
           onChange={(e) => setSel(e.target.value)}
           className="mt-2 h-9 w-full rounded-lg bg-black/40 px-2 text-xs text-gray-100"
         >
-          {keys.map((k) => (
-            <option key={k} value={k}>
-              {getSetDef(k)?.name ?? k} セット
-            </option>
-          ))}
+          <optgroup label="固有セット">
+            {namedKeys.map((k) => (
+              <option key={k} value={k}>
+                {getSetDef(k)?.name ?? k} セット
+              </option>
+            ))}
+          </optgroup>
+          {procKeys.length > 0 && (
+            <optgroup label="生成セット（深層で解放）">
+              {procKeys.map((k) => (
+                <option key={k} value={k}>
+                  {getSetDef(k)?.name ?? k} セット
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
         <button
           onClick={doWeapon}
