@@ -912,7 +912,7 @@ function CoinShop() {
   const doWeapon = () => {
     const w = buyWeapon(sel);
     if (w) {
-      setMsg(`⚔️ ${w.name} を交換！`);
+      setMsg(`🎁 ${w.name} を交換！`);
       setTimeout(() => setMsg(null), 2500);
     }
   };
@@ -947,13 +947,13 @@ function CoinShop() {
         </div>
       )}
 
-      {/* Set weapon exchange */}
+      {/* Set gear exchange (random slot) */}
       <div className="rounded-2xl border border-fuchsia-500/40 bg-fuchsia-500/5 p-3">
         <p className="flex items-center gap-1 text-sm font-bold text-fuchsia-200">
-          <PixelGlyph kind="drop" size={14} /> セット武器と交換
+          <PixelGlyph kind="drop" size={14} /> セット装備と交換（ランダム部位）
         </p>
         <p className="mt-0.5 text-[10px] text-gray-400">
-          所持装備に見合うティアのセット武器（ビルドの軸）を入手。深層で出会った生成セットも選べる。
+          所持装備に見合うティアのセット装備を入手（武器・防具・アクセからランダム＝セット完成を狙える）。深層で出会った生成セットも選べる。
         </p>
         <select
           value={sel}
