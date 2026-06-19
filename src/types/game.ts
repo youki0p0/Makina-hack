@@ -405,7 +405,7 @@ export interface Progress {
   /** Casino: cumulative 台パン count, and whether ever banned (出禁). */
   daipanCount: number;
   casinoBanned: boolean;
-  /** Casino: 運命の大博打 wins. */
+  /** @deprecated 運命の大博打は廃止。セーブ互換のため残置（常に0）。 */
   fateWins: number;
   /** Forge: successful forges + highest forge level reached. */
   forgeCount: number;

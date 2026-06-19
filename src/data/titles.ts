@@ -99,8 +99,6 @@ export const TITLES: readonly Title[] = [
   { id: "c_coin10k", name: "コイン長者", desc: "累計10000コイン獲得", tier: "medium", check: (p) => p.totalCoinsWon >= 10000 },
   { id: "c_coin100k", name: "出玉の暴力", desc: "累計100000コイン獲得", tier: "hard", check: (p) => p.totalCoinsWon >= 100000 },
   { id: "c_coin1m", name: "ミリオンの男", desc: "累計1000000コイン獲得", tier: "secret", hidden: true, check: (p) => p.totalCoinsWon >= 1000000 },
-  { id: "c_fate1", name: "運命を掴む者", desc: "運命の大博打で大当たり", tier: "medium", hidden: true, check: (p) => p.fateWins >= 1 },
-  { id: "c_fate5", name: "大博打の覇者", desc: "運命の大博打で5回大当たり", tier: "secret", hidden: true, check: (p) => p.fateWins >= 5 },
   { id: "c_jpbig", name: "二刀流博徒", desc: "ジャックポットとBIGの両方を達成", tier: "medium", check: (p) => p.jackpots >= 1 && p.slotBigCount >= 1 },
 
   // ===== カジノ: 台パン / 出禁 (hidden) =====
@@ -213,9 +211,8 @@ export const TITLES: readonly Title[] = [
   { id: "c_big200", name: "万枚への道", desc: "BIG200回", tier: "secret", hidden: true, check: (p) => p.slotBigCount >= 200 },
   { id: "c_coin50k", name: "出玉中級者", desc: "累計50000コイン獲得", tier: "medium", check: (p) => p.totalCoinsWon >= 50000 },
   { id: "c_coin500k", name: "出玉の魔王", desc: "累計500000コイン獲得", tier: "hard", check: (p) => p.totalCoinsWon >= 500000 },
-  { id: "c_fate10", name: "運命の寵児", desc: "運命の大博打で10回大当たり", tier: "secret", hidden: true, check: (p) => p.fateWins >= 10 },
   { id: "c_daipan25", name: "問題児", desc: "台パン25回", tier: "secret", hidden: true, check: (p) => p.daipanCount >= 25 },
-  { id: "c_allcasino", name: "カジノ全部入り", desc: "JP・BIG・大博打を全て達成", tier: "medium", check: (p) => p.jackpots >= 1 && p.slotBigCount >= 1 && p.fateWins >= 1 },
+  { id: "c_allcasino", name: "カジノ全部入り", desc: "JP・BIGの両方を達成", tier: "medium", check: (p) => p.jackpots >= 1 && p.slotBigCount >= 1 },
 
   // 鍛冶
   { id: "fg5", name: "鍛冶の心得", desc: "鍛冶5回成功", tier: "easy", check: (p) => p.forgeCount >= 5 },
