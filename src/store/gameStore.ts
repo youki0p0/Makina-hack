@@ -29,7 +29,7 @@ import {
   rollGenDrop,
   SIGNATURE_WEAPON_IDS,
 } from "@/data/items";
-import { forgeCost, rollForge, starInjectCost, FORGE_MAX, type ForgeKind } from "@/data/forge";
+import { forgeCost, forgeMax, rollForge, starInjectCost, type ForgeKind } from "@/data/forge";
 import { applyModifier, modTierForFloor, rollDropModTier } from "@/data/modifiers";
 import { computeSetEffects, getSetDef } from "@/data/sets";
 import { getTitle, titleSouls } from "@/data/titles";
@@ -130,6 +130,11 @@ import type {
 import { faceByValue } from "@/data/diceFaces";
 
 const LOG_LIMIT = 14;
+
+/** 1000階(DEUS EX MACHINA)を踏破済みか（到達 or エンディング視聴）。 */
+function isCleared1000(progress: Progress): boolean {
+  return progress.highestFloorReached >= FINAL_FLOOR || progress.endingSeen;
+}
 
 /** セーブポイントの階層（1, 51, 101…）。ここでは転職を常に許可する。 */
 function isSavePointFloor(floor: number): boolean {
@@ -1334,14 +1339,15 @@ export const useGameStore = create<GameState>((set, get) => {
       const item = loc === "inv" ? state.inventory[index] : state.equipped[loc];
       if (!item || item.noModifier) return;
       const level = item.forgeLevel ?? 0;
-      if (level >= FORGE_MAX) return;
+      const fmax = forgeMax(isCleared1000(state.progress)); // 1000階踏破で上限解放
+      if (level >= fmax) return;
       let cost = forgeCost(level);
       if (protect) cost = Math.round(cost * 1.5);
       if (state.gachaPoints < cost) return;
 
       const streak = item.forgeStreak ?? 0;
       const out = rollForge(level, streak, protect);
-      const newLevel = out.kind === "fail" ? level : Math.min(FORGE_MAX, level + out.delta);
+      const newLevel = out.kind === "fail" ? level : Math.min(fmax, level + out.delta);
       const newStreak = out.kind === "fail" ? streak + 1 : 0;
       const forged = getItemInstance(item.id, item.affixId, item.modTier, item.quality, newLevel, newStreak);
       if (!forged) return;
@@ -1367,7 +1373,8 @@ export const useGameStore = create<GameState>((set, get) => {
       const item = loc === "inv" ? state.inventory[index] : state.equipped[loc];
       if (!item || item.noModifier) return;
       const level = item.forgeLevel ?? 0;
-      if (level >= FORGE_MAX) return;
+      const fmax = forgeMax(isCleared1000(state.progress)); // 1000階踏破で上限解放
+      if (level >= fmax) return;
       // Cheapest same-slot spare in inventory (not the target, not locked).
       const score = (it: Equipment) => it.attack + it.defense + it.maxHp + (it.modTier ?? 0) * 5;
       let feederIdx = -1;
@@ -1386,7 +1393,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const feeder = state.inventory[feederIdx];
       // Same base id → +2 (duplicate rescue), else +1.
       const delta = feeder.id === item.id ? 2 : 1;
-      const newLevel = Math.min(FORGE_MAX, level + delta);
+      const newLevel = Math.min(fmax, level + delta);
       const forged = getItemInstance(item.id, item.affixId, item.modTier, item.quality, newLevel, item.forgeStreak);
       if (!forged) return;
 

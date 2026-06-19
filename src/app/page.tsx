@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import SoundToggle from "@/components/SoundToggle";
 import PixelGlyph from "@/components/PixelGlyph";
 import EventBadge from "@/components/EventBadge";
@@ -39,6 +39,17 @@ export default function TitlePage() {
     startFloors.push(FINAL_FLOOR);
     startFloors.sort((a, b) => a - b);
   }
+
+  // 1000階踏破で鍛冶屋の強化上限が解放される。プレイヤーが気づくよう、未確認なら鍛冶屋に「New」。
+  const cleared1000 = hydrated && (progress.highestFloorReached >= FINAL_FLOOR || progress.endingSeen);
+  const [forgeUnlockNew, setForgeUnlockNew] = useState(false);
+  useEffect(() => {
+    if (!cleared1000) {
+      setForgeUnlockNew(false);
+      return;
+    }
+    setForgeUnlockNew(window.localStorage.getItem("forgeUnlockSeen") !== "1");
+  }, [cleared1000]);
 
   const hasProgress = hydrated && (floor > 1 || player.level > 1);
   const artifactsUnlocked = isFeatureUnlocked("artifacts", progress);
@@ -115,9 +126,14 @@ export default function TitlePage() {
             {forgeUnlocked ? (
               <Link
                 href="/forge"
-                className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-amber-700/80 font-bold active:scale-95"
+                className="relative flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-amber-700/80 font-bold active:scale-95"
               >
                 <PixelGlyph kind="attack" size={18} /> 鍛冶屋
+                {forgeUnlockNew && (
+                  <span className="absolute -right-1 -top-1 animate-pulse rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-black text-white shadow">
+                    New
+                  </span>
+                )}
               </Link>
             ) : (
               lockedCell("鍛冶屋", FEATURE_UNLOCKS.forge.hint)
