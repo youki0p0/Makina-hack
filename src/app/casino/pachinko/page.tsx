@@ -11,7 +11,7 @@ import { spinReels, type Mode, type ReelResult } from "@/lib/pachinko/reels";
 import { getSymbol } from "@/lib/pachinko/symbols";
 import { planPayout, counterStep, particlesThisFrame } from "@/lib/pachinko/payout";
 import { useGameStore } from "@/store/gameStore";
-import { initAudio, slotSfx, isMuted, setMuted } from "@/lib/audio";
+import { initAudio, slotSfx, isMuted, setMuted, setBgmTheme, startBgm, stopBgm } from "@/lib/audio";
 import { fmt } from "@/lib/ui";
 
 const HOLD_MAX = 8;
@@ -208,6 +208,16 @@ export default function PachinkoPage() {
       doSpinWith(result);
     }
   });
+
+  // 連チャン(確変/Makina Mode)中だけ「潮騒アイドル」BGMを流す（同Idol曲の海リカラー）。
+  // クリーンアップで連チャン終了・離脱時に停止。通常時は触らない（他画面のBGMを止めない）。
+  useEffect(() => {
+    if (mode !== "complete") return;
+    initAudio();
+    setBgmTheme("seaIdol");
+    startBgm(); // muted 時は内部で no-op
+    return () => stopBgm();
+  }, [mode]);
 
   // ===== Makina Mode（確変/時短=電サポ）: 右打ち相当で回り続ける =====
   useEffect(() => {
