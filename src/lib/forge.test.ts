@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyForge,
   FORGE_MAX,
+  forgeMax,
   forgeCost,
   forgeSuccessChance,
   rollForge,
@@ -41,5 +42,15 @@ describe("forge", () => {
     const base = getItemById("iron_sword")!;
     const f = applyForge({ ...base }, FORGE_MAX);
     expect(f.forgeLevel).toBe(FORGE_MAX);
+  });
+
+  it("1000階踏破で強化上限が解放され、コストは15以降“微増”(線形)で伸びる", () => {
+    expect(forgeMax(false)).toBe(FORGE_MAX);
+    expect(forgeMax(true)).toBeGreaterThan(FORGE_MAX); // 上限解放
+    // 〜15は従来どおり、16以降は一定ステップの微増（二次の急騰ではない）。
+    expect(forgeCost(15)).toBeGreaterThan(forgeCost(14));
+    const step = forgeCost(30) - forgeCost(29);
+    expect(forgeCost(50) - forgeCost(49)).toBe(step); // 線形＝一定ステップ
+    expect(forgeCost(99)).toBeGreaterThan(forgeCost(15));
   });
 });
