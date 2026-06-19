@@ -11,12 +11,20 @@
 import type { Equipment } from "@/types/game";
 
 export const FORGE_MAX = 15;
+/** 1000階踏破で解放される強化上限（コストの微増が自然な抑止になる＝青天井気味）。 */
+export const FORGE_MAX_CLEARED = 99;
+/** 踏破状況に応じた強化上限。 */
+export function forgeMax(cleared1000: boolean): number {
+  return cleared1000 ? FORGE_MAX_CLEARED : FORGE_MAX;
+}
 /** Additive bonus per forge level (+7% per level). */
 export const FORGE_BONUS_PER_LV = 0.07;
 
-/** Material cost to attempt the next forge level (level → level+1). */
+/** Material cost to attempt the next forge level (level → level+1).
+ *  〜14 は従来の二次曲線、15以降（上限解放後）は急騰させず“微増”の線形で伸ばす。 */
 export function forgeCost(level: number): number {
-  return 8 + level * level * 2; // 8,10,16,26,40,58,80,…,400
+  if (level < FORGE_MAX) return 8 + level * level * 2; // 8,10,16,26,…,400(→15)
+  return 8 + FORGE_MAX * FORGE_MAX * 2 + (level - FORGE_MAX) * 80; // 15→458, 以降+80/Lv
 }
 
 /** Material cost to inject one ★ modifier tier. */

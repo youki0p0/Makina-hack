@@ -5,11 +5,12 @@ import ItemIcon from "@/components/ItemIcon";
 import PixelGlyph from "@/components/PixelGlyph";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import {
-  FORGE_MAX,
+  forgeMax,
   forgeCost,
   forgeSuccessChance,
   starInjectCost,
 } from "@/data/forge";
+import { FINAL_FLOOR } from "@/data/worlds";
 import { getItemInstance } from "@/data/items";
 import { modTierForFloor } from "@/data/modifiers";
 import { itemKey, rarityStyle, slotLabel } from "@/lib/ui";
@@ -180,7 +181,8 @@ function ForgeDetail({
 }) {
   const level = item.forgeLevel ?? 0;
   const streak = item.forgeStreak ?? 0;
-  const maxed = level >= FORGE_MAX || item.noModifier;
+  const fmax = forgeMax(highest >= FINAL_FLOOR); // 1000階踏破で強化上限が解放
+  const maxed = level >= fmax || item.noModifier;
   const cost = forgeCost(level);
   const protectCost = Math.round(cost * 1.5);
   const succ = Math.round(forgeSuccessChance(level, streak, false) * 100);
@@ -211,7 +213,7 @@ function ForgeDetail({
               {item.name}
             </p>
             <p className="text-[10px] text-gray-400">
-              鍛冶 +{level}/{FORGE_MAX} ・ ★{modTier}
+              鍛冶 +{level}/{fmax} ・ ★{modTier}
               {streak > 0 && <span className="ml-1 text-amber-300">ピティ+{streak * 5}%</span>}
             </p>
           </div>
