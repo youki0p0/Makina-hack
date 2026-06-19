@@ -189,6 +189,9 @@ export default function PachinkoPage() {
     }
     holdsRef.current = [];
     setHolds([]);
+    // RUSH中はリールが回らないので、直前スピンの演出（◆SU pip/カットイン/赤いモヤ等）が
+    // 残って固まる。突入時に演出オーバーレイを掃除してクリーンな盤面で出玉を見せる。
+    reelsRef.current?.clearEffects();
     slotSfx(b.coins >= 300 ? "bonusBig" : "bonus");
     if (effects) {
       if (typeof navigator !== "undefined") navigator.vibrate?.(ren > 1 ? [20, 20, 40] : [40, 30, 80]);
@@ -328,7 +331,13 @@ export default function PachinkoPage() {
   useEffect(() => {
     if (!auto && mode !== "complete") return;
     const interval = mode === "complete" ? 160 : PACHINKO_CONFIG.launchIntervalMs;
-    const id = setInterval(() => launch(), interval);
+    const id = setInterval(() => {
+      // 盤上の玉が多いときは発射を見送る。発射は実時間・物理はフレーム駆動なので、
+      // FPSが落ちると発射が排出を追い越して玉が溜まり続け重くなる（暴走）。稼働数で
+      // 絞ることでフレーム実態に追従させ、右打ち中の玉が増え続けるのを防ぐ。
+      if ((boardRef.current?.activeCount() ?? 0) >= PACHINKO_CONFIG.autoMaxInflight) return;
+      launch();
+    }, interval);
     return () => clearInterval(id);
   }, [auto, mode, launch]);
 
