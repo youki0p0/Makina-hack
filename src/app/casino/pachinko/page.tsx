@@ -15,9 +15,10 @@ import { initAudio, slotSfx } from "@/lib/audio";
 import { fmt } from "@/lib/ui";
 
 const HOLD_MAX = 4;
-// 確変/時短(Makina Mode)の回転数＝固定ST（無限ループ防止のため連チャンで延長しない）。
-// この長さで玉のRTP≈1.9（スロット+約10%）に調整済み。
-const MAKINA_SPINS = { jackpot: 15, big: 10 };
+// 確変/時短(Makina Mode)のST回転数。確変中の当たり(enterComplete)でこの数にリセット＝
+// 継続ループ（跳ねたら止まらない）。確変中の当たり率(0.28)×STでループ率≈0.84に収束し、
+// 玉のRTP≈1.74（スロット≈1.78とほぼ同等＝どちらを打つか悩ましい高ボラ台）。
+const MAKINA_SPINS = { jackpot: 12, big: 8 };
 // ラウンド制アタッカーの表示用ラウンド数。
 const ROUNDS: Record<string, number> = { small: 2, normal: 4, big: 8, jackpot: 16 };
 
@@ -163,9 +164,9 @@ export default function PachinkoPage() {
         navigator.vibrate?.(result.jackpot ? [40, 30, 80] : 30);
       }
       startPayout(result);
-      // 確変突入は「通常モードからの当たり」だけ。Makina 中の当たりは延長せず固定STを
-      // 消化させる（無限ループ防止＝RTPを有限化）。
-      if (result.enterComplete && modeRef.current !== "complete") {
+      // 確変突入＋継続ループ：当たり(4/5/6/7)のたびにSTを満タンへリセット＝連チャンが
+      // 続く（跳ねたら止まらない）。継続率<1（当たり率0.28×ST）で必ず収束＝RTP有限。
+      if (result.enterComplete) {
         const k = result.jackpot ? MAKINA_SPINS.jackpot : MAKINA_SPINS.big;
         setMakina(k);
         makinaRef.current = k;

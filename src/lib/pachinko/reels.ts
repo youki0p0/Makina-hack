@@ -41,8 +41,9 @@ export interface ReelResult {
 
 type Rng = () => number;
 
-// 当たりは希少に（回り続け、たまに当たる）。確変中は連チャンしやすく。
-const WIN_CHANCE: Record<Mode, number> = { normal: 1 / 30, complete: 0.4 };
+// 初当たりは希少に（当たりづらく＝高ボラ）。確変中は当たりやすく＝連チャンが続く
+// （跳ねたら止まらない）。確変の継続は page.tsx 側の ST リセットで制御し、RTP を有限化。
+const WIN_CHANCE: Record<Mode, number> = { normal: 1 / 66, complete: 0.28 };
 
 // 当たり図柄の重み（id 1..7）。上位ほどレア。complete では上位寄り。
 const WEIGHTS: Record<Mode, number[]> = {
