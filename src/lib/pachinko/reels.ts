@@ -28,7 +28,8 @@ export interface ReelResult {
 
 type Rng = () => number;
 
-const WIN_CHANCE: Record<Mode, number> = { normal: 0.14, complete: 0.34 };
+// 当たりは希少に（回り続け、たまに当たる）。確変中は連チャンしやすく。
+const WIN_CHANCE: Record<Mode, number> = { normal: 1 / 30, complete: 0.4 };
 
 // 当たり図柄の重み（id 1..7）。上位ほどレア。complete では上位寄り。
 const WEIGHTS: Record<Mode, number[]> = {
@@ -59,8 +60,8 @@ export function spinReels(mode: Mode, rng: Rng = Math.random): ReelResult {
   const win = rng() < WIN_CHANCE[mode];
 
   if (!win) {
-    // ハズレ。一定確率でテンパイ（2つ揃い）を作って煽る。
-    const reach = rng() < 0.2;
+    // ハズレ。一定確率でテンパイ（2つ揃い）を作って煽る（リーチは希少に）。
+    const reach = rng() < 0.13;
     let symbols: [number, number, number];
     if (reach) {
       const t = pick(WEIGHTS[mode], rng);
@@ -79,7 +80,7 @@ export function spinReels(mode: Mode, rng: Rng = Math.random): ReelResult {
       symbolId: null,
       tier: "miss",
       payout: 0,
-      durationMs: reach ? 2600 : 1500,
+      durationMs: reach ? 2600 : 900,
       reach,
       group: groupForMiss(reach, rng),
       enterComplete: false,
@@ -121,17 +122,24 @@ export function spinReels(mode: Mode, rng: Rng = Math.random): ReelResult {
   };
 }
 
+// 信頼度ピラミッド: 弱(武器/ダイス/歯車群)→激熱(神機マキナ群)。
+// 神機マキナ群はほぼ当たり時に出し、ハズレでは“ガセ魚群”として極まれに出す
+// （出たら基本勝てる＝出た瞬間に叫べる。たまに泣く＝裏切りで興奮が増す）。
+function lowGroup(rng: Rng): GroupKind {
+  return GROUP_KINDS[Math.floor(rng() * 3)]; // makina 以外の3種
+}
+
 function groupForMiss(reach: boolean, rng: Rng): GroupKind | null {
-  // ハズレでもまれに群が出る（ガセ）。
-  if (rng() < (reach ? 0.25 : 0.06)) {
-    return GROUP_KINDS[Math.floor(rng() * 3)]; // makina 以外
-  }
+  // ガセ激アツ（神機マキナ群がハズレで出る）はごく低確率。
+  if (rng() < (reach ? 0.04 : 0.004)) return "makina";
+  // 弱群はそこそこ出る（弱予告は裏切り前提）。
+  if (rng() < (reach ? 0.32 : 0.07)) return lowGroup(rng);
   return null;
 }
 
 function groupForWin(id: number, rng: Rng): GroupKind | null {
-  // 上位当たりほど makina 群（激熱/当確）が出やすい。
-  if (id >= 6) return rng() < 0.6 ? "makina" : GROUP_KINDS[Math.floor(rng() * 3)];
-  if (rng() < 0.45) return GROUP_KINDS[Math.floor(rng() * 3)];
-  return null;
+  if (id === 7) return "makina"; // JP当確
+  if (id >= 4) return rng() < 0.62 ? "makina" : lowGroup(rng); // big はほぼ激アツ
+  if (id >= 2) return rng() < 0.18 ? "makina" : rng() < 0.55 ? lowGroup(rng) : null;
+  return rng() < 0.4 ? lowGroup(rng) : null; // 最小当たりは弱め
 }

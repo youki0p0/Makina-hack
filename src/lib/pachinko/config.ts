@@ -46,10 +46,10 @@ export const BOARD = {
   monitorY: 10,
   monitorW: 244,
   monitorH: 172,
-  /** スタートチャッカー（中央下の入賞口=ヘソ。モニター直下）。 */
+  /** スタートチャッカー（中央下の入賞口=ヘソ。モニター直下。命釘で絞り≈20%入賞）。 */
   pocketX: 160,
   pocketY: 300,
-  pocketW: 50,
+  pocketW: 20,
   pocketH: 20,
   /**
    * ステージ＆ワープ（海物語の肝）。モニター直下の舞台に玉が乗り、中央へ転がって
@@ -57,9 +57,17 @@ export const BOARD = {
    */
   stageY: 244,
   /** ステージの左右半幅（pocketX ± stageHalf に乗る＝ワープ入口は狭い）。 */
-  stageHalf: 16,
+  stageHalf: 14,
   /** 中央ワープの半幅（|x-pocketX| < warpHalf で吸い込み落下）。 */
   warpHalf: 12,
+  /** ステージ上の中央への復元力（弱め＝ゆっくり泳ぐ）。 */
+  stageRestoreK: 0.006,
+  /** ステージ摩擦（強めの減衰でヌルッと減速）。 */
+  stageDamp: 0.99,
+  /** ワープ吸い込みの速度ゲート（中央通過がこの速度以下の時だけ吸い込み＝惜しい）。 */
+  warpVGate: 0.3,
+  /** ステージ滞留の上限フレーム（超えたら強制排出＝詰まり防止）。 */
+  stageMaxFrames: 150,
   /** 電サポ(確変/時短=Makina Mode)時に広がるヘソ実効半幅の加算。 */
   denchuBonusHalf: 18,
   /** 1発の消費玉。 */

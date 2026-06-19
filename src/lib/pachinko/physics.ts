@@ -13,6 +13,10 @@ export interface Ball {
   active: boolean;
   /** ステージ上を転がっている最中か。 */
   onStage?: boolean;
+  /** ステージ滞留フレーム数（詰まり防止の強制排出に使う）。 */
+  stageFrames?: number;
+  /** ヘソ吸い込みアニメの進捗（0→1）。描画用。 */
+  sinking?: number;
 }
 
 export interface Peg {
@@ -49,15 +53,20 @@ export function buildPegs(board: BoardGeom = BOARD): Peg[] {
   pegs.push({ x: board.pocketX + board.stageHalf + 18, y: board.stageY + 18 });
   pegs.push({ x: board.pocketX - board.stageHalf - 34, y: board.stageY + 40 });
   pegs.push({ x: board.pocketX + board.stageHalf + 34, y: board.stageY + 40 });
-  // ヘソ直上の風車釘（最後の関門・少し広め＝直撃は渋い）。
-  pegs.push({ x: board.pocketX - board.pocketW / 2 - 9, y: board.pocketY - 12 });
-  pegs.push({ x: board.pocketX + board.pocketW / 2 + 9, y: board.pocketY - 12 });
+  // ヘソ直上の命釘2本（最後の関門）。間隔は玉が中央を通れるギリギリに絞り、
+  // 中央でないズレた玉(=道釘ルート)はここで弾かれて入らない。ワープの中央落下だけが抜ける。
+  const gate = board.ballRadius + board.pegRadius + 1.6; // ≒9.2
+  pegs.push({ x: board.pocketX - gate, y: board.pocketY - 13 });
+  pegs.push({ x: board.pocketX + gate, y: board.pocketY - 13 });
+  // その外側に風車釘（散らし）。
+  pegs.push({ x: board.pocketX - gate - 16, y: board.pocketY - 24 });
+  pegs.push({ x: board.pocketX + gate + 16, y: board.pocketY - 24 });
   return pegs;
 }
 
 /** 1球を生成。左上打ち→レール(描画演出)で天へ→中央寄りに落下。 */
 export function launchBall(board: BoardGeom = BOARD, rng: () => number = Math.random): Ball {
-  const spread = 150;
+  const spread = 240; // 広めに散らし、中央のステージ/命釘へ集まる玉を絞る（≈20%入賞）
   const dropX = board.pocketX - 6 + (rng() - 0.5) * spread;
   return {
     x: Math.max(14, Math.min(board.width - 14, dropX)),
@@ -82,14 +91,16 @@ export function stepBall(
   const r = board.ballRadius;
   const pr = board.pegRadius;
 
-  // ===== ステージ＆ワープ =====
+  // ===== ステージ＆ワープ（減衰振り子。中央でヌルッと吸い込むか、勢い余って前にこぼれる） =====
   if (ball.onStage) {
-    const dir = ball.x < board.pocketX ? 1 : -1;
-    ball.vx += dir * 0.07;
-    ball.vx *= 0.95;
+    ball.stageFrames = (ball.stageFrames ?? 0) + 1;
+    ball.vx += -(ball.x - board.pocketX) * board.stageRestoreK; // 中央への弱い復元力
+    ball.vx *= board.stageDamp; // 強めの減衰でゆっくり泳ぐ
     ball.x += ball.vx;
     ball.y = board.stageY;
-    if (Math.abs(ball.x - board.pocketX) < board.warpHalf) {
+    const centered = Math.abs(ball.x - board.pocketX) < board.warpHalf;
+    if (centered && Math.abs(ball.vx) < board.warpVGate) {
+      // 減速しきって中央通過＝ワープ吸い込み（ヘソ濃厚）。
       ball.onStage = false;
       ball.x = board.pocketX;
       ball.vx = 0;
@@ -99,8 +110,14 @@ export function stepBall(
       ball.x < board.pocketX - board.stageHalf ||
       ball.x > board.pocketX + board.stageHalf
     ) {
+      // 勢い余って端からこぼれる＝ほぼハズレ（惜しい）。
       ball.onStage = false;
-      ball.vy = 0.4;
+      ball.vy = 0.5;
+    } else if (ball.stageFrames > board.stageMaxFrames) {
+      // 滞留しすぎ＝強制排出（詰まり防止）。
+      ball.onStage = false;
+      ball.vx = (ball.x < board.pocketX ? -1 : 1) * 0.6;
+      ball.vy = 0.5;
     }
     return null;
   }
@@ -128,9 +145,10 @@ export function stepBall(
     ball.x <= board.pocketX + board.stageHalf
   ) {
     ball.onStage = true;
+    ball.stageFrames = 0;
     ball.y = board.stageY;
     ball.vy = 0;
-    ball.vx *= 0.5;
+    ball.vx *= 0.7; // 進入速度を残す（速いと泳いで前にこぼれ、遅いと中央へ）
     return null;
   }
 

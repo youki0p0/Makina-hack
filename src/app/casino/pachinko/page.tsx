@@ -27,6 +27,34 @@ interface Bonus {
   round: number;
 }
 
+// 保留＝ヘソ入賞時に内部抽選済みの1変動（実機どおり）。色は信頼度の先読み示唆。
+interface Hold {
+  result: ReelResult;
+  color: string;
+}
+const HOLD_COLORS: Record<string, string> = {
+  white: "#e5e7eb",
+  blue: "#38bdf8",
+  green: "#34d399",
+  red: "#f43f5e",
+  rainbow: "#fbbf24",
+};
+
+/** 先読み色を抽選（赤/虹はほぼ当たり、まれにガセ＝裏切りで興奮を作る）。 */
+function holdColorFor(result: ReelResult, rng = Math.random): string {
+  if (result.win) {
+    if (result.jackpot) return "rainbow";
+    if (result.tier === "big") return rng() < 0.55 ? "red" : "green";
+    return rng() < 0.5 ? "green" : rng() < 0.5 ? "blue" : "white";
+  }
+  // ハズレ：ほぼ白、まれに高信頼色（ガセ）。
+  const r = rng();
+  if (r < 0.012) return "red";
+  if (r < 0.05) return "green";
+  if (r < 0.16) return "blue";
+  return "white";
+}
+
 export default function PachinkoPage() {
   const boardRef = useRef<PachinkoBoardHandle>(null);
   const reelsRef = useRef<PachinkoReelsHandle>(null);
@@ -40,9 +68,9 @@ export default function PachinkoPage() {
   const modeRef = useRef<Mode>("normal");
   modeRef.current = mode;
 
-  // 保留(ヘソ入賞のストック、最大4)。
-  const [holds, setHolds] = useState(0);
-  const holdsRef = useRef(0);
+  // 保留(ヘソ入賞のストック、最大4。各保留は抽選済み結果＋先読み色を持つ)。
+  const [holds, setHolds] = useState<Hold[]>([]);
+  const holdsRef = useRef<Hold[]>([]);
   holdsRef.current = holds;
 
   // Makina Mode 残り回転。
@@ -126,6 +154,9 @@ export default function PachinkoPage() {
   // ===== 変動の確定処理 =====
   const onReelDone = useCallbackRef((result: ReelResult) => {
     if (result.win) {
+      if (effects && typeof navigator !== "undefined") {
+        navigator.vibrate?.(result.jackpot ? [40, 30, 80] : 30);
+      }
       startPayout(result);
       if (result.enterComplete) {
         // 確変突入/引き戻し（Makina Mode を満タンに）。
@@ -137,26 +168,32 @@ export default function PachinkoPage() {
       }
     }
     // 通常モードのみ保留消化で連続変動（Makina はタイマー駆動）。
-    if (modeRef.current === "normal" && holdsRef.current > 0) {
-      setHolds((h) => Math.max(0, h - 1));
-      window.setTimeout(() => doSpin(), 80);
+    if (modeRef.current === "normal" && holdsRef.current.length > 0) {
+      const [next, ...rest] = holdsRef.current;
+      holdsRef.current = rest;
+      setHolds(rest);
+      window.setTimeout(() => doSpinWith(next.result), 80);
     }
   });
 
-  const doSpin = useCallbackRef(() => {
-    const result = spinReels(modeRef.current);
+  const doSpinWith = useCallbackRef((result: ReelResult) => {
     if (result.reach && effects) slotSfx("reach");
     reelsRef.current?.spin(result, () => onReelDone(result));
   });
 
-  // ヘソ入賞。通常時は変動 or 保留(最大4)。Makina 中は時短回転が主役なので保留せず。
+  // ヘソ入賞。入賞時に1変動を内部抽選し、変動中なら保留(最大4)に積む（実機どおり）。
   const onPocket = useCallbackRef(() => {
     slotSfx("small");
+    if (effects && typeof navigator !== "undefined") navigator.vibrate?.(8);
     if (modeRef.current === "complete") return;
+    const result = spinReels("normal");
     if (reelsRef.current?.busy()) {
-      setHolds((h) => Math.min(HOLD_MAX, h + 1));
+      if (holdsRef.current.length >= HOLD_MAX) return; // 保留満タンは入賞のみ（変動せず）
+      const hold: Hold = { result, color: HOLD_COLORS[holdColorFor(result)] };
+      holdsRef.current = [...holdsRef.current, hold];
+      setHolds(holdsRef.current);
     } else {
-      doSpin();
+      doSpinWith(result);
     }
   });
 
@@ -176,11 +213,11 @@ export default function PachinkoPage() {
           makinaRef.current = n;
           return n;
         });
-        doSpin();
+        doSpinWith(spinReels("complete"));
       }
     }, 900);
     return () => clearInterval(id);
-  }, [mode, doSpin]);
+  }, [mode, doSpinWith]);
 
   // ===== 発射 =====
   const launch = useCallbackRef(() => {
@@ -234,14 +271,19 @@ export default function PachinkoPage() {
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-gray-400">保留</span>
           <div className="flex gap-1">
-            {Array.from({ length: HOLD_MAX }, (_, i) => (
-              <span
-                key={i}
-                className={`h-2.5 w-2.5 rounded-full ${
-                  i < holds ? "bg-emerald-400" : "bg-white/15"
-                }`}
-              />
-            ))}
+            {Array.from({ length: HOLD_MAX }, (_, i) => {
+              const h = holds[i];
+              return (
+                <span
+                  key={i}
+                  className="h-2.5 w-2.5 rounded-full transition-colors"
+                  style={{
+                    background: h ? h.color : "rgba(255,255,255,.15)",
+                    boxShadow: h && h.color !== HOLD_COLORS.white ? `0 0 5px ${h.color}` : "none",
+                  }}
+                />
+              );
+            })}
           </div>
         </div>
         <span className="text-lg font-black text-amber-300">玉 {fmt(balls)}</span>

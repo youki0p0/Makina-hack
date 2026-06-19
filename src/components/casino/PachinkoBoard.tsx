@@ -147,13 +147,20 @@ const PachinkoBoard = forwardRef<
         ctx.textAlign = "center";
         ctx.fillText("ヘソ", BOARD.pocketX, BOARD.pocketY + 14);
 
-        // 球。
-        ctx.fillStyle = "#f4f7ff";
+        // 球（稼働中＝白丸、入賞後＝ヘソへ吸い込まれて縮む“間”）。
         for (const b of balls.current) {
-          if (!b.active) continue;
-          ctx.beginPath();
-          ctx.arc(b.x, b.y, BOARD.ballRadius, 0, Math.PI * 2);
-          ctx.fill();
+          if (b.active) {
+            ctx.fillStyle = b.onStage ? "#ffe9a3" : "#f4f7ff";
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, BOARD.ballRadius, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (b.sinking !== undefined && b.sinking < 1) {
+            const r = BOARD.ballRadius * (1 - b.sinking);
+            ctx.fillStyle = `rgba(255,233,163,${1 - b.sinking})`;
+            ctx.beginPath();
+            ctx.arc(BOARD.pocketX, BOARD.pocketY, Math.max(0.5, r), 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       };
 
@@ -161,9 +168,16 @@ const PachinkoBoard = forwardRef<
         raf.current = requestAnimationFrame(frame);
         if (!visible.current) return;
         for (const b of balls.current) {
-          if (!b.active) continue;
+          if (!b.active) {
+            // 入賞済みの吸い込みアニメを進める。
+            if (b.sinking !== undefined && b.sinking < 1) b.sinking += 0.12;
+            continue;
+          }
           const ev = stepBall(b, pegs.current, BOARD, denchuRef.current);
-          if (ev === "pocket") onPocketRef.current();
+          if (ev === "pocket") {
+            b.sinking = 0; // ヘソへ吸い込まれる“間”を描く
+            onPocketRef.current();
+          }
         }
         draw();
       };

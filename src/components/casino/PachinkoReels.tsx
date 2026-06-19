@@ -69,7 +69,8 @@ const PachinkoReels = forwardRef<
       const fast = !effects || reduced;
       const base = fast ? 110 : 460;
       const step = fast ? 110 : 430;
-      const reachExtra = fast ? 0 : 900;
+      // テンパイ前の“沈黙”。神機マキナ群(激熱)ほど長く溜める。
+      const reachExtra = fast ? 0 : result.group === "makina" ? 2200 : 1100;
 
       cycler.current = setInterval(
         () => {
@@ -94,10 +95,36 @@ const PachinkoReels = forwardRef<
 
       stop(0, base);
       stop(1, base + step);
-      const reachDelay = result.symbols[0] === result.symbols[1] ? reachExtra : 0;
-      stop(2, base + step * 2 + reachDelay);
+      const isReach = result.symbols[0] === result.symbols[1];
+      const reachDelay = isReach ? reachExtra : 0;
+      const thirdAt = base + step * 2 + reachDelay;
 
-      const settleAt = base + step * 2 + reachDelay + 260;
+      let settleAt: number;
+      if (!fast && isReach) {
+        // スベリ：1コマ手前で一旦止め、ためてから本停止（当たりほど効く煽り）。
+        const slipSym = (result.symbols[2] % 7) + 1;
+        const t1 = setTimeout(() => {
+          stoppedNow[2] = true;
+          setStopped([...stoppedNow]);
+          setCells((prev) => {
+            const n = [...prev];
+            n[2] = slipSym;
+            return n;
+          });
+        }, thirdAt);
+        const t2 = setTimeout(() => {
+          setCells((prev) => {
+            const n = [...prev];
+            n[2] = result.symbols[2];
+            return n;
+          });
+        }, thirdAt + 480);
+        timers.current.push(t1, t2);
+        settleAt = thirdAt + 480 + 260;
+      } else {
+        stop(2, thirdAt);
+        settleAt = thirdAt + 260;
+      }
       const finish = setTimeout(() => {
         if (cycler.current) {
           clearInterval(cycler.current);
