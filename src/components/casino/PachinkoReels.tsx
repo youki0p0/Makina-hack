@@ -11,6 +11,8 @@ export interface PachinkoReelsHandle {
   /** 図柄変動を開始。完了で onDone を呼ぶ。多重呼び出しは無視（busy）。 */
   spin: (result: ReelResult, onDone: () => void) => boolean;
   busy: () => boolean;
+  /** すべての演出オーバーレイを消す（RUSH中はリールが回らずリセットが走らないため）。 */
+  clearEffects: () => void;
 }
 
 interface Tween {
@@ -122,6 +124,21 @@ const PachinkoReels = forwardRef<
 
   useImperativeHandle(ref, () => ({
     busy: () => busy.current,
+    // 直前スピンの演出（群予告/SU pip/カットイン/プレミア/全画面リーチ等）を一括で消す。
+    // RUSH中はリールが回らず spin() のリセットが走らないため、突入時にこれで掃除する。
+    clearEffects() {
+      setGroup(null);
+      setBonus(null);
+      setPromo([]);
+      setReach(false);
+      setSu(0);
+      setSpId(null);
+      setCu(0);
+      setPremium(false);
+      setWinId(null);
+      setFullReach(null);
+      setFlash(0);
+    },
     spin(result, onDone) {
       if (busy.current) return false;
       busy.current = true;

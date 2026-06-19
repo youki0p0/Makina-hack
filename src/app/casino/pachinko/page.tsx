@@ -189,6 +189,9 @@ export default function PachinkoPage() {
     }
     holdsRef.current = [];
     setHolds([]);
+    // RUSH中はリールが回らないので、直前スピンの演出（◆SU pip/カットイン/赤いモヤ等）が
+    // 残って固まる。突入時に演出オーバーレイを掃除してクリーンな盤面で出玉を見せる。
+    reelsRef.current?.clearEffects();
     slotSfx(b.coins >= 300 ? "bonusBig" : "bonus");
     if (effects) {
       if (typeof navigator !== "undefined") navigator.vibrate?.(ren > 1 ? [20, 20, 40] : [40, 30, 80]);
