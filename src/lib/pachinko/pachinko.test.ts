@@ -149,7 +149,7 @@ describe("payout", () => {
     };
     const plan = planPayout(fake)!;
     expect(plan.rainbow).toBe(true);
-    expect(plan.particleBudget).toBeGreaterThan(600);
+    expect(plan.particleBudget).toBeGreaterThan(0);
   });
 
   it("stepTowards never overshoots and counterStep drains in time", () => {

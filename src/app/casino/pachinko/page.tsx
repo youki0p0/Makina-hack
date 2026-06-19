@@ -10,13 +10,14 @@ import { PACHINKO_CONFIG, BOARD } from "@/lib/pachinko/config";
 import { spinReels, type Mode, type ReelResult } from "@/lib/pachinko/reels";
 import { getSymbol } from "@/lib/pachinko/symbols";
 import { planPayout, counterStep, particlesThisFrame } from "@/lib/pachinko/payout";
+import { useGameStore } from "@/store/gameStore";
 import { initAudio, slotSfx } from "@/lib/audio";
 import { fmt } from "@/lib/ui";
 
-const START_BALLS = 500;
 const HOLD_MAX = 4;
-// 確変/時短(Makina Mode)の回転数。海物語の電サポ区間に相当。
-const MAKINA_SPINS = { jackpot: 100, big: 60 };
+// 確変/時短(Makina Mode)の回転数＝固定ST（無限ループ防止のため連チャンで延長しない）。
+// この長さで玉のRTP≈1.9（スロット+約10%）に調整済み。
+const MAKINA_SPINS = { jackpot: 15, big: 10 };
 // ラウンド制アタッカーの表示用ラウンド数。
 const ROUNDS: Record<string, number> = { small: 2, normal: 4, big: 8, jackpot: 16 };
 
@@ -60,9 +61,13 @@ export default function PachinkoPage() {
   const reelsRef = useRef<PachinkoReelsHandle>(null);
   const particlesRef = useRef<PayoutParticlesHandle>(null);
 
-  const [balls, setBalls] = useState(START_BALLS);
-  const ballsRef = useRef(balls);
-  ballsRef.current = balls;
+  // 甘ダイスはカジノコインで遊技（1コイン=1玉）。発射で-1、払い出しで加算。
+  const hydrate = useGameStore((s) => s.hydrate);
+  const coins = useGameStore((s) => s.coins);
+  const addCoins = useGameStore((s) => s.addCoins);
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
 
   const [mode, setMode] = useState<Mode>("normal");
   const modeRef = useRef<Mode>("normal");
@@ -115,7 +120,7 @@ export default function PachinkoPage() {
         const step = counterStep(payoutBalls.current, 75, reduced);
         const inc = Math.min(payoutBalls.current, step);
         payoutBalls.current -= inc;
-        setBalls((b) => b + inc);
+        addCoins(inc);
         // ラウンド表示を出玉の進捗に同期。
         const b0 = bonusRef.current;
         if (b0) {
@@ -158,8 +163,9 @@ export default function PachinkoPage() {
         navigator.vibrate?.(result.jackpot ? [40, 30, 80] : 30);
       }
       startPayout(result);
-      if (result.enterComplete) {
-        // 確変突入/引き戻し（Makina Mode を満タンに）。
+      // 確変突入は「通常モードからの当たり」だけ。Makina 中の当たりは延長せず固定STを
+      // 消化させる（無限ループ防止＝RTPを有限化）。
+      if (result.enterComplete && modeRef.current !== "complete") {
         const k = result.jackpot ? MAKINA_SPINS.jackpot : MAKINA_SPINS.big;
         setMakina(k);
         makinaRef.current = k;
@@ -221,11 +227,11 @@ export default function PachinkoPage() {
 
   // ===== 発射 =====
   const launch = useCallbackRef(() => {
-    if (ballsRef.current < BOARD.startCost) return;
+    if (useGameStore.getState().coins < BOARD.startCost) return;
     initAudio();
     const ok = boardRef.current?.launch();
     if (ok) {
-      setBalls((b) => b - BOARD.startCost);
+      addCoins(-BOARD.startCost);
       slotSfx("lever");
     }
   });
@@ -261,12 +267,13 @@ export default function PachinkoPage() {
         <Link href="/casino" className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">
           ← カジノ
         </Link>
+        <span className="text-sm font-black tracking-wide text-amber-200">🎲 甘ダイス</span>
         <span className={`text-xs font-bold ${complete ? "animate-pulse text-amber-300" : "text-cyan-200"}`}>
-          {complete ? `🌊 Makina Mode（確変/時短）残り${makina}` : "通常モード"}
+          {complete ? `Makina Mode 残り${makina}` : "通常モード"}
         </span>
       </div>
 
-      {/* 所持玉 ＋ 保留ランプ */}
+      {/* 所持コイン ＋ 保留ランプ */}
       <div className="flex items-center justify-between rounded-xl border border-amber-400/30 bg-black/30 px-3 py-2">
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-gray-400">保留</span>
@@ -286,7 +293,7 @@ export default function PachinkoPage() {
             })}
           </div>
         </div>
-        <span className="text-lg font-black text-amber-300">玉 {fmt(balls)}</span>
+        <span className="text-lg font-black text-amber-300">🎲 コイン {fmt(coins)}</span>
       </div>
 
       {/* 盤面が中央モニターを囲む“ひとつの台”。役物の窪みに図柄オーバーレイを重ねる。 */}
@@ -329,11 +336,16 @@ export default function PachinkoPage() {
 
       <button
         onClick={() => launch()}
-        disabled={balls < BOARD.startCost}
+        disabled={coins < BOARD.startCost}
         className="h-14 rounded-2xl bg-amber-500 text-lg font-extrabold text-black active:scale-95 disabled:opacity-40"
       >
-        ● 発射（{complete ? "右打ち" : "左打ち"} / 玉 -{BOARD.startCost}）
+        ● 発射（{complete ? "右打ち" : "左打ち"} / コイン -{BOARD.startCost}）
       </button>
+      {coins < BOARD.startCost && (
+        <p className="text-center text-[11px] text-rose-300">
+          コインが足りません。<Link href="/casino" className="underline">カジノ</Link>でゴールドからコインを用意してね（1コイン=1玉）。
+        </p>
+      )}
 
       <div className="grid grid-cols-3 gap-2 text-[11px]">
         <Toggle label="オート発射" on={auto} onClick={() => setAuto((v) => !v)} />

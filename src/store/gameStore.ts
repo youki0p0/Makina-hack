@@ -456,6 +456,8 @@ interface GameState {
   buyCoinsAll: () => void;
   /** Cash all slot coins back into gold. */
   cashoutCoins: () => void;
+  /** カジノコインを増減（甘ダイス発射/払い出し・BJ 用。0未満にはしない）。 */
+  addCoins: (delta: number) => void;
   /** Spin the slot. Returns the resolved result, or null if coins are short. */
   slotSpin: () => SlotSpinResult | null;
   /** Sit at a different slot machine (resets 天井/ゾーン for that 台). */
@@ -1750,6 +1752,12 @@ export const useGameStore = create<GameState>((set, get) => {
       const s = get();
       if (s.coins <= 0) return;
       set({ player: { ...s.player, gold: s.player.gold + s.coins * COIN_VALUE }, coins: 0, slotReplay: false });
+      persist();
+    },
+
+    addCoins: (delta: number) => {
+      const s = get();
+      set({ coins: Math.max(0, s.coins + Math.round(delta)) });
       persist();
     },
 
