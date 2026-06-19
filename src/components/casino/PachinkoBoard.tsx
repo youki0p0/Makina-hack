@@ -11,6 +11,33 @@ export interface PachinkoBoardHandle {
   activeCount: () => number;
 }
 
+/** 角丸矩形パス（文字ラベルの代わりに“いい感じの役物”を描くため）。 */
+function rrect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+/** 4方向のきらめき星（入賞口の中心アクセント）。 */
+function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, r: number) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const a = (i * Math.PI) / 2;
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(a - 0.28) * r * 0.4, y + Math.sin(a - 0.28) * r * 0.4);
+    ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    ctx.lineTo(x + Math.cos(a + 0.28) * r * 0.4, y + Math.sin(a + 0.28) * r * 0.4);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
 /**
  * 盤面 Canvas。物理玉（最大 maxPhysicsBalls）を requestAnimationFrame で更新し、
  * 入賞口に入ったら onPocket を呼ぶ。object pool で球を再利用。非表示時は停止。
@@ -94,24 +121,58 @@ const PachinkoBoard = forwardRef<
         // 右打ちレーン（大入賞口アタッカーまで）。
         drawLane(BOARD.rightLaneX, BOARD.launchY, BOARD.attackerY, migi);
 
-        // 右下の大入賞口（アタッカー）。右打ち中だけ開いて光る演出。
-        ctx.fillStyle = migi ? "rgba(255,207,51,.3)" : "rgba(124,92,255,.12)";
-        ctx.strokeStyle = migi ? "#ffcf33" : "#5b6b8a";
-        ctx.lineWidth = 2;
-        ctx.fillRect(BOARD.attackerX - BOARD.attackerW / 2, BOARD.attackerY, BOARD.attackerW, BOARD.attackerH);
-        ctx.strokeRect(BOARD.attackerX - BOARD.attackerW / 2, BOARD.attackerY, BOARD.attackerW, BOARD.attackerH);
-        ctx.lineWidth = 1;
-        ctx.fillStyle = migi ? "#ffe9a3" : "#8a96b5";
-        ctx.font = "8px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("大入賞", BOARD.attackerX, BOARD.attackerY + 12);
+        // 右下の大入賞口（アタッカー）＝開閉シャッター。右打ち中だけ金色に開いて光る（文字なし）。
+        {
+          const ax = BOARD.attackerX - BOARD.attackerW / 2;
+          const ay = BOARD.attackerY;
+          const aw = BOARD.attackerW;
+          const ah = BOARD.attackerH;
+          const ag = ctx.createLinearGradient(0, ay, 0, ay + ah);
+          if (migi) {
+            ag.addColorStop(0, "#fff0b8");
+            ag.addColorStop(1, "#cf8418");
+          } else {
+            ag.addColorStop(0, "#2b3650");
+            ag.addColorStop(1, "#151d2e");
+          }
+          ctx.fillStyle = ag;
+          rrect(ctx, ax, ay, aw, ah, 3);
+          ctx.fill();
+          // 開いたシャッターの横スリット。
+          ctx.strokeStyle = migi ? "rgba(120,70,0,.45)" : "rgba(255,255,255,.06)";
+          for (let yy = ay + 4; yy < ay + ah - 1; yy += 4) {
+            ctx.beginPath();
+            ctx.moveTo(ax + 2, yy);
+            ctx.lineTo(ax + aw - 2, yy);
+            ctx.stroke();
+          }
+          // ふち（開放時はグロー）。
+          if (migi) {
+            ctx.save();
+            ctx.shadowColor = "#ffcf33";
+            ctx.shadowBlur = 12;
+          }
+          ctx.strokeStyle = migi ? "#ffcf33" : "#46566f";
+          ctx.lineWidth = 2;
+          rrect(ctx, ax, ay, aw, ah, 3);
+          ctx.stroke();
+          if (migi) ctx.restore();
+          ctx.lineWidth = 1;
+        }
 
-        // 「右打ち→」表示（当たり中のみ）。
+        // 右打ち誘導は文字でなくシェブロン（▸）で示す（当たり中のみ）。
         if (migi) {
           ctx.fillStyle = "#ffcf33";
-          ctx.font = "bold 11px sans-serif";
-          ctx.textAlign = "right";
-          ctx.fillText("右打ち→", BOARD.rightLaneX - 4, mY + 40);
+          for (let c = 0; c < 3; c++) {
+            const cy = mY + 24 + c * 11;
+            const cx = BOARD.rightLaneX - 12;
+            ctx.beginPath();
+            ctx.moveTo(cx - 4, cy - 4);
+            ctx.lineTo(cx + 4, cy);
+            ctx.lineTo(cx - 4, cy + 4);
+            ctx.closePath();
+            ctx.fill();
+          }
         }
 
         // プレイ領域の道釘。
@@ -143,18 +204,51 @@ const PachinkoBoard = forwardRef<
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // 入賞口（ヘソ）。電サポ中は広がって光る。
-        const half = BOARD.pocketW / 2 + (denchuRef.current ? BOARD.denchuBonusHalf : 0);
-        ctx.fillStyle = denchuRef.current ? "rgba(255,207,51,.3)" : "rgba(124,92,255,.25)";
-        ctx.fillRect(BOARD.pocketX - half, BOARD.pocketY, half * 2, BOARD.pocketH);
-        ctx.strokeStyle = denchuRef.current ? "#ffcf33" : "#7c5cff";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(BOARD.pocketX - half, BOARD.pocketY, half * 2, BOARD.pocketH);
-        ctx.lineWidth = 1;
-        ctx.fillStyle = denchuRef.current ? "#ffe9a3" : "#cdbcff";
-        ctx.font = "9px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("ヘソ", BOARD.pocketX, BOARD.pocketY + 14);
+        // 入賞口（ヘソ）＝光る吸い込み口。電サポ中は広がって金色に光る（文字なし）。
+        {
+          const hot = denchuRef.current;
+          const half = BOARD.pocketW / 2 + (hot ? BOARD.denchuBonusHalf : 0);
+          const px = BOARD.pocketX;
+          const py = BOARD.pocketY;
+          const ph = BOARD.pocketH;
+          const cyc = py + ph / 2;
+          // 放射グロー。
+          const rg = ctx.createRadialGradient(px, cyc, 1, px, cyc, half + 9);
+          rg.addColorStop(0, hot ? "rgba(255,207,51,.55)" : "rgba(124,92,255,.5)");
+          rg.addColorStop(1, hot ? "rgba(255,207,51,0)" : "rgba(124,92,255,0)");
+          ctx.fillStyle = rg;
+          ctx.fillRect(px - half - 9, py - 7, (half + 9) * 2, ph + 16);
+          // 吸い込み口（口が下に向かってすぼまる台形）。
+          const topHalf = half;
+          const botHalf = Math.max(4, half * 0.5);
+          ctx.beginPath();
+          ctx.moveTo(px - topHalf, py);
+          ctx.lineTo(px + topHalf, py);
+          ctx.lineTo(px + botHalf, py + ph);
+          ctx.lineTo(px - botHalf, py + ph);
+          ctx.closePath();
+          const pg = ctx.createLinearGradient(0, py, 0, py + ph);
+          pg.addColorStop(0, hot ? "rgba(255,207,51,.5)" : "rgba(124,92,255,.45)");
+          pg.addColorStop(1, "rgba(0,0,0,.55)");
+          ctx.fillStyle = pg;
+          ctx.fill();
+          ctx.strokeStyle = hot ? "#ffcf33" : "#7c5cff";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.lineWidth = 1;
+          // 入口の左右ふち（受け皿）。
+          ctx.strokeStyle = hot ? "#ffe9a3" : "#cdbcff";
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          ctx.moveTo(px - topHalf - 3, py - 1);
+          ctx.lineTo(px - topHalf, py + 1);
+          ctx.moveTo(px + topHalf + 3, py - 1);
+          ctx.lineTo(px + topHalf, py + 1);
+          ctx.stroke();
+          ctx.lineWidth = 1;
+          // 中心のきらめき。
+          sparkle(ctx, px, cyc, hot ? "#fff6cf" : "#e7dcff", 3.4);
+        }
 
         // 球（稼働中＝白丸、入賞後＝ヘソへ吸い込まれて縮む“間”）。
         for (const b of balls.current) {
