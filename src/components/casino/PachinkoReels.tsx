@@ -124,16 +124,19 @@ const PachinkoReels = forwardRef<
   return (
     <div className="relative rounded-2xl border-4 border-cyan-500/40 bg-[#04101c] p-3 shadow-[0_0_24px_rgba(34,211,238,.25)_inset]">
       <p className="mb-1 text-center text-[9px] tracking-widest text-cyan-400/70">▼ MONITOR ▼</p>
-      {group && (
-        <div
-          className={`absolute inset-x-0 top-6 z-10 text-center text-sm font-extrabold ${
-            group === "makina" ? "animate-pulse text-amber-300" : "text-cyan-200"
-          }`}
-        >
-          ✦ {GROUP_LABEL[group]}
-          {group === "makina" && " 激熱！"}
+      {group === "makina" ? (
+        // 神機マキナ群＝魚群相当の全画面カットイン（激熱/当確級）。
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-black/55 animate-pulse">
+          <span className="rounded-lg border-2 border-amber-300 bg-amber-400/15 px-4 py-2 text-lg font-black tracking-wide text-amber-200">
+            ✦ 神機マキナ群 ✦<br />
+            <span className="text-sm">激 熱 ！ ！</span>
+          </span>
         </div>
-      )}
+      ) : group ? (
+        <div className="absolute inset-x-0 top-6 z-10 text-center text-sm font-extrabold text-cyan-200">
+          ✦ {GROUP_LABEL[group]}
+        </div>
+      ) : null}
 
       <div className="flex items-stretch justify-center gap-2 pt-3">
         {cells.map((id, i) => {

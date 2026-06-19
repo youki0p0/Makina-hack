@@ -47,6 +47,17 @@ export const BOARD = {
   pocketY: 206,
   pocketW: 50,
   pocketH: 20,
+  /**
+   * ステージ＆ワープ（海物語の肝）。モニター直下の舞台に玉が乗り、中央へ転がって
+   * ワープから落ちるとヘソに吸い込まれやすい。
+   */
+  stageY: 150,
+  /** ステージの左右半幅（pocketX ± stageHalf に乗る＝ワープ入口は狭い）。 */
+  stageHalf: 16,
+  /** 中央ワープの半幅（|x-pocketX| < warpHalf で吸い込み落下）。 */
+  warpHalf: 12,
+  /** 電サポ(確変/時短=Makina Mode)時に広がるヘソ実効半幅の加算。 */
+  denchuBonusHalf: 18,
   /** 1発の消費玉。 */
   startCost: 1,
 } as const;

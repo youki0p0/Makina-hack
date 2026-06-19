@@ -15,8 +15,10 @@ export interface PachinkoBoardHandle {
  * 盤面 Canvas。物理玉（最大 maxPhysicsBalls）を requestAnimationFrame で更新し、
  * 入賞口に入ったら onPocket を呼ぶ。object pool で球を再利用。非表示時は停止。
  */
-const PachinkoBoard = forwardRef<PachinkoBoardHandle, { onPocket: () => void; reduced?: boolean }>(
-  function PachinkoBoard({ onPocket, reduced = false }, ref) {
+const PachinkoBoard = forwardRef<
+  PachinkoBoardHandle,
+  { onPocket: () => void; reduced?: boolean; denchu?: boolean }
+>(function PachinkoBoard({ onPocket, reduced = false, denchu = false }, ref) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const balls = useRef<Ball[]>([]);
     const pegs = useRef<Peg[]>([]);
@@ -24,6 +26,8 @@ const PachinkoBoard = forwardRef<PachinkoBoardHandle, { onPocket: () => void; re
     const visible = useRef(true);
     const onPocketRef = useRef(onPocket);
     onPocketRef.current = onPocket;
+    const denchuRef = useRef(denchu);
+    denchuRef.current = denchu;
 
     const cap = () =>
       reduced ? Math.ceil(PACHINKO_CONFIG.maxPhysicsBalls / 2) : PACHINKO_CONFIG.maxPhysicsBalls;
@@ -82,27 +86,39 @@ const PachinkoBoard = forwardRef<PachinkoBoardHandle, { onPocket: () => void; re
           ctx.fill();
         }
 
-        // 入賞口（中央下のスタートチャッカー）。
-        ctx.fillStyle = "rgba(124,92,255,.25)";
-        ctx.fillRect(
-          BOARD.pocketX - BOARD.pocketW / 2,
-          BOARD.pocketY,
-          BOARD.pocketW,
-          BOARD.pocketH,
-        );
-        ctx.strokeStyle = "#7c5cff";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(
-          BOARD.pocketX - BOARD.pocketW / 2,
-          BOARD.pocketY,
-          BOARD.pocketW,
-          BOARD.pocketH,
-        );
+        // ステージ＆ワープ（海物語の肝）。中央の隙間=ワープから落ちるとヘソ濃厚。
+        const sLeft = BOARD.pocketX - BOARD.stageHalf;
+        const sRight = BOARD.pocketX + BOARD.stageHalf;
+        ctx.strokeStyle = "#36c0e0";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(sLeft, BOARD.stageY);
+        ctx.lineTo(BOARD.pocketX - BOARD.warpHalf, BOARD.stageY);
+        ctx.moveTo(BOARD.pocketX + BOARD.warpHalf, BOARD.stageY);
+        ctx.lineTo(sRight, BOARD.stageY);
+        ctx.stroke();
         ctx.lineWidth = 1;
-        ctx.fillStyle = "#cdbcff";
+        // ワープ→ヘソの導線。
+        ctx.strokeStyle = "rgba(54,192,224,.35)";
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(BOARD.pocketX, BOARD.stageY + 2);
+        ctx.lineTo(BOARD.pocketX, BOARD.pocketY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 入賞口（ヘソ）。電サポ中は広がって光る。
+        const half = BOARD.pocketW / 2 + (denchuRef.current ? BOARD.denchuBonusHalf : 0);
+        ctx.fillStyle = denchuRef.current ? "rgba(255,207,51,.3)" : "rgba(124,92,255,.25)";
+        ctx.fillRect(BOARD.pocketX - half, BOARD.pocketY, half * 2, BOARD.pocketH);
+        ctx.strokeStyle = denchuRef.current ? "#ffcf33" : "#7c5cff";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(BOARD.pocketX - half, BOARD.pocketY, half * 2, BOARD.pocketH);
+        ctx.lineWidth = 1;
+        ctx.fillStyle = denchuRef.current ? "#ffe9a3" : "#cdbcff";
         ctx.font = "9px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("START", BOARD.pocketX, BOARD.pocketY + 17);
+        ctx.fillText("ヘソ", BOARD.pocketX, BOARD.pocketY + 14);
 
         // 球。
         ctx.fillStyle = "#f4f7ff";
@@ -119,7 +135,7 @@ const PachinkoBoard = forwardRef<PachinkoBoardHandle, { onPocket: () => void; re
         if (!visible.current) return;
         for (const b of balls.current) {
           if (!b.active) continue;
-          const ev = stepBall(b, pegs.current, BOARD);
+          const ev = stepBall(b, pegs.current, BOARD, denchuRef.current);
           if (ev === "pocket") onPocketRef.current();
         }
         draw();

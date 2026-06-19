@@ -8,11 +8,24 @@ import PachinkoReels, { type PachinkoReelsHandle } from "@/components/casino/Pac
 import PayoutParticles, { type PayoutParticlesHandle } from "@/components/casino/PayoutParticles";
 import { PACHINKO_CONFIG, BOARD } from "@/lib/pachinko/config";
 import { spinReels, type Mode, type ReelResult } from "@/lib/pachinko/reels";
-import { planPayout, counterStep, particlesThisFrame, stepTowards } from "@/lib/pachinko/payout";
+import { getSymbol } from "@/lib/pachinko/symbols";
+import { planPayout, counterStep, particlesThisFrame } from "@/lib/pachinko/payout";
 import { initAudio, slotSfx } from "@/lib/audio";
 import { fmt } from "@/lib/ui";
 
 const START_BALLS = 500;
+const HOLD_MAX = 4;
+// 確変/時短(Makina Mode)の回転数。海物語の電サポ区間に相当。
+const MAKINA_SPINS = { jackpot: 100, big: 60 };
+// ラウンド制アタッカーの表示用ラウンド数。
+const ROUNDS: Record<string, number> = { small: 2, normal: 4, big: 8, jackpot: 16 };
+
+interface Bonus {
+  label: string;
+  color: string;
+  rounds: number;
+  round: number;
+}
 
 export default function PachinkoPage() {
   const boardRef = useRef<PachinkoBoardHandle>(null);
@@ -27,19 +40,30 @@ export default function PachinkoPage() {
   const modeRef = useRef<Mode>("normal");
   modeRef.current = mode;
 
+  // 保留(ヘソ入賞のストック、最大4)。
+  const [holds, setHolds] = useState(0);
+  const holdsRef = useRef(0);
+  holdsRef.current = holds;
+
+  // Makina Mode 残り回転。
+  const [makina, setMakina] = useState(0);
+  const makinaRef = useRef(0);
+  makinaRef.current = makina;
+
+  const [bonus, setBonus] = useState<Bonus | null>(null);
+  const bonusRef = useRef<Bonus | null>(null);
+  bonusRef.current = bonus;
+
   const [auto, setAuto] = useState(false);
   const [reduced, setReduced] = useState(false);
   const [effects, setEffects] = useState(true);
   const [flash, setFlash] = useState(false);
 
-  // 入賞キュー（リール変動中の入賞は溜める）。
-  const pendingSpins = useRef(0);
-  // 払い出しの残り（玉・粒子）。複数当たりは加算。
   const payoutBalls = useRef(0);
   const payoutParticles = useRef(0);
+  const payoutTotal = useRef(1);
   const payoutTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // prefers-reduced-motion → 自動で軽量モード。
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
     const m = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -49,21 +73,28 @@ export default function PachinkoPage() {
     }
   }, []);
 
-  // ===== 払い出しループ（数秒かけて玉カウンタを増やし、払い出し玉を流す） =====
+  // ===== 払い出しループ（ラウンド制アタッカー：数秒かけて出玉カウンタを増やす） =====
   const drainPayout = () => {
     if (payoutTimer.current) return;
     payoutTimer.current = setInterval(() => {
       if (payoutBalls.current <= 0 && payoutParticles.current <= 0) {
         if (payoutTimer.current) clearInterval(payoutTimer.current);
         payoutTimer.current = null;
+        window.setTimeout(() => setBonus(null), 500);
         return;
       }
       if (payoutBalls.current > 0) {
-        // 残りを ~2.5秒で消化する想定のフレーム数で割る。
         const step = counterStep(payoutBalls.current, 75, reduced);
         const inc = Math.min(payoutBalls.current, step);
         payoutBalls.current -= inc;
         setBalls((b) => b + inc);
+        // ラウンド表示を出玉の進捗に同期。
+        const b0 = bonusRef.current;
+        if (b0) {
+          const prog = 1 - payoutBalls.current / Math.max(1, payoutTotal.current);
+          const round = Math.min(b0.rounds, Math.max(1, Math.ceil(prog * b0.rounds)));
+          if (round !== b0.round) setBonus({ ...b0, round });
+        }
       }
       if (payoutParticles.current > 0) {
         const n = particlesThisFrame(payoutParticles.current, reduced);
@@ -76,6 +107,9 @@ export default function PachinkoPage() {
   const startPayout = (result: ReelResult) => {
     const plan = planPayout(result);
     if (!plan) return;
+    const sym = getSymbol(result.symbolId ?? 1);
+    setBonus({ label: sym.bonus, color: sym.color, rounds: ROUNDS[sym.tier] ?? 2, round: 1 });
+    payoutTotal.current = plan.balls;
     payoutBalls.current += plan.balls;
     payoutParticles.current += plan.particleBudget;
     if (effects) particlesRef.current?.emit(0, plan.rainbow);
@@ -89,19 +123,23 @@ export default function PachinkoPage() {
     drainPayout();
   };
 
-  // ===== リール変動 =====
+  // ===== 変動の確定処理 =====
   const onReelDone = useCallbackRef((result: ReelResult) => {
     if (result.win) {
       startPayout(result);
-      if (result.enterComplete) setMode("complete");
-    } else if (modeRef.current === "complete" && Math.random() < 0.25) {
-      // 確変転落。
-      setMode("normal");
+      if (result.enterComplete) {
+        // 確変突入/引き戻し（Makina Mode を満タンに）。
+        const k = result.jackpot ? MAKINA_SPINS.jackpot : MAKINA_SPINS.big;
+        setMakina(k);
+        makinaRef.current = k;
+        setMode("complete");
+        modeRef.current = "complete";
+      }
     }
-    // 溜まった入賞があれば続けて変動。
-    if (pendingSpins.current > 0) {
-      pendingSpins.current -= 1;
-      window.setTimeout(() => doSpin(), 60);
+    // 通常モードのみ保留消化で連続変動（Makina はタイマー駆動）。
+    if (modeRef.current === "normal" && holdsRef.current > 0) {
+      setHolds((h) => Math.max(0, h - 1));
+      window.setTimeout(() => doSpin(), 80);
     }
   });
 
@@ -111,15 +149,38 @@ export default function PachinkoPage() {
     reelsRef.current?.spin(result, () => onReelDone(result));
   });
 
-  // 入賞口に球が入った。変動中はキューに積む（バックログ過多を防ぐため上限3）。
+  // ヘソ入賞。通常時は変動 or 保留(最大4)。Makina 中は時短回転が主役なので保留せず。
   const onPocket = useCallbackRef(() => {
     slotSfx("small");
+    if (modeRef.current === "complete") return;
     if (reelsRef.current?.busy()) {
-      pendingSpins.current = Math.min(3, pendingSpins.current + 1);
+      setHolds((h) => Math.min(HOLD_MAX, h + 1));
     } else {
       doSpin();
     }
   });
+
+  // ===== Makina Mode（確変/時短=電サポ）: 右打ち相当で回り続ける =====
+  useEffect(() => {
+    if (mode !== "complete") return;
+    const id = setInterval(() => {
+      if (makinaRef.current <= 0) {
+        setMode("normal");
+        modeRef.current = "normal";
+        setMakina(0);
+        return;
+      }
+      if (!reelsRef.current?.busy()) {
+        setMakina((m) => {
+          const n = Math.max(0, m - 1);
+          makinaRef.current = n;
+          return n;
+        });
+        doSpin();
+      }
+    }, 900);
+    return () => clearInterval(id);
+  }, [mode, doSpin]);
 
   // ===== 発射 =====
   const launch = useCallbackRef(() => {
@@ -132,18 +193,20 @@ export default function PachinkoPage() {
     }
   });
 
-  // オート発射。
+  // オート発射。Makina 中(電サポ=右打ち)は常時自動で打つ。
   useEffect(() => {
-    if (!auto) return;
+    if (!auto && mode !== "complete") return;
     const id = setInterval(() => launch(), PACHINKO_CONFIG.launchIntervalMs);
     return () => clearInterval(id);
-  }, [auto, launch]);
+  }, [auto, mode, launch]);
 
   useEffect(() => {
     return () => {
       if (payoutTimer.current) clearInterval(payoutTimer.current);
     };
   }, []);
+
+  const complete = mode === "complete";
 
   return (
     <main className="flex min-h-dvh flex-col gap-2 p-3">
@@ -161,45 +224,60 @@ export default function PachinkoPage() {
         <Link href="/casino" className="rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95">
           ← カジノ
         </Link>
-        <span className="text-xs font-bold text-cyan-200">
-          {mode === "complete" ? "🌊 Makina Mode（確変）" : "通常モード"}
+        <span className={`text-xs font-bold ${complete ? "animate-pulse text-amber-300" : "text-cyan-200"}`}>
+          {complete ? `🌊 Makina Mode（確変/時短）残り${makina}` : "通常モード"}
         </span>
       </div>
 
-      <div className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 p-2 text-center">
-        <h1 className="font-bold text-cyan-200">奈落海 / Abyss Marine</h1>
-        <p className="text-[10px] text-gray-400">
-          深海×歯車×ダイス×固有武器のパチンコ。7以外でも3つ揃えば当たり。
-        </p>
-      </div>
-
-      {/* 所持玉 */}
+      {/* 所持玉 ＋ 保留ランプ */}
       <div className="flex items-center justify-between rounded-xl border border-amber-400/30 bg-black/30 px-3 py-2">
-        <span className="text-xs text-gray-300">所持玉</span>
-        <span className="text-xl font-black text-amber-300">{fmt(balls)}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-gray-400">保留</span>
+          <div className="flex gap-1">
+            {Array.from({ length: HOLD_MAX }, (_, i) => (
+              <span
+                key={i}
+                className={`h-2.5 w-2.5 rounded-full ${
+                  i < holds ? "bg-emerald-400" : "bg-white/15"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+        <span className="text-lg font-black text-amber-300">玉 {fmt(balls)}</span>
       </div>
 
-      {/* 主役: 中央モニター（固有武器のドット絵が変動） */}
-      <PachinkoReels ref={reelsRef} effects={effects} reduced={reduced} />
+      {/* 主役: 中央モニター */}
+      <div className="relative">
+        <PachinkoReels ref={reelsRef} effects={effects} reduced={reduced} />
+        {/* ラウンド制アタッカー出玉オーバーレイ */}
+        {bonus && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-1 z-20 text-center">
+            <span
+              className="rounded-full px-3 py-0.5 text-sm font-black text-black"
+              style={{ background: bonus.color }}
+            >
+              {bonus.label}　ROUND {bonus.round}/{bonus.rounds}
+            </span>
+          </div>
+        )}
+      </div>
 
-      {/* モニター直下の盤面“帯”。左上打ちした玉が中央のヘソに入るか（玉・釘はドット描画）。 */}
       <p className="-mb-1 text-center text-[10px] text-cyan-300/70">
-        ▲ 玉がヘソ(中央)に入ると上のモニターが変動！
+        ▲ 玉がヘソ(中央)に入ると変動！ ステージ中央のワープに乗ると吸い込み濃厚
       </p>
-      <PachinkoBoard ref={boardRef} onPocket={onPocket} reduced={reduced} />
+      <PachinkoBoard ref={boardRef} onPocket={onPocket} reduced={reduced} denchu={complete} />
 
-      {/* 下部: 出玉演出（薄め） */}
       <div className="rounded-xl border border-amber-400/20 bg-black/40">
         <PayoutParticles ref={particlesRef} reduced={reduced} />
       </div>
 
-      {/* 操作 */}
       <button
         onClick={() => launch()}
         disabled={balls < BOARD.startCost}
         className="h-14 rounded-2xl bg-amber-500 text-lg font-extrabold text-black active:scale-95 disabled:opacity-40"
       >
-        ● 発射（玉 -{BOARD.startCost}）
+        ● 発射（左上打ち / 玉 -{BOARD.startCost}）
       </button>
 
       <div className="grid grid-cols-3 gap-2 text-[11px]">
@@ -209,7 +287,8 @@ export default function PachinkoPage() {
       </div>
 
       <p className="pb-2 text-center text-[10px] text-gray-500">
-        球は左上から発射 → 釘を流れて中央下の入賞口へ → 図柄変動 → 当たりで大量払い出し。
+        左上打ち→釘を流れて中央へ→ステージ＆ワープでヘソIN→図柄変動。
+        4/5/6/7当たりで確変(Makina Mode)＝右打ち高速回転。
       </p>
     </main>
   );
