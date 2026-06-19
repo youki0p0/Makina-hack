@@ -26,9 +26,6 @@ const HOLD_MAX = 8;
 const REVEAL_MS = 800;
 // ボーナス1ゲーム(回転)の長さ。保証G ぶん消化したらラウンド終了→継続抽選。
 const GAME_MS = 420;
-// 設定で変わる天井の範囲（表示用。実際の天井は台の隠し設定で決まる＝看破の沼）。
-const CEIL_MIN = pachiCeilingSpins(6); // 420
-const CEIL_MAX = pachiCeilingSpins(1); // 570
 const PACHI_MACHINE_KEY = "pachiMachine";
 
 // ボーナス(RUSH)の進行状態。出玉は大入賞口に入った玉で payRemaining を削って加算。
@@ -377,9 +374,8 @@ export default function PachinkoPage() {
             台{i + 1}
           </button>
         ))}
-        <span className="shrink-0 text-[9px] leading-tight text-gray-500">
-          天井{CEIL_MIN}〜{CEIL_MAX}
-          <br />設定は隠し
+        <span className="shrink-0 text-[9px] leading-tight text-gray-500">設定・天井
+          <br />は隠し
         </span>
       </div>
 
@@ -477,7 +473,7 @@ export default function PachinkoPage() {
       <p className="pb-2 text-center text-[10px] text-gray-500">
         通常時は左打ち（ヘソINで図柄変動＆賞球+{BOARD.hesoPrize}で玉持ちUP）。当たると保証枚数(100〜400)×保証G(10/16)の
         RUSHへ＝右打ち・発射無料で大入賞口に出玉。継続でループ（10G≈78%/16G≈88%・平均≈5連）。
-        天井{CEIL_MIN}〜{CEIL_MAX}回転ノーヒットで強制初当たり（台の隠し設定で変動）。4台から座って設定を見極めよう。
+        ハマっても救済の強制初当たりあり（条件＝天井は秘密）。4台から座って設定を見極めよう。
       </p>
     </main>
   );
