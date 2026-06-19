@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { getItemById } from "@/data/items";
 import { getItemIconDataUrl } from "@/lib/itemIcon";
 import { iconSpecForItem } from "@/components/ItemIcon";
-import { getSymbol, GROUP_LABEL, SYMBOLS } from "@/lib/pachinko/symbols";
+import { getSymbol, SYMBOLS } from "@/lib/pachinko/symbols";
 import type { ReelResult } from "@/lib/pachinko/reels";
 
 export interface PachinkoReelsHandle {
@@ -25,8 +25,7 @@ interface Tween {
 const idAt = (off: number) => ((((Math.round(off) % 7) + 7) % 7) + 1) as number;
 const CELL = 100 / 3; // 1コマ＝表示幅の1/3（横3コマ表示）
 // SU予告（ステップアップ予告）の段階色（1→4で青→緑→赤→金にエスカレート）。
-const SU_FILL = ["bg-sky-300", "bg-emerald-300", "bg-rose-400", "bg-amber-300"];
-const SU_TEXT = ["text-sky-200", "text-emerald-200", "text-rose-200", "text-amber-200"];
+const SU_HEX = ["#38bdf8", "#34d399", "#fb7185", "#fbbf24"];
 
 /**
  * 中央の巨大ドラム表示（海物語式・横ドラム）。
@@ -48,11 +47,13 @@ const PachinkoReels = forwardRef<
   const [group, setGroup] = useState<ReelResult["group"]>(null);
   const [bonus, setBonus] = useState<string | null>(null);
   const [promo, setPromo] = useState<number[]>([]);
-  // 海物語式リーチ演出の段階表示。
+  // 海物語式リーチ演出の段階表示（文字ではなくグラフィック/動きで見せる）。
   const [su, setSu] = useState(0); // SU予告ステップ（0=非表示）
-  const [spName, setSpName] = useState<string | null>(null); // SP発展タイトル
-  const [cu, setCu] = useState(0); // チャンスアップ点滅トリガ
+  const [spId, setSpId] = useState<number | null>(null); // SP発展＝この図柄でカットイン
+  const [cu, setCu] = useState(0); // チャンスアップ（バースト再生トリガ）
   const [premium, setPremium] = useState(false); // プレミア（当確）
+  const [winId, setWinId] = useState<number | null>(null); // 当たり確定図柄（カットイン）
+  const [flash, setFlash] = useState(0); // 全画面フラッシュの再生トリガ
 
   // ドラム位置（ref で 60fps 駆動）。初期は中段に id 1,2,3。
   const offsets = useRef<number[]>([0, 1, 2]);
@@ -129,9 +130,10 @@ const PachinkoReels = forwardRef<
       setReach(false);
       setGroup(result.group);
       setSu(0);
-      setSpName(null);
+      setSpId(null);
       setCu(0);
       setPremium(false);
+      setWinId(null);
       setMoving([true, true, true]);
 
       const [topId, cId, botId] = result.symbols; // 中央列ライン [上, 中, 下]
@@ -157,7 +159,10 @@ const PachinkoReels = forwardRef<
       at(t0, () => tweenTo(0, nextK(offsets.current[0] + (fast ? 3 : 7), topId), dur, true));
       at(t0 + stepT, () => {
         tweenTo(2, nextK(offsets.current[2] + (fast ? 3 : 6), botId), dur, true);
-        if (isReach) setReach(true);
+        if (isReach) {
+          setReach(true);
+          setFlash((f) => f + 1); // テンパイ＝フラッシュ＋判定ラインのスイープ光
+        }
       });
 
       // フェーズ④中リール: テンパイなら変則、非テンパイは普通に停止。
@@ -168,8 +173,11 @@ const PachinkoReels = forwardRef<
       if (fast || !isReach) {
         at(centerAt, () => tweenTo(1, nextK(offsets.current[1] + (fast ? 3 : 6), cId), dur, true));
       } else if (sp) {
-        // パターンB: SP発展（黒潮＝逆回転スロー）。SPタイトル→チャンスアップ→当落。
-        at(Math.max(0, centerAt - 600), () => setSpName(result.spName));
+        // パターンB: SP発展（黒潮＝逆回転スロー）。図柄カットイン→チャンスアップ→当落。
+        at(Math.max(0, centerAt - 600), () => {
+          setSpId(topId); // テンパイ図柄でドンとカットイン
+          setFlash((f) => f + 1);
+        });
         for (let j = 1; j <= result.chanceUp; j++) at(centerAt + 200 + j * 460, () => setCu(j));
         at(centerAt, () => {
           const kf = nextK(offsets.current[1] + 8, cId);
@@ -189,7 +197,12 @@ const PachinkoReels = forwardRef<
       }
 
       // プレミア（当確）。演出ありなら本停止手前で“割り込み”、なければ確定時に。
-      if (result.premium && !fast) at(Math.max(centerAt, centerEnd - 700), () => setPremium(true));
+      if (result.premium && !fast) {
+        at(Math.max(centerAt, centerEnd - 700), () => {
+          setPremium(true);
+          setFlash((f) => f + 1);
+        });
+      }
 
       // 確定（出目・onDone）。
       at(centerEnd + (fast ? 60 : 300), () => {
@@ -199,6 +212,8 @@ const PachinkoReels = forwardRef<
         if (result.win) {
           if (result.promotion.length > 1) setPromo(result.promotion);
           setBonus(getSymbol(result.symbolId ?? 1).bonus);
+          setWinId(result.symbolId ?? 1); // 当たり図柄のドンッ！カットイン
+          setFlash((f) => f + 1);
         }
         at(fast ? 60 : 380, () => {
           busy.current = false;
@@ -239,64 +254,84 @@ const PachinkoReels = forwardRef<
     );
   };
 
+  const groupUrl = group === "makina" ? urls[7] : urls[6];
+
   return (
-    <div className="relative flex h-full w-full flex-col rounded-xl bg-[#04101c]/80 p-2">
+    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-xl bg-[#04101c]/80 p-2">
       <p className="text-center text-[8px] tracking-widest text-cyan-400/70">▼ MONITOR ▼</p>
 
-      {/* SU予告（ステップアップ予告）。段階が上がるほど信頼度↑。 */}
+      {/* 群予告（魚群相当）: 図柄が左→右へ群れで流れる。makina=金で激アツ。 */}
+      {group && !bonus && (
+        <>
+          {group === "makina" && (
+            <div className="pointer-events-none absolute inset-0 z-20 rounded-xl bg-black/45" />
+          )}
+          <Swarm url={groupUrl} count={group === "makina" ? 9 : 6} hot={group === "makina"} />
+        </>
+      )}
+
+      {/* SU予告（ステップアップ予告）: チャージ pip が段階点灯。色が上がるほど激アツ。 */}
       {su > 0 && !bonus && (
-        <div className="absolute left-1.5 top-1.5 z-30 flex items-center gap-0.5">
-          {Array.from({ length: 4 }, (_, i) => (
+        <div key={su} className="fx-charge pointer-events-none absolute left-1/2 top-1 z-30 flex -translate-x-1/2 gap-1">
+          {Array.from({ length: 4 }, (_, i) => {
+            const lit = i < su;
+            const c = SU_HEX[su - 1];
+            return (
+              <span
+                key={i}
+                style={{
+                  width: 9,
+                  height: 9,
+                  transform: "rotate(45deg)",
+                  background: lit ? c : "rgba(255,255,255,.12)",
+                  boxShadow: lit ? `0 0 8px ${c}, 0 0 3px ${c}` : "none",
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* SP発展: テンパイ図柄をドンとカットイン＋衝撃リング（文字なし）。 */}
+      {spId != null && !bonus && (
+        <CutIn url={urls[spId]} color={getSymbol(spId).color} z={30} />
+      )}
+
+      {/* チャンスアップ: 中央でスパークが弾けて舞い上がる（cu をキーに再生）。 */}
+      {cu > 0 && !bonus && (
+        <div key={cu} className="pointer-events-none absolute inset-0 z-30">
+          <div className="fx-ring absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-amber-300" />
+          {Array.from({ length: 6 }, (_, i) => (
             <span
               key={i}
-              className={`h-1.5 w-3 rounded-full ${i < su ? SU_FILL[su - 1] : "bg-white/15"}`}
-            />
+              className="fx-rise absolute left-1/2 top-1/2 text-amber-300"
+              style={{ marginLeft: (i - 2.5) * 16, fontSize: 12, animationDelay: `${i * 0.04}s` }}
+            >
+              ✦
+            </span>
           ))}
-          <span className={`ml-0.5 text-[9px] font-black ${SU_TEXT[su - 1]}`}>SU{su}</span>
         </div>
       )}
 
-      {/* SP発展タイトル（ノーマル→SPリーチ昇格）。 */}
-      {spName && !bonus && (
-        <div className="absolute inset-x-0 top-7 z-30 text-center">
-          <span className="inline-block animate-pop rounded-md border border-rose-300 bg-rose-500/25 px-3 py-0.5 text-sm font-black text-rose-100">
-            ⚔ {spName} 発展！
-          </span>
-        </div>
-      )}
-
-      {/* チャンスアップ（SP中に追加で信頼度↑）。cu をキーに点滅再生。 */}
-      {cu > 0 && !bonus && (
-        <div key={cu} className="pointer-events-none absolute right-1.5 top-1/3 z-30 animate-pop">
-          <span className="rounded bg-amber-400/90 px-2 py-0.5 text-[11px] font-black text-black">
-            チャンスアップ！
-          </span>
-        </div>
-      )}
-
-      {/* プレミア演出（激レア・ほぼ当確）。 */}
+      {/* プレミア（当確）: 全画面の虹フラッシュ＋神機マキナが巨大回転＋多重リング。 */}
       {premium && (
-        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center rounded-2xl bg-black/60 animate-pulse">
-          <span className="rounded-xl border-2 border-amber-200 bg-amber-300/20 px-5 py-2 text-center text-lg font-black text-amber-100">
-            ✦ プレミア ✦
-            <br />
-            <span className="text-base">当 確 ！</span>
-          </span>
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center overflow-hidden rounded-xl">
+          <div className="rainbow-flash absolute inset-0 opacity-70" />
+          <div className="fx-ring absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-amber-100" />
+          <div
+            className="fx-ring absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-fuchsia-200"
+            style={{ animationDelay: "0.18s" }}
+          />
+          {urls[7] && (
+            <img
+              src={urls[7]}
+              alt=""
+              className="fx-huespin relative"
+              style={{ width: 64, height: 64, imageRendering: "pixelated", filter: "drop-shadow(0 0 12px #ffcf33)" }}
+            />
+          )}
         </div>
       )}
-
-      {group === "makina" ? (
-        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-black/55 animate-pulse">
-          <span className="rounded-lg border-2 border-amber-300 bg-amber-400/15 px-4 py-2 text-lg font-black tracking-wide text-amber-200">
-            ✦ 神機マキナ群 ✦<br />
-            <span className="text-sm">激 熱 ！ ！</span>
-          </span>
-        </div>
-      ) : group ? (
-        <div className="absolute inset-x-0 top-5 z-10 text-center text-sm font-extrabold text-cyan-200">
-          ✦ {GROUP_LABEL[group]}
-        </div>
-      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-1.5 pt-1">
         {renderReel(0)}
@@ -304,23 +339,116 @@ const PachinkoReels = forwardRef<
         {renderReel(2)}
       </div>
 
-      {reach && !bonus && (
-        <p className="mt-1 text-center text-xs font-extrabold text-rose-300">★ リーチ！ ★</p>
+      {/* 昇格: 図柄チェインが順にせり上がって光る（3→6→7 を絵で）。 */}
+      {promo.length > 1 && !premium && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-8 z-30 flex items-center justify-center gap-1">
+          {promo.map((pid, i) => (
+            <img
+              key={i}
+              src={urls[pid]}
+              alt=""
+              className="fx-cutin"
+              style={{
+                width: 28,
+                height: 28,
+                imageRendering: "pixelated",
+                animationDelay: `${i * 0.18}s`,
+                filter: `drop-shadow(0 0 6px ${getSymbol(pid).color})`,
+              }}
+            />
+          ))}
+        </div>
       )}
-      {promo.length > 1 && (
-        <p className="mt-1 text-center text-[11px] text-amber-300">昇格！ {promo.join(" → ")}</p>
+
+      {/* 当たり確定: 当たり図柄をドンッ！とカットイン＋リング＋舞い上がるスパーク。 */}
+      {winId != null && (
+        <CutIn url={urls[winId]} color={getSymbol(winId).color} z={35} big sparks />
       )}
-      {bonus && (
-        <p
-          className="mt-1 animate-pop text-center text-base font-black"
-          style={{ color: getSymbol(idAt(offsets.current[1])).color }}
-        >
-          ✦ {bonus} ✦
-        </p>
+
+      {/* テンパイ/SP/当たり/プレミアの瞬間フラッシュ（key で毎回再生）＋判定ラインのスイープ光。 */}
+      {flash > 0 && (
+        <div key={flash} className="pointer-events-none absolute inset-0 z-50 overflow-hidden">
+          <div className="fx-flash absolute inset-0 bg-white/70" />
+          <div className="fx-line absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+        </div>
       )}
     </div>
   );
 });
+
+/** 図柄カットイン: 小さく回りながらドンと拡大＋衝撃リング＋（任意で）舞うスパーク。 */
+function CutIn({
+  url,
+  color,
+  z,
+  big,
+  sparks,
+}: {
+  url?: string;
+  color: string;
+  z: number;
+  big?: boolean;
+  sparks?: boolean;
+}) {
+  if (!url) return null;
+  const size = big ? 60 : 48;
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center" style={{ zIndex: z }}>
+      <div
+        className="fx-ring absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
+        style={{ width: size + 28, height: size + 28, borderColor: color }}
+      />
+      <img
+        src={url}
+        alt=""
+        className="fx-cutin relative"
+        style={{ width: size, height: size, imageRendering: "pixelated", filter: `drop-shadow(0 0 10px ${color})` }}
+      />
+      {sparks &&
+        Array.from({ length: 8 }, (_, i) => (
+          <span
+            key={i}
+            className="fx-rise absolute left-1/2 top-1/2"
+            style={{ marginLeft: (i - 3.5) * 18, color, fontSize: 12, animationDelay: `${0.1 + (i % 4) * 0.05}s` }}
+          >
+            ✦
+          </span>
+        ))}
+    </div>
+  );
+}
+
+/** 群予告のスウォーム: 同じ図柄が時間差で左→右へ流れる（魚群相当）。 */
+function Swarm({ url, count, hot }: { url?: string; count: number; hot?: boolean }) {
+  if (!url) return null;
+  const size = hot ? 30 : 20;
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+      {Array.from({ length: count }, (_, i) => {
+        const top = 6 + ((i * 41) % 78);
+        const delay = (i * 0.11).toFixed(2);
+        const dur = (1.0 + (i % 3) * 0.28).toFixed(2);
+        return (
+          <img
+            key={i}
+            src={url}
+            alt=""
+            style={{
+              position: "absolute",
+              top: `${top}%`,
+              left: 0,
+              width: size,
+              height: size,
+              imageRendering: "pixelated",
+              animation: `fxSweep ${dur}s linear ${delay}s both, fxBob 0.6s ease-in-out ${delay}s infinite`,
+              filter: hot ? "drop-shadow(0 0 7px #ffcf33)" : "drop-shadow(0 0 3px rgba(120,200,255,.7))",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
 
 function Tile({ id, xc, url, blur }: { id: number; xc: number; url?: string; blur: boolean }) {
   const s = getSymbol(id);
