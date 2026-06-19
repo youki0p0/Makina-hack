@@ -2,7 +2,23 @@
 
 All notable changes to Dice Ex Machina.
 
-## [Unreleased] — バランス大改修(上方修正でビルド多様化＋カジノ入手導線)
+## [Unreleased] — パチンコ「奈落海 / Abyss Marine」を追加
+
+カジノに演出特化のパチンコミニゲーム(`/casino/pachinko`)を追加:
+
+- **盤面物理**(`src/lib/pachinko/physics.ts`): 左上発射→釘で跳ねながら中央下の
+  入賞口へ。円-円反射のみの軽量物理(Matter.js 不使用)。入賞率 ~20%。
+- **図柄変動**(`reels.ts` / `PachinkoReels`): 絵柄は既存の固有武器＋神機マキナの
+  procedural ドット絵を流用。7以外でも3つ揃えば当たり、777=Jackpot。リーチ/群予告/
+  昇格(333→666→777)/確変(Makina Mode)。
+- **出玉演出**(`payout.ts` / `PayoutParticles`): payoutQueue を数秒かけて消化、
+  下部に払い出し玉(ドット粒子・object pool)を連続表示。Jackpot は虹発光＋最大量。
+- **パフォーマンス**: requestAnimationFrame / Canvas / object pool / 非表示時停止 /
+  prefers-reduced-motion 自動軽量 / 手動軽量モード。
+- 玉・釘はドット描画、絵文字不使用。所持玉は演出用アーケード資源(セーブ非保存)。
+- 純粋ロジックは `pachinko.test.ts` で検証。詳細は [docs/pachinko.md](docs/pachinko.md)。
+
+## [過去] — バランス大改修(上方修正でビルド多様化＋カジノ入手導線)
 
 単一ビルド収束(2pcスイッチ分散＋耐久職)への対策として、各ビルド概念を
 **上方修正のみ**で底上げし、敵に相性(マッチアップ)多様性を追加。さらに

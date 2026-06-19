@@ -112,6 +112,13 @@ export default function CasinoPage() {
         <p className="text-[10px] text-gray-400">カジノコインで遊ぶ。ダイスラッシュで一攫千金。</p>
       </div>
 
+      <Link
+        href="/casino/pachinko"
+        className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-cyan-600/80 font-bold active:scale-95"
+      >
+        🎲 甘ダイスへ
+      </Link>
+
       <div className="grid grid-cols-3 gap-2">
         {([
           ["slots", "🎲 スロット"],
@@ -150,11 +157,11 @@ export default function CasinoPage() {
 function BetSelector({
   bet,
   setBet,
-  gold,
+  coins,
 }: {
   bet: number;
   setBet: (n: number) => void;
-  gold: number;
+  coins: number;
 }) {
   return (
     <div className="flex gap-2">
@@ -162,12 +169,12 @@ function BetSelector({
         <button
           key={b}
           onClick={() => setBet(b)}
-          disabled={b > gold}
+          disabled={b > coins}
           className={`h-9 flex-1 rounded-lg text-xs font-bold active:scale-95 disabled:opacity-30 ${
             bet === b ? "bg-amber-600 text-white" : "bg-white/10 text-gray-300"
           }`}
         >
-          💰{b}
+          🎲{b}
         </button>
       ))}
     </div>
@@ -652,8 +659,8 @@ function Slots({ onPan }: { onPan: () => void }) {
 type BjPhase = "bet" | "player" | "result";
 
 function Blackjack() {
-  const gold = useGameStore((s) => s.player.gold);
-  const settle = useGameStore((s) => s.casinoSettle);
+  const coins = useGameStore((s) => s.coins);
+  const addCoins = useGameStore((s) => s.addCoins);
   const [bet, setBet] = useState(10);
   const [phase, setPhase] = useState<BjPhase>("bet");
   const [player, setPlayer] = useState<number[]>([]);
@@ -663,8 +670,8 @@ function Blackjack() {
   const [msg, setMsg] = useState("");
 
   const deal = () => {
-    if (gold < bet) return;
-    settle(-bet);
+    if (coins < bet) return;
+    addCoins(-bet);
     setPlayer([drawDie(), drawDie()]);
     setDealer([]);
     setOutcome(null);
@@ -707,7 +714,7 @@ function Blackjack() {
     if (r.won) {
       const np = pot * 2;
       setPot(np);
-      setMsg(`${PIPS[r.die]} 当たり！ ポット 💰${np}`);
+      setMsg(`${PIPS[r.die]} 当たり！ ポット 🎲${np}`);
     } else {
       setPot(0);
       setOutcome("lose");
@@ -716,7 +723,7 @@ function Blackjack() {
   };
 
   const cashOut = () => {
-    if (pot > 0) settle(pot);
+    if (pot > 0) addCoins(pot);
     setPhase("bet");
     setMsg("");
     setOutcome(null);
@@ -746,19 +753,20 @@ function Blackjack() {
           </p>
         )}
         {phase === "result" && pot > 0 && (
-          <p className="mt-1 text-center text-sm text-amber-300">ポット: 💰{pot}</p>
+          <p className="mt-1 text-center text-sm text-amber-300">ポット: 🎲{pot}</p>
         )}
       </div>
 
       {phase === "bet" && (
         <>
-          <BetSelector bet={bet} setBet={setBet} gold={gold} />
+          <div className="text-center text-xs text-amber-300">🎲 カジノコイン {fmt(coins)}</div>
+          <BetSelector bet={bet} setBet={setBet} coins={coins} />
           <button
             onClick={deal}
-            disabled={gold < bet}
+            disabled={coins < bet}
             className="h-16 rounded-2xl bg-fuchsia-600 text-xl font-extrabold text-white active:scale-95 disabled:opacity-40"
           >
-            🃏 配る（💰{bet}）
+            🃏 配る（🎲{bet}）
           </button>
           <p className="text-center text-[10px] text-gray-500">21に近づけて勝負。勝てばダブルアップに挑戦。</p>
         </>
@@ -788,7 +796,7 @@ function Blackjack() {
             </div>
           )}
           <button onClick={cashOut} className="h-16 rounded-2xl bg-amber-600 text-xl font-extrabold text-white active:scale-95">
-            {pot > 0 ? `受け取る（💰${pot}）` : "終了"}
+            {pot > 0 ? `受け取る（🎲${pot}）` : "終了"}
           </button>
         </div>
       )}
