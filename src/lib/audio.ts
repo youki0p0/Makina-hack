@@ -416,7 +416,7 @@ const IDOL_LEAD: number[] = [
 /** Per-chapter battle themes (w1…w11) plus the fixed-location themes. */
 export type WorldKey =
   | "w1" | "w2" | "w3" | "w4" | "w5" | "w6" | "w7" | "w8" | "w9" | "w10" | "w11";
-export type BgmTheme = "dungeon" | "casino" | "forge" | "boss" | "idol" | "final" | "credits" | WorldKey;
+export type BgmTheme = "dungeon" | "casino" | "forge" | "boss" | "idol" | "seaIdol" | "final" | "credits" | WorldKey;
 
 // ===== Credits theme: "Running Toward Light" (図鑑のクレジット曲) =====
 // 明るくほろ苦い D メジャー。IV→V→vi を多用し、簡単には解決しない。
@@ -505,8 +505,10 @@ interface ThemeDef {
   idol?: boolean;
   casino?: boolean;
   credits?: boolean;
+  /** 海っぽいリカラー（idolTick に波/マリンベル/明るいシマーを足す）。 */
+  sea?: boolean;
 }
-const THEMES: Record<"dungeon" | "casino" | "forge" | "boss" | "idol" | "credits", ThemeDef> = {
+const THEMES: Record<"dungeon" | "casino" | "forge" | "boss" | "idol" | "seaIdol" | "credits", ThemeDef> = {
   dungeon: { stepMs: 150, prog: PROG },
   boss: { stepMs: 124, prog: PROG },
   credits: { stepMs: CREDITS_STEP_MS, prog: CREDITS_PROG, credits: true },
@@ -515,6 +517,8 @@ const THEMES: Record<"dungeon" | "casino" | "forge" | "boss" | "idol" | "credits
   forge: { stepMs: 172, prog: FORGE_PROG, metal: true },
   // BPM≈178 → 16分音符 ≈ 84ms。専用レンダラ idolTick(BIG中=ダイスラッシュ専用BGM)。
   idol: { stepMs: 84, prog: IDOL_PROG, idol: true },
+  // 同じ Idol 曲(同BPM/同進行)を海っぽくリカラー＝甘ダイス連チャン用BGM。
+  seaIdol: { stepMs: 84, prog: IDOL_PROG, idol: true, sea: true },
 };
 let bgmTheme: BgmTheme = "dungeon";
 let bgmTranspose = 1;
@@ -710,7 +714,7 @@ function bgmTick(): void {
   } else {
     const def = THEMES[bgmTheme as keyof typeof THEMES];
     if (def.credits) creditsTick();
-    else if (def.idol) idolTick();
+    else if (def.idol) idolTick(def.sea === true);
     else if (def.metal) forgeTick();
     else if (def.casino) casinoTick();
     else dungeonTick(); // dungeon / boss (variants inside)
@@ -1250,7 +1254,7 @@ function forgeTick(): void {
 // 王道進行のアイドルポップを 16bit ゲーム音源風に。A(Aメロ)→A2(Bメロ/ビルドアップ)
 // →B(サビ)→A'(間奏) の起伏を表現。ステレオパン+共有リバーブで空間の広がりを、
 // クラップ/キラキラ上昇/ワイドstab/高域シマーで特殊アクセントを加えている。
-function idolTick(): void {
+function idolTick(sea = false): void {
   if (muted) return;
   const def = THEMES.idol;
   const T = bgmTranspose;
@@ -1375,6 +1379,36 @@ function idolTick(): void {
       // 主声(やや左) + わずかにデチューンした副声(やや右)で厚みと幅。
       slideVoice(note * 0.985 * T, note * T, 0.26, "square", lv, 0, 0.04, -0.22, 0.3);
       slideVoice(note * 0.985 * 1.006 * T, note * 1.006 * T, 0.26, "square", lv * 0.6, 0.012, 0.04, 0.22, 0.35);
+      // 海リカラー: 1oct上のサイン重ねで“海風”の倍音(エアリー)。
+      if (sea) voice(note * 2 * T, 0.28, "sine", lv * 0.3, 0.01, 0.15, 0.45);
+    }
+  }
+
+  // ================= 海っぽいリカラー（同じ Idol 曲に海の音色を足す） =================
+  // sea=false の通常 idol(ダイスラッシュAT)には一切影響しない加算レイヤー。
+  if (sea) {
+    // ① 波のウォッシュ: セクション頭で「ザァ…」と寄せる残響ノイズ(L/R)。
+    if (inBar === 0) {
+      const swell = isChorus ? 0.05 : 0.035;
+      noisePan(0.6, swell, -0.35, 0.5);
+      noisePan(0.6, swell, 0.35, 0.5);
+    }
+    // ②引き波: サビ前の最終小節で細かく引いていく波。
+    if (secPos === 7 && inBar >= 12) {
+      noisePan(0.18, 0.03, inBar % 2 ? 0.4 : -0.4, 0.45);
+    }
+    // ③ マリンベル(スティールパン風): 和音の頂点をL/Rへピンと響かせる＝南国/海の煌めき。
+    if ((isChorus || isVerse) && inBar % 2 === 0) {
+      const idx = (inBar / 2) % 4;
+      const f = chord.arp[idx] * 2 * T;
+      const pan = (inBar / 2) % 2 === 0 ? -0.5 : 0.5;
+      voice(f, 0.45, "triangle", isChorus ? 0.06 : 0.04, 0, pan, 0.45);
+      voice(f, 0.45, "sine", isChorus ? 0.03 : 0.02, 0.03, -pan, 0.5); // 逆サイドへ反響
+    }
+    // ④ 水面のきらめき: 常時うっすら高域シマー(セクション頭でロングに伸ばす)。
+    if (inBar === 0) {
+      voice(chord.root * 6 * T, 1.6, "sine", 0.018, 0, -0.7, 0.5);
+      voice(chord.root * 6 * 1.01 * T, 1.6, "sine", 0.018, 0, 0.7, 0.5);
     }
   }
 }
@@ -1486,6 +1520,7 @@ export const MUSIC_TRACKS: MusicTrack[] = [
   { id: "casino", name: "カジノ", desc: "落ち着いた煌びやかなラウンジ", theme: "casino" },
   { id: "forge", name: "鍛冶屋", desc: "重厚な D-ドリアン。金床のクランク", theme: "forge" },
   { id: "idol", name: "ダイスラッシュ (AT)", desc: "王道進行のアイドルポップ(BIG中)", theme: "idol" },
+  { id: "seaIdol", name: "甘ダイス連チャン 〜潮騒アイドル〜", desc: "同じアイドルポップを海っぽくリカラー(波/マリンベル/水面の煌めき)。甘ダイス確変中に流れる", theme: "seaIdol" },
   {
     id: "credits",
     name: "スタッフロール 〜光へ走る〜",
