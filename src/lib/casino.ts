@@ -148,6 +148,59 @@ export function pachiCeilingSpins(setting: number): number {
   return 600 - Math.max(1, Math.min(6, setting)) * 30; // 1→570 … 6→420
 }
 
+// ===== イベントデー (カレンダー連動の設定上書き) =====
+// プレイヤーの“今日”の日付(ローカルの日)で隠し設定を一時的に上書きする祭り。
+//  - 0のつく日(10/20/30): スロット＆甘ダイス両方を「polar」上書き。最優先。
+//      低設定(≤3)→1、高設定(≥4)→6 に振り分けて、台選びの明暗をくっきり。
+//  - 1のつく日(1/11/21/31): 甘ダイスのみ「boost」上書き(≤3→3, ≥4→5)。
+//  - 7のつく日(7/17/27): スロットのみ「boost」上書き。
+// 17のように1と7が重なる日は両方boost。0の日は1を含んでいても常にpolar(優先)。
+
+/** 設定の上書きモード。boost: ≤3→3,≥4→5 ／ polar: ≤3→1,≥4→6 */
+export type EventOverride = "boost" | "polar";
+
+export interface CasinoEventDay {
+  slot: EventOverride | null;
+  pachinko: EventOverride | null;
+  label: string; // 例: "1のつく日" / "7のつく日" / "1・7のつく日" / "0のつく日" / 無いとき ""
+  active: boolean;
+}
+
+/** 今日(ローカルの日)からイベント内容を判定。date 省略時は new Date()。 */
+export function casinoEvent(date?: Date): CasinoEventDay {
+  const day = String((date ?? new Date()).getDate());
+  const has0 = day.includes("0");
+  const has1 = day.includes("1");
+  const has7 = day.includes("7");
+  // 0のつく日は最優先：1を含む日(10など)でもpolar両取り。
+  if (has0) {
+    return { slot: "polar", pachinko: "polar", label: "0のつく日", active: true };
+  }
+  const slot: EventOverride | null = has7 ? "boost" : null;
+  const pachinko: EventOverride | null = has1 ? "boost" : null;
+  const label = has1 && has7 ? "1・7のつく日" : has1 ? "1のつく日" : has7 ? "7のつく日" : "";
+  return { slot, pachinko, label, active: !!(slot || pachinko) };
+}
+
+/** 隠し設定をイベントモードで上書き(null はそのまま返す)。 */
+export function overrideSetting(s: number, mode: EventOverride | null): number {
+  if (mode === "boost") return s <= 3 ? 3 : 5;
+  if (mode === "polar") return s <= 3 ? 1 : 6;
+  return s;
+}
+
+/** スロット4台の“実効”設定(イベント上書き適用後)。 */
+export function effectiveSlotSettings(bucket: number, date?: Date): number[] {
+  const mode = casinoEvent(date).slot;
+  return machineSettings(bucket).map((s) => overrideSetting(s, mode));
+}
+
+/** 甘ダイス4台の“実効”設定(イベント上書き適用後)。 */
+export function effectivePachiSettings(bucket: number, date?: Date): number[] {
+  const mode = casinoEvent(date).pachinko;
+  return pachiMachineSettings(bucket).map((s) => overrideSetting(s, mode));
+}
+
 /** 連チャンゾーン: length and BIG/REG odds boost right after an AT ends.
  * 連チャン率は控えめに(倍率・長さを下げた)。 */
 export const ZONE_SPINS = 24;

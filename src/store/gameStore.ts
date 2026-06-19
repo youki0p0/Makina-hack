@@ -92,7 +92,7 @@ import {
   SIGNATURE_WEAPON_COIN,
   SOULS_COIN,
   settingBucket,
-  machineSettings,
+  effectiveSlotSettings,
   settingMult,
   ceilingSpins,
   coinBuyCost,
@@ -1821,7 +1821,8 @@ export const useGameStore = create<GameState>((set, get) => {
       if (state.coins < cost) return null;
 
       // 設定差(隠し設定1-6) × 連チャンゾーン でBIG/REG確率を底上げ。
-      const setting = machineSettings(bucket)[state.slotMachine] ?? 1;
+      // イベントデー中は実効設定(上書き後)で抽選する。
+      const setting = effectiveSlotSettings(bucket)[state.slotMachine] ?? 1;
       const inZone = cur.zone > 0;
       const bonusMult = settingMult(setting) * (inZone ? ZONE_MULT : 1);
       // 天井: ハマるほど近づく救済(設定で天井Gが変動)。到達でBIG確定。

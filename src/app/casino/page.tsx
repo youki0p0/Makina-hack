@@ -20,8 +20,9 @@ import {
   coinBuyCost,
   coinBuyMax,
   settingBucket,
-  machineSettings,
-  pachiMachineSettings,
+  effectiveSlotSettings,
+  effectivePachiSettings,
+  casinoEvent,
   type BjOutcome,
 } from "@/lib/casino";
 import { estimateTier } from "@/data/items";
@@ -32,6 +33,7 @@ import { getSlotIconDataUrl } from "@/lib/itemIcon";
 import { slotSfx, setBgmTheme } from "@/lib/audio";
 import EnemyIcon from "@/components/EnemyIcon";
 import PixelGlyph from "@/components/PixelGlyph";
+import EventBadge from "@/components/EventBadge";
 import { fmt } from "@/lib/ui";
 import { useGameStore, type SlotSpinResult } from "@/store/gameStore";
 
@@ -88,6 +90,9 @@ export default function CasinoPage() {
     );
   }
 
+  // イベントデー判定(ローカルの日)。ヘッダーのお祭り表示・各ゲームのEVENTバッジに使う。
+  const event = casinoEvent();
+
   const onPan = () => {
     const r = daiPan();
     slotSfx("pan");
@@ -112,8 +117,15 @@ export default function CasinoPage() {
 
       <div className="rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 p-3 text-center">
         <div className="text-3xl">🎰</div>
-        <h1 className="font-bold text-fuchsia-200">カジノ</h1>
-        <p className="text-[10px] text-gray-400">カジノコインで遊ぶ。ダイスラッシュで一攫千金。</p>
+        <h1 className="flex items-center justify-center gap-1 font-bold text-fuchsia-200">
+          カジノ
+          {event.active && <EventBadge />}
+        </h1>
+        {event.active ? (
+          <p className="text-[11px] font-bold text-amber-300">🎉 {event.label}・激アツ設定デー！</p>
+        ) : (
+          <p className="text-[10px] text-gray-400">カジノコインで遊ぶ。ダイスラッシュで一攫千金。</p>
+        )}
       </div>
 
       <Link
@@ -121,6 +133,7 @@ export default function CasinoPage() {
         className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-cyan-600/80 font-bold active:scale-95"
       >
         🎲 甘ダイスへ
+        {event.pachinko && <EventBadge />}
       </Link>
 
       <div className="grid grid-cols-3 gap-2">
@@ -132,11 +145,12 @@ export default function CasinoPage() {
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`h-10 rounded-xl text-[11px] font-bold active:scale-95 ${
+            className={`flex h-10 items-center justify-center gap-1 rounded-xl text-[11px] font-bold active:scale-95 ${
               tab === k ? "bg-fuchsia-600 text-white" : "bg-white/10 text-gray-300"
             }`}
           >
             {label}
+            {k === "slots" && event.slot && <EventBadge />}
           </button>
         ))}
       </div>
@@ -856,7 +870,8 @@ function CoinShop() {
     const pick = Math.floor(Math.random() * (MACHINE_COUNT * 2)); // 0..7
     const isSlot = pick < MACHINE_COUNT;
     const m = pick % MACHINE_COUNT;
-    const s = (isSlot ? machineSettings(bucket) : pachiMachineSettings(bucket))[m];
+    // 看破はイベント上書き後の“実効設定”を暴く（実際に効いている値と一致させる）。
+    const s = (isSlot ? effectiveSlotSettings(bucket) : effectivePachiSettings(bucket))[m];
     try {
       let store: { bucket: number; slot: Record<number, number>; pachi: Record<number, number> } = {
         bucket,

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect } from "react";
 import SoundToggle from "@/components/SoundToggle";
 import PixelGlyph from "@/components/PixelGlyph";
+import EventBadge from "@/components/EventBadge";
+import { casinoEvent } from "@/lib/casino";
 import { FINAL_FLOOR } from "@/data/worlds";
 import { isFeatureUnlocked, FEATURE_UNLOCKS } from "@/data/unlocks";
 import { getDailyBonus } from "@/lib/daily";
@@ -149,6 +151,7 @@ export default function TitlePage() {
               className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-fuchsia-600/80 font-bold active:scale-95"
             >
               <PixelGlyph kind="casino" size={18} /> カジノ
+              {casinoEvent().active && <EventBadge />}
             </Link>
           ) : (
             <div className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/5 text-sm text-gray-500">
