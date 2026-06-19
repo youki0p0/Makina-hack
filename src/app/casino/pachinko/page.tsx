@@ -247,14 +247,28 @@ export default function PachinkoPage() {
         <span className="text-lg font-black text-amber-300">玉 {fmt(balls)}</span>
       </div>
 
-      {/* 主役: 中央モニター */}
-      <div className="relative">
-        <PachinkoReels ref={reelsRef} effects={effects} reduced={reduced} />
-        {/* ラウンド制アタッカー出玉オーバーレイ */}
+      {/* 盤面が中央モニターを囲む“ひとつの台”。役物の窪みに図柄オーバーレイを重ねる。 */}
+      <div className="relative w-full">
+        <PachinkoBoard ref={boardRef} onPocket={onPocket} reduced={reduced} denchu={complete} />
+        <div
+          className="absolute"
+          style={{
+            left: `${(BOARD.monitorX / BOARD.width) * 100}%`,
+            top: `${(BOARD.monitorY / BOARD.height) * 100}%`,
+            width: `${(BOARD.monitorW / BOARD.width) * 100}%`,
+            height: `${(BOARD.monitorH / BOARD.height) * 100}%`,
+          }}
+        >
+          <PachinkoReels ref={reelsRef} effects={effects} reduced={reduced} />
+        </div>
+        {/* ラウンド制アタッカー出玉オーバーレイ（役物直下） */}
         {bonus && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-1 z-20 text-center">
+          <div
+            className="pointer-events-none absolute inset-x-0 z-20 text-center"
+            style={{ top: `${((BOARD.monitorY + BOARD.monitorH + 2) / BOARD.height) * 100}%` }}
+          >
             <span
-              className="rounded-full px-3 py-0.5 text-sm font-black text-black"
+              className="rounded-full px-3 py-0.5 text-xs font-black text-black"
               style={{ background: bonus.color }}
             >
               {bonus.label}　ROUND {bonus.round}/{bonus.rounds}
@@ -263,10 +277,9 @@ export default function PachinkoPage() {
         )}
       </div>
 
-      <p className="-mb-1 text-center text-[10px] text-cyan-300/70">
-        ▲ 玉がヘソ(中央)に入ると変動！ ステージ中央のワープに乗ると吸い込み濃厚
+      <p className="text-center text-[10px] text-cyan-300/70">
+        玉がヘソ(中央)に入ると変動！ ステージ中央のワープに乗ると吸い込み濃厚
       </p>
-      <PachinkoBoard ref={boardRef} onPocket={onPocket} reduced={reduced} denchu={complete} />
 
       <div className="rounded-xl border border-amber-400/20 bg-black/40">
         <PayoutParticles ref={particlesRef} reduced={reduced} />

@@ -25,7 +25,7 @@ export const PACHINKO_CONFIG = {
  */
 export const BOARD = {
   width: 320,
-  height: 240,
+  height: 372,
   ballRadius: 5,
   pegRadius: 2.6,
   /** 1ステップあたりの重力加速。 */
@@ -34,24 +34,28 @@ export const BOARD = {
   bounce: 0.5,
   /** 速度減衰。 */
   friction: 0.995,
-  /** 発射口（左上＝左上打ち）。 */
-  launchX: 20,
+  /** 発射口（左下のレール基点。描画演出用）。 */
+  launchX: 10,
   launchY: 12,
-  /** 発射初速（右下へ流す＝左上打ち）。 */
-  launchVX: 1.8,
-  launchVY: 0.5,
-  /** 発射初速のばらつき（打ち加減のブレ）。 */
-  launchJitter: 0.6,
+  /**
+   * 中央モニター（主役のセンター役物）。盤面の上半分を大きく占有し、ここに図柄
+   * オーバーレイを重ねる。玉は天から落ちて“役物の裏”を通り、下のステージから出る
+   * （実機の見え方）。盤面はこの周囲を囲む。
+   */
+  monitorX: 38,
+  monitorY: 10,
+  monitorW: 244,
+  monitorH: 172,
   /** スタートチャッカー（中央下の入賞口=ヘソ。モニター直下）。 */
   pocketX: 160,
-  pocketY: 206,
+  pocketY: 300,
   pocketW: 50,
   pocketH: 20,
   /**
    * ステージ＆ワープ（海物語の肝）。モニター直下の舞台に玉が乗り、中央へ転がって
    * ワープから落ちるとヘソに吸い込まれやすい。
    */
-  stageY: 150,
+  stageY: 244,
   /** ステージの左右半幅（pocketX ± stageHalf に乗る＝ワープ入口は狭い）。 */
   stageHalf: 16,
   /** 中央ワープの半幅（|x-pocketX| < warpHalf で吸い込み落下）。 */

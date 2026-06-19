@@ -1,7 +1,7 @@
 // ===== 軽量物理（純粋関数 / Matter.js 不使用） =====
-// 海物語の肝「ステージ＆ワープ」を再現: 玉はモニター直下の舞台(ステージ)に乗り、
-// 中央へ転がってワープから落ちるとヘソ(入賞口)に吸い込まれやすい。
-// 舞台に乗れずこぼれた玉は釘を流れてほぼハズレ＝入賞のドキドキ。
+// 玉は天(上部)から落ち、大きなセンター役物(モニター)の裏を通って、その直下の
+// ステージ＆ワープへ。中央ワープに乗るとヘソ(入賞口)へ吸い込み濃厚＝海物語の肝。
+// 役物の周りを盤面の釘が囲む。スマホ最優先で円-円反射のみの簡易物理。
 
 import { BOARD, type BoardGeom } from "./config";
 
@@ -24,38 +24,38 @@ export interface Peg {
 export type BallEvent = "pocket" | "fall" | null;
 
 /**
- * ピン配置。上部は千鳥の「道釘」で玉を中央へ流す。ステージ帯には釘を置かず玉が
- * 乗れるようにし、ヘソ直上に風車釘（最後の関門）を置く。
+ * ピン配置。役物直下〜ヘソの「見えるプレイ領域」に道釘の千鳥格子、ステージ脇の
+ * こぼし釘、ヘソ直上の風車釘を置く。役物の上(天)は空けて玉を落とす。
  */
 export function buildPegs(board: BoardGeom = BOARD): Peg[] {
   const pegs: Peg[] = [];
-  // 上部の道釘（千鳥格子。玉を散らしつつステージへ落とす）。
-  const top = 46;
-  const bottom = board.stageY - 18;
-  const rows = 4;
+  const monBottom = board.monitorY + board.monitorH;
+  // 道釘（役物直下からステージ手前まで）。
+  const top = monBottom + 8;
+  const bottom = board.stageY - 16;
+  const rows = 3;
   const rowGap = (bottom - top) / (rows - 1);
   const colGap = 30;
   for (let r = 0; r < rows; r++) {
     const y = top + r * rowGap;
     const offset = r % 2 === 0 ? 0 : colGap / 2;
-    for (let x = 22 + offset; x < board.width - 16; x += colGap) {
+    for (let x = 24 + offset; x < board.width - 18; x += colGap) {
       const jitter = (((r * 7 + x) % 5) - 2) * 0.8;
       pegs.push({ x: x + jitter, y });
     }
   }
-  // ステージ両脇の「こぼし釘」（端から落ちた玉を外側へ逃がす＝ハズレ動線）。
-  const sideY = board.stageY + 16;
-  pegs.push({ x: board.pocketX - board.stageHalf - 10, y: sideY });
-  pegs.push({ x: board.pocketX + board.stageHalf + 10, y: sideY });
-  pegs.push({ x: board.pocketX - board.stageHalf - 24, y: sideY + 22 });
-  pegs.push({ x: board.pocketX + board.stageHalf + 24, y: sideY + 22 });
-  // ヘソ直上の風車釘（最後の関門。入口を少し広めにして直撃ルートを渋く＝多くはこぼれる）。
+  // ステージ両脇のこぼし釘（端から落ちた玉を外へ＝ハズレ動線）。
+  pegs.push({ x: board.pocketX - board.stageHalf - 18, y: board.stageY + 18 });
+  pegs.push({ x: board.pocketX + board.stageHalf + 18, y: board.stageY + 18 });
+  pegs.push({ x: board.pocketX - board.stageHalf - 34, y: board.stageY + 40 });
+  pegs.push({ x: board.pocketX + board.stageHalf + 34, y: board.stageY + 40 });
+  // ヘソ直上の風車釘（最後の関門・少し広め＝直撃は渋い）。
   pegs.push({ x: board.pocketX - board.pocketW / 2 - 9, y: board.pocketY - 12 });
   pegs.push({ x: board.pocketX + board.pocketW / 2 + 9, y: board.pocketY - 12 });
   return pegs;
 }
 
-/** 1球を生成。左上打ちした玉はレール（描画演出）で盤面上部「天」へ運ばれ落下。 */
+/** 1球を生成。左上打ち→レール(描画演出)で天へ→中央寄りに落下。 */
 export function launchBall(board: BoardGeom = BOARD, rng: () => number = Math.random): Ball {
   const spread = 150;
   const dropX = board.pocketX - 6 + (rng() - 0.5) * spread;
@@ -85,12 +85,11 @@ export function stepBall(
   // ===== ステージ＆ワープ =====
   if (ball.onStage) {
     const dir = ball.x < board.pocketX ? 1 : -1;
-    ball.vx += dir * 0.07; // 中央へ転がる
+    ball.vx += dir * 0.07;
     ball.vx *= 0.95;
     ball.x += ball.vx;
     ball.y = board.stageY;
     if (Math.abs(ball.x - board.pocketX) < board.warpHalf) {
-      // ワープ＝中央から吸い込み落下（ヘソ濃厚）。着地帯より下へ抜けて再着地を防ぐ。
       ball.onStage = false;
       ball.x = board.pocketX;
       ball.vx = 0;
@@ -100,7 +99,6 @@ export function stepBall(
       ball.x < board.pocketX - board.stageHalf ||
       ball.x > board.pocketX + board.stageHalf
     ) {
-      // 端からこぼれて通常落下へ（ほぼハズレ）。
       ball.onStage = false;
       ball.vy = 0.4;
     }
@@ -121,7 +119,7 @@ export function stepBall(
     ball.vx = -Math.abs(ball.vx) * board.bounce;
   }
 
-  // ステージへの着地（上から落ちてきて中央帯に入ったら乗る）。
+  // ステージへの着地（上から落ちて中央帯に入ったら乗る）。
   if (
     ball.vy > 0 &&
     ball.y >= board.stageY &&
@@ -151,7 +149,9 @@ export function stepBall(
       const vDotN = ball.vx * nx + ball.vy * ny;
       ball.vx = (ball.vx - 2 * vDotN * nx) * board.bounce;
       ball.vy = (ball.vy - 2 * vDotN * ny) * board.bounce;
-      ball.vx += nx * 0.3;
+      // 真上に乗ってバランスするのを防ぐため必ず左右へ蹴り出す。
+      const sign = nx >= 0 ? 1 : -1;
+      ball.vx += nx * 0.3 + sign * 0.25;
       break;
     }
   }

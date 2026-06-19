@@ -122,8 +122,8 @@ const PachinkoReels = forwardRef<
   }));
 
   return (
-    <div className="relative rounded-2xl border-4 border-cyan-500/40 bg-[#04101c] p-3 shadow-[0_0_24px_rgba(34,211,238,.25)_inset]">
-      <p className="mb-1 text-center text-[9px] tracking-widest text-cyan-400/70">▼ MONITOR ▼</p>
+    <div className="relative flex h-full w-full flex-col rounded-xl bg-[#04101c]/80 p-2">
+      <p className="text-center text-[8px] tracking-widest text-cyan-400/70">▼ MONITOR ▼</p>
       {group === "makina" ? (
         // 神機マキナ群＝魚群相当の全画面カットイン（激熱/当確級）。
         <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-black/55 animate-pulse">
@@ -138,7 +138,7 @@ const PachinkoReels = forwardRef<
         </div>
       ) : null}
 
-      <div className="flex items-stretch justify-center gap-2 pt-3">
+      <div className="flex min-h-0 flex-1 items-stretch justify-center gap-1.5 pt-1">
         {cells.map((id, i) => {
           const s = getSymbol(id);
           const isStopped = stopped[i];
@@ -146,7 +146,7 @@ const PachinkoReels = forwardRef<
           return (
             <div
               key={i}
-              className={`flex h-32 flex-1 flex-col items-center justify-center rounded-xl border-2 ${
+              className={`flex h-full flex-1 flex-col items-center justify-center rounded-lg border-2 ${
                 isStopped ? "" : "blur-[1.5px]"
               } ${reach && i === 2 && !isStopped ? "animate-pulse" : ""}`}
               style={{ borderColor: s.color, background: `${s.color}22` }}
@@ -155,15 +155,15 @@ const PachinkoReels = forwardRef<
                 <img
                   src={url}
                   alt={s.name}
-                  width={64}
-                  height={64}
+                  width={44}
+                  height={44}
                   draggable={false}
-                  style={{ width: 64, height: 64, imageRendering: "pixelated" }}
+                  style={{ width: 44, height: 44, imageRendering: "pixelated" }}
                 />
               ) : (
-                <span className="block h-16 w-16 rounded bg-white/5" />
+                <span className="block h-11 w-11 rounded bg-white/5" />
               )}
-              <span className="mt-1 text-[10px] font-bold text-gray-200">{s.name}</span>
+              <span className="mt-0.5 text-[8px] font-bold text-gray-200">{s.name}</span>
             </div>
           );
         })}

@@ -64,21 +64,48 @@ const PachinkoBoard = forwardRef<
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, BOARD.width, BOARD.height);
 
-        // 左上打ちのレール（左下の発射口 → 左を上って → 天＝中央上へ）。
+        // 中央モニター（センター役物）の窪み。ここに図柄オーバーレイが重なる。
+        const mX = BOARD.monitorX;
+        const mY = BOARD.monitorY;
+        const mW = BOARD.monitorW;
+        const mH = BOARD.monitorH;
+        ctx.fillStyle = "#02080f";
+        ctx.fillRect(mX, mY, mW, mH);
+        ctx.strokeStyle = "#2b6c86";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(mX, mY, mW, mH);
+        ctx.lineWidth = 1;
+
+        // 役物を囲む装飾釘（左右の縁＋役物直下の天釘）。
+        ctx.fillStyle = "#7d97ad";
+        const frameNails: Array<[number, number]> = [];
+        for (let y = mY + 14; y < mY + mH - 8; y += 26) {
+          frameNails.push([14, y], [BOARD.width - 14, y]); // 左右の縁
+        }
+        for (let x = mX + 18; x < mX + mW - 12; x += 30) {
+          frameNails.push([x, mY + mH + 10]); // 役物直下の天釘
+        }
+        for (const [x, y] of frameNails) {
+          ctx.beginPath();
+          ctx.arc(x, y, BOARD.pegRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 左上打ちのレール（左下の発射口 → 左の縁を上って → 天＝役物上へ）。
         ctx.strokeStyle = "rgba(255,207,51,.4)";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(10, BOARD.height - 18);
-        ctx.lineTo(10, 14);
-        ctx.quadraticCurveTo(10, 7, BOARD.pocketX - 8, 7);
+        ctx.moveTo(8, BOARD.height - 18);
+        ctx.lineTo(8, 12);
+        ctx.quadraticCurveTo(8, 5, BOARD.pocketX - 8, 5);
         ctx.stroke();
         ctx.lineWidth = 1;
         ctx.fillStyle = "#ffcf33";
         ctx.beginPath();
-        ctx.arc(10, BOARD.height - 18, 5, 0, Math.PI * 2); // 発射口（左下）
+        ctx.arc(8, BOARD.height - 18, 5, 0, Math.PI * 2); // 発射口（左下）
         ctx.fill();
 
-        // ピン。
+        // プレイ領域の道釘。
         ctx.fillStyle = "#8fb3d9";
         for (const p of pegs.current) {
           ctx.beginPath();
