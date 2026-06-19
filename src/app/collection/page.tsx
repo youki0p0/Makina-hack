@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ACHIEVEMENTS, achievedCount } from "@/data/achievements";
 import { BESTIARY_BOSSES, ENEMY_ABILITY_LABEL, ENEMY_TEMPLATES } from "@/data/enemies";
 import { ITEMS } from "@/data/items";
 import {
@@ -27,14 +26,13 @@ import {
 } from "@/lib/audio";
 import { useGameStore } from "@/store/gameStore";
 
-type Tab = "achievements" | "items" | "sets" | "enemies" | "titles" | "music";
+type Tab = "achievements" | "items" | "sets" | "enemies" | "music";
 
 const TAB_LABEL: Record<Tab, string> = {
   achievements: "実績",
   items: "装備",
   sets: "セット",
   enemies: "敵",
-  titles: "称号",
   music: "音楽",
 };
 
@@ -104,8 +102,8 @@ export default function CollectionPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-6 gap-1">
-        {(["achievements", "items", "sets", "enemies", "titles", "music"] as Tab[]).map((t) => (
+      <div className="grid grid-cols-5 gap-1">
+        {(["achievements", "items", "sets", "enemies", "music"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -145,26 +143,46 @@ export default function CollectionPage() {
             })}
           </div>
 
-          <p className="pt-1 text-xs text-gray-400">
-            達成 {achievedCount(progress)} / {ACHIEVEMENTS.length}
-          </p>
-          {ACHIEVEMENTS.map((a) => {
-            const done = a.check(progress);
-            return (
-              <div
-                key={a.id}
-                className={`flex items-center gap-3 rounded-xl border p-2 ${
-                  done ? "border-amber-500/50 bg-amber-500/10" : "border-white/10 bg-black/20 opacity-60"
-                }`}
-              >
-                <span className="text-2xl">{done ? a.icon : <PixelGlyph kind="lock" size={20} />}</span>
-                <div className="min-w-0">
-                  <p className={`font-bold ${done ? "text-amber-200" : "text-gray-400"}`}>{a.name}</p>
-                  <p className="text-[10px] text-gray-400">{a.desc}</p>
-                </div>
-              </div>
-            );
-          })}
+          {/* 称号（旧・称号タブを統合）。獲得で転生ポイント、名前の前に表示。 */}
+          <div className="pt-2">
+            <p className="text-xs font-bold text-amber-200">称号</p>
+            <p className="text-[11px] text-gray-400">
+              名前の前に表示される称号を選べる。獲得すると転生ポイント(0.5〜1)を獲得。
+            </p>
+            <p className="mt-0.5 text-[11px] text-amber-300">
+              獲得 {TITLES.filter((t) => t.tier && isTitleUnlocked(t.id, progress)).length} / {TITLES.filter((t) => t.tier).length}
+            </p>
+          </div>
+          <div className="space-y-2">
+            {TITLES.map((t) => {
+              const unlocked = isTitleUnlocked(t.id, progress);
+              const current = t.id === titleId;
+              // Hidden titles stay masked (name + desc) until unlocked.
+              const mask = !unlocked && t.hidden;
+              return (
+                <button
+                  key={t.id || "none"}
+                  onClick={() => unlocked && setTitle(t.id)}
+                  disabled={!unlocked}
+                  className={`flex w-full items-center justify-between gap-2 rounded-xl border p-2 text-left active:scale-[0.98] disabled:opacity-50 ${
+                    current ? "border-amber-500/60 bg-amber-500/10" : "border-white/10 bg-black/20"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className={`font-bold ${current ? "text-amber-200" : unlocked ? "text-gray-100" : "text-gray-500"}`}>
+                      {unlocked ? `《${t.name}》` : <><PixelGlyph kind="lock" size={12} /> ???</>}
+                    </p>
+                    <p className="text-[10px] text-gray-400">{mask ? "??????（隠し称号）" : t.desc}</p>
+                  </div>
+                  {current ? (
+                    <span className="shrink-0 text-[10px] text-amber-300">選択中</span>
+                  ) : t.tier ? (
+                    <span className="shrink-0 text-[10px] text-violet-300">転生+{titleSouls(t)}</span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -253,45 +271,6 @@ export default function CollectionPage() {
                   <p className="text-[10px] text-gray-400">{found ? e.desc : "未発見の敵"}</p>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {tab === "titles" && (
-        <div className="space-y-2">
-          <p className="text-xs text-gray-400">
-            名前の前に表示される称号を選べる。獲得すると転生ポイント(0.5〜1)を獲得。
-          </p>
-          <p className="text-[11px] text-amber-300">
-            獲得 {TITLES.filter((t) => t.tier && isTitleUnlocked(t.id, progress)).length} / {TITLES.filter((t) => t.tier).length}
-          </p>
-          {TITLES.map((t) => {
-            const unlocked = isTitleUnlocked(t.id, progress);
-            const current = t.id === titleId;
-            // Hidden titles stay masked (name + desc) until unlocked.
-            const mask = !unlocked && t.hidden;
-            return (
-              <button
-                key={t.id || "none"}
-                onClick={() => unlocked && setTitle(t.id)}
-                disabled={!unlocked}
-                className={`flex w-full items-center justify-between gap-2 rounded-xl border p-2 text-left active:scale-[0.98] disabled:opacity-50 ${
-                  current ? "border-amber-500/60 bg-amber-500/10" : "border-white/10 bg-black/20"
-                }`}
-              >
-                <div className="min-w-0">
-                  <p className={`font-bold ${current ? "text-amber-200" : unlocked ? "text-gray-100" : "text-gray-500"}`}>
-                    {unlocked ? `《${t.name}》` : <><PixelGlyph kind="lock" size={12} /> ???</>}
-                  </p>
-                  <p className="text-[10px] text-gray-400">{mask ? "??????（隠し称号）" : t.desc}</p>
-                </div>
-                {current ? (
-                  <span className="shrink-0 text-[10px] text-amber-300">選択中</span>
-                ) : t.tier ? (
-                  <span className="shrink-0 text-[10px] text-violet-300">転生+{titleSouls(t)}</span>
-                ) : null}
-              </button>
             );
           })}
         </div>
