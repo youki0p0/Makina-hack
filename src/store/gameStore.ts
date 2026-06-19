@@ -72,8 +72,6 @@ import {
   SCRAP_VALUE,
 } from "@/lib/loot";
 import {
-  FATE_WIN_CHANCE,
-  fateCost,
   COIN_VALUE,
   SLOT_BET,
   GASE_REACH_CHANCE,
@@ -252,12 +250,6 @@ function equippedResist(eq: EquippedItems): { poison: number; stun: number } {
   }
   return { poison: Math.min(0.9, poison), stun: Math.min(0.9, stun) };
 }
-
-/** Outcome of a 運命の大博打 spin. */
-export type FateResult =
-  | { kind: "lose"; cost: number }
-  | { kind: "item"; cost: number; item: Equipment }
-  | { kind: "souls"; cost: number; souls: number };
 
 /** Result of one slot spin (the RNG is resolved up-front; the UI animates it). */
 export interface SlotSpinResult {
@@ -458,8 +450,6 @@ interface GameState {
 
   // casino
   casinoSettle: (goldDelta: number, prize?: Equipment | null) => void;
-  /** 運命の大博打: spend gold for a tiny chance at huge reward (★+2 gear or souls). */
-  fateGamble: () => FateResult;
   /** Buy slot coins with gold (price scales with held coins). */
   buyCoins: (coinAmount: number) => void;
   /** Buy as many coins as the current gold allows (全購入). */
@@ -1735,64 +1725,6 @@ export const useGameStore = create<GameState>((set, get) => {
         progress,
       });
       persist();
-    },
-
-    fateGamble: (): FateResult => {
-      const state = get();
-      // Reference power = the player's current best owned gear (equipped + bag).
-      let refTier = 0;
-      let refMod = 0;
-      const consider = (it: Equipment | null) => {
-        if (!it) return;
-        refTier = Math.max(refTier, estimateTier(it));
-        refMod = Math.max(refMod, it.modTier ?? 0);
-      };
-      for (const slot of EQUIP_SLOTS) consider(state.equipped[slot]);
-      for (const it of state.inventory) consider(it);
-
-      const cost = fateCost(refTier);
-      if (state.player.gold < cost) return { kind: "lose", cost };
-
-      const goldLeft = state.player.gold - cost;
-
-      // Almost always a loss — that's the thrill.
-      if (Math.random() >= FATE_WIN_CHANCE) {
-        set({ player: { ...state.player, gold: goldLeft } });
-        persist();
-        return { kind: "lose", cost };
-      }
-
-      // Jackpot! 75% a piece of gear two stars above your best, 25% souls.
-      if (Math.random() < 0.75) {
-        const slot = EQUIP_SLOTS[Math.floor(Math.random() * EQUIP_SLOTS.length)];
-        const tier = Math.max(refTier, 30);
-        const item = applyModifier(genItem(slot, tier), refMod + 2);
-        const capped = capInventory([...state.inventory, item], state.favorites);
-        set({
-          player: { ...state.player, gold: goldLeft },
-          inventory: capped.kept,
-          gachaPoints: state.gachaPoints + capped.material,
-          progress: {
-            ...state.progress,
-            jackpots: state.progress.jackpots + 1,
-            fateWins: state.progress.fateWins + 1,
-            discoveredItems: discover(state.progress.discoveredItems, item.id),
-          },
-        });
-        applyTitleGrants();
-        persist();
-        return { kind: "item", cost, item };
-      }
-
-      const souls = 3 + Math.floor(Math.random() * 4); // 3–6 転生ポイント
-      set({
-        player: { ...state.player, gold: goldLeft },
-        souls: state.souls + souls,
-        progress: { ...state.progress, jackpots: state.progress.jackpots + 1, fateWins: state.progress.fateWins + 1 },
-      });
-      applyTitleGrants();
-      persist();
-      return { kind: "souls", cost, souls };
     },
 
     buyCoins: (coinAmount: number) => {

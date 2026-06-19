@@ -285,21 +285,6 @@ export function pickReach(win: boolean): ReachDef {
 /** Chance a losing spin still shows a (gase) reach, for tension. */
 export const GASE_REACH_CHANCE = 0.1;
 
-// ===== 運命の大博打 (Fate gamble) =====
-// 期待値超低めの一撃必殺コンテンツ。ハズレ続きで、まれに「所持している★より2段階上」の
-// 装備 or 転生ポイントが出る。長め・派手な演出は UI 側（FatePanel）が担う。
-
-/** Win chance per spin. Deliberately tiny — most pulls are losses. */
-export const FATE_WIN_CHANCE = 0.08;
-
-/**
- * Gold cost of one Fate spin. Scales with the player's current best gear tier so
- * it stays an expensive sink late-game (gold is plentiful by then).
- */
-export function fateCost(refTier: number): number {
-  return Math.max(3000, Math.round(Math.max(0, refTier) * 80));
-}
-
 // ===== dice blackjack =====
 
 export const BJ_TARGET = 21;

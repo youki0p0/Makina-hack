@@ -8,7 +8,6 @@ import {
   dealerPlay,
   doubleUp,
   drawDie,
-  fateCost,
   COIN_VALUE,
   SLOT_BET,
   DAIPAN_LIMIT,
@@ -30,7 +29,7 @@ import { slotSfx, setBgmTheme } from "@/lib/audio";
 import EnemyIcon from "@/components/EnemyIcon";
 import PixelGlyph from "@/components/PixelGlyph";
 import { fmt } from "@/lib/ui";
-import { useGameStore, type FateResult, type SlotSpinResult } from "@/store/gameStore";
+import { useGameStore, type SlotSpinResult } from "@/store/gameStore";
 
 const PIPS = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 const BETS = [10, 50, 100];
@@ -43,7 +42,7 @@ export default function CasinoPage() {
   const bossKills = useGameStore((s) => s.progress.bossKills);
   const atGames = useGameStore((s) => s.atGames);
   const daiPan = useGameStore((s) => s.daiPan);
-  const [tab, setTab] = useState<"slots" | "bj" | "fate" | "shop">("slots");
+  const [tab, setTab] = useState<"slots" | "bj" | "shop">("slots");
   const [shaking, setShaking] = useState(false);
   const [panMsg, setPanMsg] = useState<string | null>(null);
   const shakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -113,11 +112,10 @@ export default function CasinoPage() {
         <p className="text-[10px] text-gray-400">カジノコインで遊ぶ。ダイスラッシュで一攫千金。</p>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {([
           ["slots", "🎲 スロット"],
           ["bj", "🃏 BJ"],
-          ["fate", "🔮 運命"],
           ["shop", "🪙 交換所"],
         ] as const).map(([k, label]) => (
           <button
@@ -136,8 +134,6 @@ export default function CasinoPage() {
         <Slots onPan={onPan} />
       ) : tab === "bj" ? (
         <Blackjack />
-      ) : tab === "fate" ? (
-        <FatePanel />
       ) : (
         <CoinShop />
       )}
@@ -935,137 +931,3 @@ function CoinShop() {
   );
 }
 
-// ===== 運命の大博打 (Fate gamble) =====
-
-const FATE_GLYPHS = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅", "💀", "🔮", "✦", "🌈", "💎", "👑"];
-
-function FatePanel() {
-  const gold = useGameStore((s) => s.player.gold);
-  const equipped = useGameStore((s) => s.equipped);
-  const inventory = useGameStore((s) => s.inventory);
-  const gamble = useGameStore((s) => s.fateGamble);
-
-  const [spinning, setSpinning] = useState(false);
-  const [glyphs, setGlyphs] = useState<string[]>(["🔮", "🔮", "🔮"]);
-  const [result, setResult] = useState<FateResult | null>(null);
-  const timers = useRef<ReturnType<typeof setInterval>[]>([]);
-
-  // Reference power = the player's current best owned gear → drives the price.
-  const refTier = useMemo(() => {
-    let t = 0;
-    for (const slot of EQUIP_SLOTS) {
-      const it = equipped[slot];
-      if (it) t = Math.max(t, estimateTier(it));
-    }
-    for (const it of inventory) t = Math.max(t, estimateTier(it));
-    return t;
-  }, [equipped, inventory]);
-
-  const cost = fateCost(refTier);
-  const canAfford = gold >= cost && !spinning;
-
-  useEffect(() => {
-    return () => timers.current.forEach(clearInterval);
-  }, []);
-
-  const spin = () => {
-    if (!canAfford) return;
-    const r = gamble(); // RNG decided up-front; the animation is pure suspense.
-    if (r.cost > gold) return;
-    setResult(null);
-    setSpinning(true);
-
-    const cycle = setInterval(() => {
-      setGlyphs([
-        FATE_GLYPHS[Math.floor(Math.random() * FATE_GLYPHS.length)],
-        FATE_GLYPHS[Math.floor(Math.random() * FATE_GLYPHS.length)],
-        FATE_GLYPHS[Math.floor(Math.random() * FATE_GLYPHS.length)],
-      ]);
-    }, 80);
-    timers.current.push(cycle);
-
-    // Long, flashy reveal (~2.6s).
-    const finish = setTimeout(() => {
-      clearInterval(cycle);
-      const face =
-        r.kind === "item" ? "💎" : r.kind === "souls" ? "🌈" : "💀";
-      setGlyphs([face, face, face]);
-      setSpinning(false);
-      setResult(r);
-    }, 2600);
-    timers.current.push(finish as unknown as ReturnType<typeof setInterval>);
-  };
-
-  const won = result && result.kind !== "lose";
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div
-        className={`relative overflow-hidden rounded-2xl border p-5 text-center transition-colors ${
-          spinning
-            ? "border-amber-400/60 bg-gradient-to-br from-amber-500/20 via-fuchsia-600/20 to-rose-600/20"
-            : won
-              ? "border-amber-300 bg-gradient-to-br from-amber-400/30 to-rose-500/30"
-              : "border-white/10 bg-black/40"
-        }`}
-      >
-        <div
-          className={`flex justify-center gap-2 text-5xl ${
-            spinning ? "animate-pulse" : won ? "fate-pop" : ""
-          }`}
-        >
-          {glyphs.map((g, i) => (
-            <span key={i}>{g}</span>
-          ))}
-        </div>
-
-        {spinning && (
-          <p className="mt-3 animate-pulse text-sm font-bold text-amber-200">
-            運命を回しています…
-          </p>
-        )}
-
-        {result && !spinning && (
-          <div className="mt-3">
-            {result.kind === "item" && (
-              <>
-                <p className="text-lg font-extrabold text-amber-300">🎉 大当たり！</p>
-                <p className="mt-1 text-sm font-bold text-amber-200">
-                  💎 {result.item.name} を獲得！
-                </p>
-              </>
-            )}
-            {result.kind === "souls" && (
-              <>
-                <p className="text-lg font-extrabold text-fuchsia-300">🎉 大当たり！</p>
-                <p className="mt-1 text-sm font-bold text-fuchsia-200">
-                  🌈 転生ポイント +{result.souls}！
-                </p>
-              </>
-            )}
-            {result.kind === "lose" && (
-              <p className="text-lg font-extrabold text-gray-400">💀 ハズレ…</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-xl border border-white/10 bg-black/20 p-2 text-[10px] leading-relaxed text-gray-400">
-        🔮 <b className="text-amber-300">運命の大博打</b>：超低確率・特大報酬。
-        当たれば<b className="text-amber-200">所持している★より2段階上の装備</b>、
-        または<b className="text-fuchsia-200">転生ポイント</b>。ほとんどはハズレ。
-      </div>
-
-      <button
-        onClick={spin}
-        disabled={!canAfford}
-        className="h-16 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-600 text-xl font-extrabold text-white shadow-lg active:scale-95 disabled:opacity-40"
-      >
-        🔮 運命を回す（💰{fmt(cost)}）
-      </button>
-      {gold < cost && (
-        <p className="text-center text-[10px] text-red-300">ゴールドが足りません。</p>
-      )}
-    </div>
-  );
-}
