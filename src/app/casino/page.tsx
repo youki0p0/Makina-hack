@@ -18,7 +18,6 @@ import {
   SETTING_TIP_COIN,
   HIT_WINDOW_MS,
   coinBuyCost,
-  coinBuyMax,
   settingBucket,
   effectiveSlotSettings,
   effectivePachiSettings,
@@ -308,7 +307,6 @@ function Slots({ onPan }: { onPan: () => void }) {
   const slotHits = useGameStore((s) => s.slotHits);
   const selectMachine = useGameStore((s) => s.selectMachine);
   const buyCoins = useGameStore((s) => s.buyCoins);
-  const buyCoinsAll = useGameStore((s) => s.buyCoinsAll);
   const cashout = useGameStore((s) => s.cashoutCoins);
   const slotSpin = useGameStore((s) => s.slotSpin);
 
@@ -509,11 +507,11 @@ function Slots({ onPan }: { onPan: () => void }) {
           +200（💰{fmt(coinBuyCost(200, coins))}）
         </button>
         <button
-          onClick={buyCoinsAll}
-          disabled={spinning || coinBuyMax(gold, coins) <= 0}
-          className="h-9 flex-1 rounded-lg bg-amber-500 text-[11px] font-extrabold text-black active:scale-95 disabled:opacity-30"
+          onClick={() => buyCoins(1000)}
+          disabled={spinning || gold < coinBuyCost(1000, coins)}
+          className="h-9 flex-1 rounded-lg bg-amber-600/80 text-[11px] font-bold text-white active:scale-95 disabled:opacity-30"
         >
-          全購入（+{fmt(coinBuyMax(gold, coins))}）
+          +1000（💰{fmt(coinBuyCost(1000, coins))}）
         </button>
         <button
           onClick={cashout}

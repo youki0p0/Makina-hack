@@ -128,11 +128,14 @@ describe("slot machine (パチスロ4号機フレーバー)", () => {
   });
 
   it("カジノコインの買値は所持枚数が多いほど割高(買いづらく)", () => {
-    // 0枚のときは基本レート、保有が増えるほど単価が上がる。
-    expect(coinBuyCost(50, 0)).toBe(50 * COIN_VALUE);
+    // 0枚からでも、まとめ買いは購入中に単価が逓増する→基本レートより必ず高い。
+    // （全換金→0枚にして20:1で買い戻す裁定グリッチを封じる。）
+    expect(coinBuyCost(50, 0)).toBeGreaterThan(50 * COIN_VALUE);
     expect(coinBuyCost(50, 400)).toBeGreaterThan(coinBuyCost(50, 0));
     // 換金(COIN_VALUE)より買値の単価が常に高い→裁定取引にならない。
-    expect(coinBuyCost(100, 100) / 100).toBeGreaterThanOrEqual(COIN_VALUE);
+    expect(coinBuyCost(100, 100) / 100).toBeGreaterThan(COIN_VALUE);
+    // 1枚でも基本レート超え（端数の取りこぼしが無い）。
+    expect(coinBuyCost(1, 0)).toBeGreaterThan(COIN_VALUE);
   });
 
   it("全購入(coinBuyMax)は所持ゴールドで買える最大枚数を返す(超過しない)", () => {
