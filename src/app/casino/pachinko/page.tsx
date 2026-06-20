@@ -32,8 +32,8 @@ const REVEAL_MS = 800;
 const GAME_MS = 420;
 // バトル映像の決着演出（ボス撃破=継続 / 勇者敗北=終了）の尺。決着結果は本物の
 // rollContinue で先に確定し、勝ち/負け映像は“結果に合わせて”再生するだけ（演出は結果を決めない）。
-const DECIDE_WIN_MS = 1300; // 撃破→継続（短め＝高速連チャンを止めない）
-const DECIDE_LOSE_MS = 1800; // 敗北（ためを作る）
+const DECIDE_WIN_MS = 1500; // 踏み込み→撃破→継続（寄せる尺を確保しつつ高速連チャンは保つ）
+const DECIDE_LOSE_MS = 1800; // ボス突進→被弾→ダウン（ためを作る）
 // 終了画面（連チャン回数・通算払い出し）の表示時間。
 const SUMMARY_MS = 2000;
 const SUMMARY_MS_REDUCED = 1000;
