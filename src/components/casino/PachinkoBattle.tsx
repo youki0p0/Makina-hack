@@ -54,12 +54,13 @@ export default function PachinkoBattle({
 }
 
 // 勇者の動き：差分フレームを順送りして“なめらかに”見せる（rAFなし、軽いsetInterval）。
-// idle=構え→振りかぶり→斬撃のループ、win=溜め→強打を1回（最後を保持）、lose=よろけ→ダウン。
+// idle=構えて対峙（静止＋上下の揺れはCSS側）、win=踏み込んでから斬る、lose=ボスの突進を待って被弾→ダウン。
+// delayMs ぶん「構え(先頭フレーム)」で待ってから攻撃に入る＝寄せ移動(CSS)と打撃のタイミングを合わせる。
 type HeroSeq = "idle" | "win" | "lose";
-const HERO_SEQ: Record<HeroSeq, { frames: HeroFrame[]; loop: boolean; ms: number; still: HeroFrame }> = {
-  idle: { frames: ["stance", "raise", "slash"], loop: true, ms: 150, still: "stance" },
-  win: { frames: ["raise", "slash", "slash"], loop: false, ms: 150, still: "slash" },
-  lose: { frames: ["hurt", "down"], loop: false, ms: 220, still: "down" },
+const HERO_SEQ: Record<HeroSeq, { frames: HeroFrame[]; loop: boolean; ms: number; delayMs: number; still: HeroFrame }> = {
+  idle: { frames: ["stance"], loop: false, ms: 150, delayMs: 0, still: "stance" },
+  win: { frames: ["stance", "raise", "slash", "slash"], loop: false, ms: 150, delayMs: 420, still: "slash" },
+  lose: { frames: ["stance", "hurt", "down"], loop: false, ms: 200, delayMs: 820, still: "down" },
 };
 
 /** 勇者スプライト（手続き生成の20×20ドット絵をフレーム送りでアニメ）。 */
@@ -73,20 +74,27 @@ function Hero({ seq, reduced, size = 56 }: { seq: HeroSeq; reduced: boolean; siz
   const [idx, setIdx] = useState(0);
   useEffect(() => {
     setIdx(0);
-    if (reduced || def.frames.length <= 1) return; // 軽量時は静止フレーム。
+    if (reduced || def.frames.length <= 1) return; // 軽量時/単一フレームは静止。
     let i = 0;
-    const id = window.setInterval(() => {
-      i++;
-      if (i >= def.frames.length) {
-        if (def.loop) i = 0;
-        else {
-          window.clearInterval(id); // ループしない時は最終フレームを保持。
-          return;
+    let interval: number | null = null;
+    // delayMs は先頭フレーム(=構え)で待ってから攻撃フレームへ。寄せ移動と打撃を同期させる。
+    const start = window.setTimeout(() => {
+      interval = window.setInterval(() => {
+        i++;
+        if (i >= def.frames.length) {
+          if (def.loop) i = 0;
+          else {
+            if (interval != null) window.clearInterval(interval); // 最終フレームを保持。
+            return;
+          }
         }
-      }
-      setIdx(i);
-    }, def.ms);
-    return () => window.clearInterval(id);
+        setIdx(i);
+      }, def.ms);
+    }, def.delayMs);
+    return () => {
+      window.clearTimeout(start);
+      if (interval != null) window.clearInterval(interval);
+    };
   }, [seq, reduced, def]);
 
   const name = reduced ? def.still : def.frames[Math.min(idx, def.frames.length - 1)];
@@ -123,8 +131,8 @@ function Fight({ boss, reduced }: { boss: BattleBoss; reduced: boolean }) {
       <p className="pointer-events-none absolute inset-x-0 top-1 text-center text-[9px] font-bold tracking-widest text-cyan-300/80">
         勇者 vs {boss.name}
       </p>
-      {/* 勇者（左）：構え→振りかぶり→斬撃のフレームループ。 */}
-      <div className="relative flex flex-col items-center">
+      {/* 勇者（左）：構えて対峙（軽く上下に揺れる。その場の素振りはしない）。 */}
+      <div className={`relative flex flex-col items-center ${reduced ? "" : "fx-hero-idle"}`}>
         <Hero seq="idle" reduced={reduced} size={56} />
       </div>
       {/* 上昇スパーク（火花）はドット＝小さな四角ピクセルで表現。 */}
@@ -157,32 +165,46 @@ function Fight({ boss, reduced }: { boss: BattleBoss; reduced: boolean }) {
   );
 }
 
-/** ラウンド決着：win=ボス撃破 / lose=勇者敗北。 */
+// 決着の「踏み込み→打撃」が当たる瞬間（寄せ移動とフレーム攻撃の合流点）。
+// この遅延でフラッシュ/撃破/暗転を“当たった瞬間”に合わせる。
+const WIN_IMPACT_S = 0.6; // 勇者がボスに到達して斬る瞬間。
+const LOSE_IMPACT_S = 0.82; // ボスが勇者に到達して叩く瞬間。
+
+/** ラウンド決着：win=勇者が踏み込んで撃破 / lose=ボスが突進して勇者を倒す。 */
 function Decide({ boss, win, reduced }: { boss: BattleBoss; win: boolean; reduced: boolean }) {
   return (
-    <div className="relative flex h-full w-full items-center justify-between overflow-hidden px-4">
-      {/* 勇者（左）。win=溜め→強打 / lose=よろけ→ダウン（フレーム送り）。 */}
-      <div className="relative flex flex-col items-center">
+    <div
+      className={`relative flex h-full w-full items-center justify-between overflow-hidden px-4 ${
+        !reduced && !win ? "fx-shake" : ""
+      }`}
+      style={!reduced && !win ? { animationDelay: `${LOSE_IMPACT_S}s` } : undefined}
+    >
+      {/* 勇者（左）。win=ボスへ踏み込んで斬る（fx-hero-advance） / lose=その場で被弾→ダウン。 */}
+      <div className={`relative flex flex-col items-center ${!reduced && win ? "fx-hero-advance" : ""}`}>
         <Hero seq={win ? "win" : "lose"} reduced={reduced} size={56} />
       </div>
 
-      {/* ボス（右）。win=撃破アニメ / lose=とどめの一撃でフラッシュ。 */}
-      <div className="relative flex flex-col items-center">
-        <span className={reduced ? "" : win ? "fx-boss-die inline-block" : "fx-throb inline-block"}>
+      {/* ボス（右）。win=その場で撃破 / lose=勇者へ突進して攻撃（fx-boss-charge）。 */}
+      <div className={`relative flex flex-col items-center ${!reduced && !win ? "fx-boss-charge" : ""}`}>
+        <span
+          className={reduced ? "" : win ? "fx-boss-die inline-block" : "fx-throb inline-block"}
+          style={!reduced && win ? { animationDelay: `${WIN_IMPACT_S}s` } : undefined}
+        >
           <EnemyIcon enemy={{ templateId: boss.id, isBoss: true, modTier: 0 }} size={72} />
         </span>
       </div>
 
-      {/* 決着フラッシュ・リング。 */}
+      {/* 決着フラッシュ・リング（勝ち）。斬った瞬間に合わせて発火。 */}
       {!reduced && win && (
         <>
-          <div className="fx-flash pointer-events-none absolute inset-0 z-20 bg-white/60" />
-          <div className="rainbow-flash pointer-events-none absolute inset-0 z-10 opacity-25" />
-          <div className="fx-ring pointer-events-none absolute left-2/3 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-amber-200" />
+          <div className="fx-flash pointer-events-none absolute inset-0 z-20 bg-white/60" style={{ animationDelay: `${WIN_IMPACT_S}s` }} />
+          <div className="rainbow-flash pointer-events-none absolute inset-0 z-10 opacity-25" style={{ animationDelay: `${WIN_IMPACT_S}s` }} />
+          <div className="fx-ring pointer-events-none absolute left-2/3 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-amber-200" style={{ animationDelay: `${WIN_IMPACT_S}s` }} />
         </>
       )}
+      {/* 敗北の暗転（負け）。叩かれた瞬間に合わせて暗くなる。 */}
       {!reduced && !win && (
-        <div className="fx-screen-dark fx-shake pointer-events-none absolute inset-0 z-20 bg-black/60" />
+        <div className="fx-screen-dark pointer-events-none absolute inset-0 z-10 bg-black/60" style={{ animationDelay: `${LOSE_IMPACT_S}s` }} />
       )}
     </div>
   );
