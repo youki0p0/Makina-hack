@@ -10,7 +10,7 @@ function emptyEquipped(): EquippedItems {
 }
 
 describe("カジノ王の一撃台", () => {
-  it("RTP≈0.8（少し負け越す投資台）で、一撃はKING_JACKPOT＋ハイコイン", () => {
+  it("RTP≈0.7（少し負け越す投資台）で、一撃はKING_JACKPOT＋ハイコイン", () => {
     let inB = 0,
       out = 0,
       hi = 0,
@@ -28,8 +28,8 @@ describe("カジノ王の一撃台", () => {
       }
     }
     const rtp = out / inB;
-    expect(rtp).toBeGreaterThan(0.7);
-    expect(rtp).toBeLessThan(0.9); // ≈0.8
+    expect(rtp).toBeGreaterThan(0.6);
+    expect(rtp).toBeLessThan(0.85); // ≈0.7
     expect(jp).toBeGreaterThan(0); // まれに一撃が出る
     expect(hi).toBeGreaterThan(0); // 一撃でハイコイン獲得
   });

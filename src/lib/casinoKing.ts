@@ -22,17 +22,17 @@ export interface KingResult {
 
 /**
  * 一撃台を1回まわす。BET=KING_BET（呼び出し側で消費）。
- * 振り分け（RTP≈0.8・少し負け越す本物の投資台。価値は一撃に集中）:
+ * 振り分け（RTP≈0.7・少し負け越す本物の投資台。価値は一撃に集中）:
  *  一撃 1/1850 … 100,000コイン ＋ 2,500ハイコイン
  *  中   1/45   … 300〜700コイン
- *  小   1/8    … 60〜180コイン
+ *  小   1/20   … 60〜180コイン
  *  ハズレ … 0
  */
 export function kingSpin(rng: () => number = Math.random): KingResult {
   const x = rng();
   const pJ = 1 / 1850;
   const pB = 1 / 45;
-  const pS = 1 / 8;
+  const pS = 1 / 20;
   if (x < pJ) return { coins: KING_JACKPOT, hi: KING_JACKPOT_HI, kind: "jackpot" };
   if (x < pJ + pB) return { coins: 300 + Math.floor(rng() * 400), hi: 0, kind: "big" };
   if (x < pJ + pB + pS) return { coins: 60 + Math.floor(rng() * 120), hi: 0, kind: "small" };
