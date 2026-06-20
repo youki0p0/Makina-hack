@@ -937,7 +937,8 @@ function KingChallenge() {
           オート: {auto ? "ON（停止）" : "OFF"}
         </button>
         {!canPlay && <p className="mt-1 text-[11px] text-rose-300">コインが足りません（スロット/甘ダイスで稼いでね）。</p>}
-        <p className="mt-1 text-[10px] text-gray-500">RTP≈1＝延々打てる。価値はまれな一撃に集中＝一撃で💎を大量獲得。</p>
+        <p className="mt-1 text-[10px] text-gray-500">RTP≈0.8の投資台。価値はまれな一撃に集中＝一撃で💎を大量獲得。</p>
+        <p className="text-[10px] text-gray-600">※設定・イベントデーの対象外（常に固定オッズ）。</p>
       </div>
 
       <div className="rounded-2xl border border-violet-500/40 bg-violet-500/5 p-3">
