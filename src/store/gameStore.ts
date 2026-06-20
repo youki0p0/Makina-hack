@@ -104,7 +104,7 @@ import {
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState } from "@/lib/save";
 import { runDailyMaintenance } from "@/lib/maintenance";
-import { kingSpinWithPity, KING_BET, LEGEND_PIECE_HI } from "@/lib/casinoKing";
+import { kingSpinWithPity, KING_BET, LEGEND_PIECE_HI, KING_COMP_COINS, type KingResult } from "@/lib/casinoKing";
 import { itemKey, rarityRank } from "@/lib/ui";
 import type {
   ActiveBuff,
@@ -316,8 +316,10 @@ interface GameState {
   coins: number;
   /** ハイコイン: カジノ王の一撃台でのみ稼ぐ上位通貨（伝説賭博セット交換用）。 */
   hiCoins: number;
-  /** カジノ王の天井カウンタ: 一撃なしで回した回転数（KING_CEILINGで一撃確定）。 */
+  /** カジノ王の天井カウンタ: 小当たりなしで回した回転数（KING_SMALL_CEILINGで小当たり確定）。 */
   kingPity: number;
+  /** カジノ王の一度きり補填を適用済みか（#125）。 */
+  kingComped: boolean;
   /** Whether the next slot spin is a free replay (transient). */
   slotReplay: boolean;
   /** ダイスラッシュ(AT) games remaining (0 = not in AT; transient). */
@@ -469,8 +471,8 @@ interface GameState {
   /** カジノコインを増減（甘ダイス発射/払い出し・BJ 用。0未満にはしない）。 */
   addCoins: (delta: number) => void;
   addHiCoins: (delta: number) => void;
-  /** カジノ王の一撃台を1回プレイ（100コインBET）。結果を返す。 */
-  kingPlay: () => { coins: number; hi: number; kind: string } | null;
+  /** カジノ王のスロットを1回プレイ（100コインBET）。結果を返す。 */
+  kingPlay: () => KingResult | null;
   /** ハイコインで伝説賭博セットの指定部位を交換。 */
   kingBuyLegend: (slot: EquipmentSlot) => Equipment | null;
   /** Spin the slot. Returns the resolved result, or null if coins are short. */
@@ -557,6 +559,7 @@ export const useGameStore = create<GameState>((set, get) => {
       coins: s.coins,
       hiCoins: s.hiCoins,
       kingPity: s.kingPity,
+      kingComped: s.kingComped,
       casinoBan: s.casinoBan,
       slot: {
         machine: s.slotMachine,
@@ -694,6 +697,7 @@ export const useGameStore = create<GameState>((set, get) => {
       coins: loaded.coins,
       hiCoins: loaded.hiCoins,
       kingPity: loaded.kingPity,
+      kingComped: loaded.kingComped,
       slotReplay: false,
       // Slot state survives reload, but RESETS when the 6h setting bucket changes
       // (settings reshuffled → fresh 天井/ゾーン/カウンタ).
@@ -741,6 +745,21 @@ export const useGameStore = create<GameState>((set, get) => {
       shopStock: [],
     });
     set({ diceFaces: refreshFaces() });
+
+    // 一度きりの補填(#125): カジノ王を回した「痕跡がある人」へ30万コイン。
+    // 過去の回転履歴は保存されていないため、痕跡(ハイコイン保有/伝説セット所持/天井カウンタ>0)で判定。
+    if (!loaded.kingComped) {
+      const playedKing =
+        loaded.hiCoins > 0 ||
+        loaded.kingPity > 0 ||
+        EQUIP_SLOTS.some((sl) => loaded.equipped[sl]?.setId === "legendgambler") ||
+        loaded.inventory.some((it) => it.setId === "legendgambler");
+      set({
+        coins: get().coins + (playedKing ? KING_COMP_COINS : 0),
+        kingComped: true,
+      });
+      persist();
+    }
   }
 
   return {
@@ -768,6 +787,7 @@ export const useGameStore = create<GameState>((set, get) => {
     coins: 0,
     hiCoins: 0,
     kingPity: 0,
+    kingComped: false,
     slotReplay: false,
     atGames: 0,
     slotMachine: 0,
@@ -1811,15 +1831,17 @@ export const useGameStore = create<GameState>((set, get) => {
     kingPlay: () => {
       const s = get();
       if (s.coins < KING_BET) return null;
-      // 天井つき: 一撃なしで KING_CEILING 回まわすと次の1回で一撃確定。
+      // 天井つき: 小当たりなしで KING_SMALL_CEILING 回まわすと小当たり確定。
       const { result: r, nextPity } = kingSpinWithPity(s.kingPity);
       set({
         coins: Math.max(0, s.coins - KING_BET + r.coins),
         hiCoins: s.hiCoins + r.hi,
         kingPity: nextPity,
+        // 一撃（挑戦勝利）でダイスラッシュ(AT)発動。
+        atGames: r.outcome === "jackpot" ? Math.max(s.atGames, AT_GAMES) : s.atGames,
       });
       persist();
-      return { coins: r.coins, hi: r.hi, kind: r.kind };
+      return r;
     },
 
     kingBuyLegend: (slot: EquipmentSlot): Equipment | null => {

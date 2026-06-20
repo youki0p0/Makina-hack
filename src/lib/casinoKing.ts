@@ -1,59 +1,61 @@
-// ===== カジノ王への挑戦〜そして伝説へ〜（100コインBETの一撃台）=====
-// RTP≈1（延々打てる）だが、まれな「一撃」で約10万コイン＋大量ハイコイン。
-// ハイコインは伝説賭博セットの部位指定交換にのみ使う上位通貨。
+// ===== カジノ王への挑戦〜そして伝説へ〜（100コインBETのスロット＋挑戦演出）=====
+// 仕様（#125〜）:
+//  ・BET100のスロット。小当たり 1/200（天井: 小当たりなしで200回転に達したら小当たり確定）。
+//  ・小当たり時に 1500コイン獲得＋「カジノ王への挑戦」へ。
+//  ・挑戦は勝率1/10。勝てば一撃＝+75,000コイン＋2,500ハイコイン＋ダイスラッシュ。
+//  ・天井で小当たり頻度が上がるため実質 一撃≈1/1280・RTP≈0.70。
 
 /** 1回のBET（通常コイン）。 */
 export const KING_BET = 100;
-/** 一撃ジャックポットの払い出し（通常コイン）。 */
-export const KING_JACKPOT = 100000;
+/** 一撃（挑戦勝利）の上乗せコイン。 */
+export const KING_JACKPOT = 75000;
 /** 一撃で得られるハイコイン。 */
 export const KING_JACKPOT_HI = 2500;
+/** 小当たりの払い出し（挑戦の勝敗に関わらず必ず得る）。天井で頻度が上がるため控えめ。 */
+export const KING_SMALL_PAY = 1500;
+/** 小当たり確率。 */
+export const KING_SMALL_PROB = 1 / 200;
+/** 挑戦の勝率（勝てば一撃）。 */
+export const KING_CHALLENGE_WIN = 1 / 10;
+/** 天井: 小当たりなしでこの回転数に達したら小当たり確定。 */
+export const KING_SMALL_CEILING = 200;
 /** 伝説賭博セット1部位の交換に必要なハイコイン。 */
 export const LEGEND_PIECE_HI = 10000;
+/** 一度きりの補填額（過去にカジノ王を回した痕跡がある人へ）。 */
+export const KING_COMP_COINS = 300000;
 
-/** 天井: 一撃なしでこの回転数に達したら次の1回で一撃を確定させる。 */
-export const KING_CEILING = 2000;
-
-export type KingKind = "jackpot" | "big" | "small" | "miss";
+export type KingOutcome = "miss" | "smallLose" | "jackpot";
 export interface KingResult {
-  /** 払い出し（通常コイン）。 */
+  /** miss=ハズレ / smallLose=小当たり(挑戦敗北) / jackpot=小当たり→挑戦勝利=一撃。 */
+  outcome: KingOutcome;
+  /** この回の払い出し（通常コイン）。 */
   coins: number;
   /** 獲得ハイコイン。 */
   hi: number;
-  kind: KingKind;
+  /** 「カジノ王への挑戦」カットインを出すか（=小当たりが成立したか）。 */
+  challenge: boolean;
 }
 
 /**
- * 一撃台を1回まわす。BET=KING_BET（呼び出し側で消費）。
- * 振り分け（RTP≈0.7・少し負け越す本物の投資台。価値は一撃に集中）:
- *  一撃 1/1850 … 100,000コイン ＋ 2,500ハイコイン
- *  中   1/45   … 300〜700コイン
- *  小   1/20   … 60〜180コイン
- *  ハズレ … 0
- */
-export function kingSpin(rng: () => number = Math.random): KingResult {
-  const x = rng();
-  const pJ = 1 / 1850;
-  const pB = 1 / 45;
-  const pS = 1 / 20;
-  if (x < pJ) return { coins: KING_JACKPOT, hi: KING_JACKPOT_HI, kind: "jackpot" };
-  if (x < pJ + pB) return { coins: 300 + Math.floor(rng() * 400), hi: 0, kind: "big" };
-  if (x < pJ + pB + pS) return { coins: 60 + Math.floor(rng() * 120), hi: 0, kind: "small" };
-  return { coins: 0, hi: 0, kind: "miss" };
-}
-
-/**
- * 天井つきで1回まわす。`pity` は一撃なしで回した回転数。
- * pity が KING_CEILING-1 まで来ていれば、この回は一撃を確定（天井）。
- * 一撃が出たら pity は 0 にリセット、それ以外は +1。
+ * 天井つきで1回まわす。`pity` は小当たりなしで回した回転数。
+ * 小当たり成立（天井 or 1/200）→挑戦（勝率1/10）→勝てば一撃。
+ * 小当たりが出たら pity を 0 にリセット、ハズレは +1。
  */
 export function kingSpinWithPity(
   pity: number,
   rng: () => number = Math.random,
 ): { result: KingResult; nextPity: number } {
-  if (pity + 1 >= KING_CEILING) {
-    return { result: { coins: KING_JACKPOT, hi: KING_JACKPOT_HI, kind: "jackpot" }, nextPity: 0 };
+  // 小当たり判定（天井到達 or 確率）。
+  const small = pity + 1 >= KING_SMALL_CEILING || rng() < KING_SMALL_PROB;
+  if (!small) {
+    return { result: { outcome: "miss", coins: 0, hi: 0, challenge: false }, nextPity: pity + 1 };
   }
-  const result = kingSpin(rng);
-  return { result, nextPity: result.kind === "jackpot" ? 0 : pity + 1 };
+  // 小当たり成立 → 「カジノ王への挑戦」。勝てば一撃。
+  if (rng() < KING_CHALLENGE_WIN) {
+    return {
+      result: { outcome: "jackpot", coins: KING_SMALL_PAY + KING_JACKPOT, hi: KING_JACKPOT_HI, challenge: true },
+      nextPity: 0,
+    };
+  }
+  return { result: { outcome: "smallLose", coins: KING_SMALL_PAY, hi: 0, challenge: true }, nextPity: 0 };
 }
