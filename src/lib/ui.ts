@@ -2,7 +2,19 @@ import type { DiceKind, Equipment, Rarity } from "@/types/game";
 
 /** Thousands-separated number for readable deep-floor values (1234 → "1,234"). */
 export function fmt(n: number): string {
-  return Math.round(n).toLocaleString("en-US");
+  // 出力は toLocaleString("en-US") と同一(カンマ区切り)のまま、描画毎に多数回呼ばれても
+  // 軽い手動の桁区切りに置き換える(ICUフォーマッタ呼び出しを避ける)。
+  let r = Math.round(n);
+  if (!Number.isFinite(r)) return String(r);
+  const neg = r < 0;
+  if (neg) r = -r;
+  const s = String(r);
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 === 0) out += ",";
+    out += s[i];
+  }
+  return neg ? "-" + out : out;
 }
 
 /** Stable key for an item instance (base id + affix + ★ tier), used for locks. */

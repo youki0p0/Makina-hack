@@ -149,11 +149,17 @@ export function resolvePlayerAction(
   if (e.damageMultiplier > 0) {
     const enemyDef = enemy.defense + (enemy.bonusDefense ?? 0);
     const perHit = Math.max(1, Math.round(stats.attack * e.damageMultiplier) - enemyDef);
-    enemyDamage = perHit * hits;
-    if (hits > 1) {
-      logs.push(`${face.name}！ ${hits}回攻撃で ${enemyDamage} ダメージ`);
+    // 多段耐性: 2ヒット目以降は40%に減衰(手数ビルドの天敵)。
+    if (hits > 1 && enemy.multiHitResist) {
+      enemyDamage = perHit + (hits - 1) * Math.round(perHit * 0.4);
+      logs.push(`${face.name}！ ${hits}回攻撃 (多段耐性で減衰) ${enemyDamage} ダメージ`);
     } else {
-      logs.push(`${face.name}！ ${enemyDamage} ダメージ`);
+      enemyDamage = perHit * hits;
+      if (hits > 1) {
+        logs.push(`${face.name}！ ${hits}回攻撃で ${enemyDamage} ダメージ`);
+      } else {
+        logs.push(`${face.name}！ ${enemyDamage} ダメージ`);
+      }
     }
   }
 
@@ -162,8 +168,12 @@ export function resolvePlayerAction(
     logs.push(`反動で ${selfDamage} の自傷ダメージ`);
   }
 
-  const heal = e.lifestealPct > 0 && enemyDamage > 0 ? Math.round(enemyDamage * e.lifestealPct) : 0;
-  if (heal > 0) {
+  // 吸血無効の敵には回復しない(純サステインビルドの天敵)。
+  let heal = e.lifestealPct > 0 && enemyDamage > 0 ? Math.round(enemyDamage * e.lifestealPct) : 0;
+  if (heal > 0 && enemy.lifestealImmune) {
+    heal = 0;
+    logs.push("吸血が効かない！");
+  } else if (heal > 0) {
     logs.push(`${heal} 回復した`);
   }
 
@@ -172,8 +182,12 @@ export function resolvePlayerAction(
     logs.push(`ガード態勢 (防御+${guard})`);
   }
 
-  const status = e.statusEffect ? buildStatus(e.statusEffect, stats.attack) : null;
-  if (status) {
+  // 状態異常耐性の敵には毒/燃焼を付与できない(DoTビルドの天敵)。
+  let status = e.statusEffect ? buildStatus(e.statusEffect, stats.attack) : null;
+  if (status && enemy.statusResist) {
+    status = null;
+    logs.push("状態異常が効かない！");
+  } else if (status) {
     logs.push(`${STATUS_LABEL[status.kind]}を付与！ (${status.damagePerTurn}/T × ${status.remainingTurns}T)`);
   }
 
@@ -332,6 +346,8 @@ export interface BossTurnResult {
   enemyHeal: number;
   charging: boolean;
   chargeCounter: number;
+  /** Final boss can disrupt the player's dice (lose rerolls next turn). */
+  playerStun?: number;
   logs: string[];
 }
 
@@ -348,9 +364,9 @@ export function resolveBossTurn(
   guard: number,
 ): BossTurnResult {
   const weaken = enemy.weakenTurns > 0 ? enemy.weakenAmount : 0;
-  // DPS関門: 8ターンを超えると攻撃が毎ターン+30%加速。規定ターン内に倒せない
-  // (=火力不足)と必ず力尽きるので、ボス前で武器集め/強化フェーズが強制される。
-  const ramp = 1 + Math.max(0, (enemy.bossTurns ?? 0) - 8) * 0.3;
+  // DPS関門(緩和版): 12ターンを超えると攻撃が毎ターン+20%加速。猶予を広げることで
+  // バースト/グラスキャノン系も間に合えば突破でき、単一耐久ビルドへの収束を防ぐ。
+  const ramp = 1 + Math.max(0, (enemy.bossTurns ?? 0) - 12) * 0.2;
   const eatk = Math.max(1, Math.round(enemy.attack * (enemy.enraged ? 1.5 : 1) * ramp) - weaken);
 
   // Unleash the charged attack.
@@ -397,6 +413,87 @@ export function resolveBossTurn(
     chargeCounter: counter,
     logs: [`${enemy.name} の攻撃！ ${damage} ダメージ`],
   };
+}
+
+/**
+ * 1000F final boss (機神デウス＝エクス＝マキナ) — a JRPG-style "last boss" pattern:
+ * HP-based phases, multi-action in later phases, a telegraphed charge → ultimate,
+ * and self-repair. All moves are original (dice × machine-god themed).
+ *  - Phase 1 (>66% HP): 1 action.
+ *  - Phase 2 (33–66%):  sometimes 2 actions; can disrupt the player's dice.
+ *  - Phase 3 (<33%):    always 2 actions, charges more often.
+ */
+export function resolveFinalBossTurn(
+  enemy: Enemy,
+  stats: ComputedStats,
+  guard: number,
+): BossTurnResult {
+  const weaken = enemy.weakenTurns > 0 ? enemy.weakenAmount : 0;
+  const ramp = 1 + Math.max(0, (enemy.bossTurns ?? 0) - 8) * 0.3; // DPS関門は維持
+  const eatk = Math.max(1, Math.round(enemy.attack * (enemy.enraged ? 1.4 : 1) * ramp) - weaken);
+  const hpFrac = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1;
+  const phase = hpFrac > 0.66 ? 1 : hpFrac > 0.33 ? 2 : 3;
+  const base = (): BossTurnResult => ({
+    playerDamage: 0,
+    enemyHeal: 0,
+    charging: false,
+    chargeCounter: enemy.chargeCounter,
+    logs: [],
+  });
+
+  // Unleash the charged ultimate.
+  if (enemy.charging) {
+    const damage = Math.max(1, Math.round(eatk * 2.6) - stats.defense - guard);
+    return {
+      ...base(),
+      playerDamage: damage,
+      charging: false,
+      chargeCounter: 0,
+      logs: [`${enemy.name} の【終焉のサイコロ】！ 全運命を断つ一撃 — ${damage} ダメージ`],
+    };
+  }
+
+  // Telegraph the charge (sooner in the final phase).
+  const counter = enemy.chargeCounter + 1;
+  if (counter >= (phase === 3 ? 3 : 4)) {
+    return {
+      ...base(),
+      charging: true,
+      chargeCounter: 0,
+      logs: [`${enemy.name} は無数の歯車を逆回転させ、力を凝縮し始めた…（次のターンに大技！）`],
+    };
+  }
+
+  // 1–2 actions depending on phase.
+  const acts = phase === 3 ? 2 : phase === 2 && Math.random() < 0.5 ? 2 : 1;
+  let damage = 0;
+  let heal = 0;
+  let stun = 0;
+  const logs: string[] = [];
+  for (let k = 0; k < acts; k++) {
+    const r = Math.random();
+    if (phase <= 2 && r < 0.18) {
+      const h = Math.max(1, Math.round(enemy.maxHp * 0.1));
+      heal += h;
+      logs.push(`${enemy.name} は自己修復した！ (+${h})`);
+    } else if (r < 0.4) {
+      // 次元崩壊砲: 防御を貫通する重い一撃(ガードは効く)。
+      const d = Math.max(1, Math.round(eatk * 1.5) - guard);
+      damage += d;
+      logs.push(`${enemy.name} の【次元崩壊砲】！ ${d} ダメージ`);
+    } else if (phase >= 2 && r < 0.55) {
+      // 狂気のダイス: 通常ダメージ＋次ターンの出目を乱す(リロール不可)。
+      const d = Math.max(1, eatk - stats.defense - guard);
+      damage += d;
+      stun = 1;
+      logs.push(`${enemy.name} は【狂気のダイス】を振った！ ${d} ダメージ＋出目が乱れる`);
+    } else {
+      const d = Math.max(1, eatk - stats.defense - guard);
+      damage += d;
+      logs.push(`${enemy.name} の機神の打撃！ ${d} ダメージ`);
+    }
+  }
+  return { ...base(), playerDamage: damage, enemyHeal: heal, chargeCounter: counter, playerStun: stun, logs };
 }
 
 // ===== leveling =====

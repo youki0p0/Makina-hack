@@ -1,6 +1,6 @@
 "use client";
 
-import { ENEMY_ABILITY_LABEL } from "@/data/enemies";
+import { ENEMY_ABILITY_LABEL, ENEMY_TRAIT_LABEL } from "@/data/enemies";
 import EnemyIcon from "@/components/EnemyIcon";
 import PixelGlyph from "@/components/PixelGlyph";
 import { useDamageFx } from "@/hooks/useDamageFx";
@@ -84,6 +84,17 @@ export default function EnemyCard() {
           {enemy.ability && (
             <span className="text-rose-300">{ENEMY_ABILITY_LABEL[enemy.ability]}</span>
           )}
+          {/* 相性フラグ(吸血無効/多段耐性/状態異常耐性/即死無効)を表示 */}
+          {([
+            ["lifestealImmune", enemy.lifestealImmune],
+            ["multiHitResist", enemy.multiHitResist],
+            ["statusResist", enemy.statusResist],
+            ["executeImmune", enemy.executeImmune],
+          ] as const)
+            .filter(([, on]) => on)
+            .map(([key]) => (
+              <span key={key} className="text-cyan-300">{ENEMY_TRAIT_LABEL[key]}</span>
+            ))}
         </p>
 
       {(statuses.length > 0 ||

@@ -339,6 +339,9 @@ export function slotSfx(kind: SlotSfx): void {
 
 const BAR = 16;
 const LOOP_BARS = 32;
+// The final-boss theme runs a longer, self-contained loop with its own dynamics
+// (build → climax → quiet breakdown → rebuild → grand climax).
+const FINAL_LOOP_BARS = 48;
 const DETUNE = 1.006; // ~+10 cent chorus for the pad
 
 interface Chord {
@@ -413,7 +416,87 @@ const IDOL_LEAD: number[] = [
 /** Per-chapter battle themes (w1…w11) plus the fixed-location themes. */
 export type WorldKey =
   | "w1" | "w2" | "w3" | "w4" | "w5" | "w6" | "w7" | "w8" | "w9" | "w10" | "w11";
-export type BgmTheme = "dungeon" | "casino" | "forge" | "boss" | "idol" | WorldKey;
+export type BgmTheme = "dungeon" | "casino" | "forge" | "boss" | "idol" | "seaIdol" | "final" | "credits" | WorldKey;
+
+// ===== Credits theme: "Running Toward Light" (図鑑のクレジット曲) =====
+// 明るくほろ苦い D メジャー。IV→V→vi を多用し、簡単には解決しない。
+// 32小節ループ: イントロ4 / Aメロ8 / プリサビ4 / サビ16。BPM132 (16分 = stepMs)。
+// 既存エンジン(ファイル不使用・全合成)の流儀でオリジナル作曲を移植したもの。
+const CREDITS_STEP_MS = 114; // 16th note @ ~132 BPM
+
+// note-name (例 "F#5") → 周波数。
+function noteHz(s: string): number {
+  const base: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  let semis = base[s[0]];
+  let i = 1;
+  if (s[1] === "#") {
+    semis += 1;
+    i = 2;
+  }
+  const oct = parseInt(s.slice(i), 10);
+  return hz(12 * (oct + 1) + semis);
+}
+
+// 32小節のコード進行(1小節1コード)。ch() は hoist 済みの関数宣言なのでここで使える。
+const CREDITS_PROG: Chord[] = [
+  ch(59, "min"), ch(55, "maj"), ch(57, "maj"), ch(57, "maj"), // intro: Bm G A A
+  ch(50, "maj"), ch(57, "maj"), ch(59, "min"), ch(55, "maj"), // verse A: D A Bm G
+  ch(50, "maj"), ch(57, "maj"), ch(55, "maj"), ch(57, "maj"), // verse B: D A G A
+  ch(52, "min"), ch(54, "min"), ch(55, "maj"), ch(57, "maj"), // pre-chorus: Em F#m G A
+  ch(55, "maj"), ch(57, "maj"), ch(59, "min"), ch(59, "min"), // chorus: G A Bm Bm
+  ch(55, "maj"), ch(57, "maj"), ch(50, "maj"), ch(50, "maj"), //         G A D D
+  ch(55, "maj"), ch(57, "maj"), ch(59, "min"), ch(57, "maj"), //         G A Bm A
+  ch(55, "maj"), ch(57, "maj"), ch(57, "maj"), ch(50, "maj"), //         G A A D
+];
+
+type CreditsNote = [string, number]; // [音名 | "r"(休符), 拍数]
+// 8つの4小節フレーズ(各16拍)= 作曲した主旋律。
+const CREDITS_PHRASES: CreditsNote[][] = [
+  // intro lead (Bm G A A)
+  [["F#5",1],["D5",1],["F#5",2],["E5",1],["D5",1],["B4",2],["C#5",1],["E5",1],["A4",1],["C#5",1],["E5",2],["r",2]],
+  // verse A (D A Bm G)
+  [["F#4",1],["A4",1],["D5",1],["A4",0.5],["F#4",0.5],["E4",1],["A4",1],["C#5",1.5],["B4",0.5],["D5",1],["B4",1],["F#4",1],["B4",0.5],["D5",0.5],["B4",1],["D5",1],["E5",1],["D5",1]],
+  // verse B (D A G A)
+  [["A4",1],["F#4",1],["D4",1],["F#4",1],["E4",1],["A4",1],["C#5",1],["A4",1],["B4",1.5],["A4",0.5],["G4",1],["B4",1],["C#5",1],["B4",1],["A4",1],["E4",1]],
+  // pre-chorus (Em F#m G A) — 上昇して緊張を高める
+  [["E4",1],["G4",1],["B4",1],["E5",1],["F#4",1],["A4",1],["C#5",1],["F#5",1],["G4",1],["B4",1],["D5",1],["G5",1],["A4",1],["C#5",1],["E5",1],["A5",1]],
+  // chorus A (G A Bm Bm)
+  [["D5",2],["E5",1],["D5",1],["C#5",2],["E5",2],["F#5",2],["E5",1],["D5",1],["B4",2],["D5",2]],
+  // chorus B (G A D D)
+  [["D5",1],["E5",1],["G5",2],["F#5",2],["E5",2],["D5",2],["A4",1],["D5",1],["F#5",4]],
+  // chorus C (G A Bm A)
+  [["B4",1],["D5",1],["E5",2],["C#5",1],["E5",1],["A5",2],["F#5",2],["D5",2],["E5",2],["C#5",1],["E5",1]],
+  // chorus D (G A A D) — 最後にだけ I(D) へ解決
+  [["D5",1],["E5",1],["F#5",1],["G5",1],["A5",2],["E5",2],["F#5",2],["E5",1],["C#5",1],["D5",4]],
+];
+
+// フレーズ列を 512 ステップ(=32小節×16)の「ステップ→周波数/長さ」表に展開。
+function buildCreditsLead(): { freq: number[]; dur: number[] } {
+  const total = BAR * LOOP_BARS; // 512 steps
+  const freq = new Array<number>(total).fill(0);
+  const dur = new Array<number>(total).fill(0);
+  const secPerBeat = (CREDITS_STEP_MS / 1000) * 4; // 1拍 = 4ステップ
+  let beat = 0;
+  for (const phrase of CREDITS_PHRASES) {
+    for (const [name, d] of phrase) {
+      if (name !== "r") {
+        const stepIdx = Math.round(beat * 4) % total;
+        freq[stepIdx] = noteHz(name);
+        dur[stepIdx] = d * secPerBeat;
+      }
+      beat += d;
+    }
+  }
+  return { freq, dur };
+}
+const CREDITS_LEAD = buildCreditsLead();
+
+function creditsSection(bar: number): "intro" | "verse" | "pre" | "chorus" {
+  if (bar < 4) return "intro";
+  if (bar < 12) return "verse";
+  if (bar < 16) return "pre";
+  return "chorus";
+}
 
 interface ThemeDef {
   stepMs: number;
@@ -421,15 +504,21 @@ interface ThemeDef {
   metal?: boolean;
   idol?: boolean;
   casino?: boolean;
+  credits?: boolean;
+  /** 海っぽいリカラー（idolTick に波/マリンベル/明るいシマーを足す）。 */
+  sea?: boolean;
 }
-const THEMES: Record<"dungeon" | "casino" | "forge" | "boss" | "idol", ThemeDef> = {
+const THEMES: Record<"dungeon" | "casino" | "forge" | "boss" | "idol" | "seaIdol" | "credits", ThemeDef> = {
   dungeon: { stepMs: 150, prog: PROG },
   boss: { stepMs: 124, prog: PROG },
+  credits: { stepMs: CREDITS_STEP_MS, prog: CREDITS_PROG, credits: true },
   // 落ち着いた煌びやかなラウンジ。専用レンダラ casinoTick が担当(通常カジノBGM)。
   casino: { stepMs: 162, prog: CASINO_PROG, casino: true },
   forge: { stepMs: 172, prog: FORGE_PROG, metal: true },
   // BPM≈178 → 16分音符 ≈ 84ms。専用レンダラ idolTick(BIG中=ダイスラッシュ専用BGM)。
   idol: { stepMs: 84, prog: IDOL_PROG, idol: true },
+  // 同じ Idol 曲(同BPM/同進行)を海っぽくリカラー＝甘ダイス連チャン用BGM。
+  seaIdol: { stepMs: 84, prog: IDOL_PROG, idol: true, sea: true },
 };
 let bgmTheme: BgmTheme = "dungeon";
 let bgmTranspose = 1;
@@ -606,8 +695,9 @@ function echoTone(
   for (let i = 0; i <= taps; i++) tone(freq, dur, type, vol * Math.pow(decay, i), when + i * spread);
 }
 
-/** Step length (ms) for the current theme — world themes carry their own tempo. */
+/** Step length (ms) for the current theme — world/final themes carry their own tempo. */
 function themeStepMs(theme: BgmTheme): number {
+  if (theme === "final") return FINAL_STEP_MS;
   const w = WORLD_MUSIC[theme as WorldKey];
   if (w) return w.stepMs;
   return THEMES[theme as keyof typeof THEMES].stepMs;
@@ -617,16 +707,20 @@ function themeStepMs(theme: BgmTheme): number {
 function bgmTick(): void {
   if (muted) return;
   const world = WORLD_MUSIC[bgmTheme as WorldKey];
-  if (world) {
+  if (bgmTheme === "final") {
+    finalTick();
+  } else if (world) {
     worldTick(world);
   } else {
     const def = THEMES[bgmTheme as keyof typeof THEMES];
-    if (def.idol) idolTick();
+    if (def.credits) creditsTick();
+    else if (def.idol) idolTick(def.sea === true);
     else if (def.metal) forgeTick();
     else if (def.casino) casinoTick();
     else dungeonTick(); // dungeon / boss (variants inside)
   }
-  bgmStep = (bgmStep + 1) % (BAR * LOOP_BARS);
+  const loopBars = bgmTheme === "final" ? FINAL_LOOP_BARS : LOOP_BARS;
+  bgmStep = (bgmStep + 1) % (BAR * loopBars);
 }
 
 // ===== Per-world renderer (場所コンセプト曲) =====
@@ -742,6 +836,164 @@ function worldTick(cfg: WorldMusic): void {
   }
 
   worldDrums(cfg.drums, inBar, mode, full);
+}
+
+// ===== Final boss theme (1000F: 機神デウス＝エクス＝マキナ) =====
+// 最終決戦はメインテーマ(メニュー＝dungeonの PROG / LEAD_PHRASE)の荘厳な再臨。
+// 48小節の長いループに起伏を付ける: 導入ビルド → 全効果のクライマックス →
+// 一旦静かなブレイク → そこからフェードで音がどんどん乗る再構築 → 大サビ。
+// テンポはダイスラッシュ並みに疾走、効果(ブラス/合唱/サブ/ティンパニ/ヒット)は満載。
+const FINAL_STEP_MS = 84; // ダイスラッシュ(idol)と同じ突っ走るテンポ(≈178 BPM, 16分)
+
+// ラスボス曲のコード進行 = 小室進行(vi–IV–V–I = Am–F–G–C)。主旋律(LEAD_PHRASE,
+// A minor)の動きはそのままに、コードだけ差し替える。4小節周期で旋律と揃う。
+const FINAL_PROG: Chord[] = [ch(45, "min"), ch(41, "maj"), ch(43, "maj"), ch(48, "maj")];
+
+// 48小節の構成(近代EDM流): クライマックスA[0–14] → 崩しの遷移[15] →
+// 静寂から2小節ごとに1レイヤーずつ積むビルド[16–31] → ドロップ → 大サビ[32–47]。
+// クライマックス↔ループ継ぎ目(47→0)は両方フルなので滑らか。
+
+/** Full-band climax (used by [0–14] and [32–47]). */
+function finalClimax(chord: Chord, step: number, inBar: number, bar: number, lb: number): void {
+  // kick / hats / snare backbeat
+  if (inBar % 4 === 0) {
+    noise(0.06, 0.24);
+    slideTone(120, 40, 0.12, "sine", 0.28);
+  }
+  if (inBar % 2 === 1) noise(0.02, 0.09);
+  if (inBar === 4 || inBar === 12) {
+    noise(0.16, 0.2);
+    tone(190, 0.12, "triangle", 0.14);
+  }
+  // octave bass + sub
+  if (inBar % 2 === 0) tone(inBar % 4 === 0 ? chord.root : chord.root * 2, 0.14, "sawtooth", 0.2);
+  if (inBar === 0) tone(chord.root * 0.5, 0.6, "sine", 0.16);
+  // wide brass power chords
+  if (inBar === 0 || inBar === 8) {
+    voice(chord.root, 0.5, "sawtooth", 0.1, 0, -0.55, 0.22);
+    voice(chord.root * 1.007, 0.5, "sawtooth", 0.1, 0, 0.55, 0.22);
+    voice(chord.fifth, 0.5, "sawtooth", 0.09, 0, 0.3, 0.22);
+    voice(chord.root * 2, 0.5, "sawtooth", 0.07, 0, -0.3, 0.22);
+  }
+  // grand choir bed
+  if (inBar === 0) {
+    voice(chord.arp[0], 1.8, "sine", 0.05, 0, -0.5, 0.5);
+    voice(chord.arp[1], 1.8, "sine", 0.05, 0.04, 0.5, 0.5);
+    voice(chord.fifth * 2, 1.8, "sine", 0.035, 0.08, 0, 0.5);
+  }
+  // fast arp + high shimmer
+  const an = chord.arp[ARP_SHAPES[(bar % 8) % ARP_SHAPES.length][step & 3]];
+  if (an) tone(an, 0.1, "square", 0.07);
+  if (inBar % 2 === 0) {
+    const bnote = chord.arp[(step >> 1) % chord.arp.length] * 2;
+    voice(bnote, 0.3, "triangle", 0.045, 0, (step >> 1) % 2 === 0 ? -0.6 : 0.6, 0.5);
+  }
+  // soaring brass lead — メニューで耳に聴こえる並び(E-D-B-A から)に合わせて開始位置を回転。
+  const note = LEAD_PHRASE[((bar + 3) % 4) * BAR + inBar];
+  if (note) {
+    echoTone(note, 0.28, "sawtooth", 0.13, 0, 2, 0.11, 0.45);
+    echoTone(note * 2, 0.24, "square", 0.06, 0, 1, 0.11, 0.45);
+    voice(note, 0.3, "sine", 0.05, 0, 0, 0.4);
+  }
+  // orchestral hit + crash ONLY at the real drop (bar 32, after the build).
+  // 冒頭(bar 0)では鳴らさない — 大シンバルでいきなり始まるのを避ける。
+  if (lb === 32 && inBar === 0) {
+    noise(0.4, 0.22);
+    tone(chord.root, 0.4, "sawtooth", 0.13);
+    tone(chord.fifth, 0.4, "sawtooth", 0.1);
+  }
+}
+
+function finalTick(): void {
+  if (muted) return;
+  const step = bgmStep;
+  const bar = Math.floor(step / BAR);
+  const inBar = step % BAR;
+  const chord = FINAL_PROG[bar % FINAL_PROG.length]; // ★ 小室進行(旋律はメインテーマのまま)
+  const lb = bar % FINAL_LOOP_BARS;
+
+  // ===== [15] クライマックス→静寂の "崩し" 遷移(EDMのダウンリフター+リバースシンバル) =====
+  if (lb === 15) {
+    if (inBar === 0) slideTone(chord.root * 4, chord.root, 1.3, "sawtooth", 0.13); // downlifter
+    // 加速するスネアロール → bar頭に向かって膨らむ逆再生シンバル
+    if (inBar % (inBar < 8 ? 2 : 1) === 0) noise(0.03, 0.05 + inBar * 0.012);
+    noisePan(0.06, 0.02 + (inBar / 16) * 0.24, 0, 0.35);
+    // 合唱だけは繋ぎとして残す
+    if (inBar === 0) {
+      voice(chord.arp[0], 1.6, "sine", 0.045, 0, -0.5, 0.5);
+      voice(chord.arp[1], 1.6, "sine", 0.045, 0.04, 0.5, 0.5);
+    }
+    return;
+  }
+
+  // ===== クライマックス [0–14] / 大サビ [32–47] =====
+  if (lb < 15 || lb >= 32) {
+    finalClimax(chord, step, inBar, bar, lb);
+    return;
+  }
+
+  // ===== 静寂 → 2小節ごとにレイヤーを積むビルド [16–31] =====
+  const tier = Math.floor((lb - 16) / 2); // 0..7、2小節ごとに +1
+  // [16] ドロップ着地のインパクト + 長い残響テールで静寂へ
+  if (lb === 16 && inBar === 0) {
+    noise(0.5, 0.26);
+    tone(chord.root, 0.5, "sine", 0.2);
+    voice(chord.root, 2.6, "sawtooth", 0.05, 0, 0, 0.6); // reverberant boom tail
+  }
+
+  // tier0(常時): 剥き出しの合唱パッド + 柔らかい主旋律 + 疎なベル(静かな曲調)
+  if (inBar === 0) {
+    voice(chord.arp[0], 2.2, "sine", 0.06, 0, -0.5, 0.55);
+    voice(chord.arp[1], 2.2, "sine", 0.06, 0.04, 0.5, 0.55);
+    voice(chord.fifth * 2, 2.2, "sine", 0.04, 0.08, 0, 0.55);
+  }
+  if (inBar % 4 === 0) {
+    const bnote = chord.arp[(step >> 1) % chord.arp.length] * 2;
+    voice(bnote, 0.5, "sine", 0.05, 0, bar % 2 ? 0.5 : -0.5, 0.55);
+  }
+  // 主旋律: ビルド中は柔らかいサイン。メニューと同じく E-D-B-A から始まる並びに合わせる。
+  const note = LEAD_PHRASE[((bar + 3) % 4) * BAR + inBar];
+  if (note) voice(note, 0.5, "sine", 0.06 + Math.min(0.03, tier * 0.005), 0, 0, 0.5);
+
+  // tier1+: 柔らかいサブ
+  if (tier >= 1 && inBar === 0) tone(chord.root * 0.5, 1.0, "sine", 0.12);
+  // tier1+(=2番目のレイヤー追加から): バックコーラス「Ha—」。半小節ごとに和音上で
+  // 声のように歌う(息の"H"+デチューンの母音)。tierが上がるほど少し前に出る。
+  if (tier >= 1 && (inBar === 0 || inBar === 8)) {
+    const vv = 0.045 + Math.min(0.03, (tier - 1) * 0.006);
+    const f = inBar === 0 ? chord.arp[0] : chord.arp[1];
+    noisePan(0.05, vv * 0.5, inBar === 0 ? -0.4 : 0.4, 0.4); // 息の "H"
+    voice(f, 1.1, "sine", vv, 0.02, inBar === 0 ? -0.45 : 0.45, 0.5); // 母音の芯
+    voice(f * 1.006, 1.1, "triangle", vv * 0.6, 0.04, inBar === 0 ? 0.45 : -0.45, 0.55); // 人声感のデチューン
+  }
+  // tier2+: 静かな4つ打ちキック(徐々に強く)
+  if (tier >= 2 && inBar % 4 === 0) {
+    noise(0.04, 0.07 + tier * 0.02);
+    slideTone(110, 42, 0.1, "sine", 0.1 + tier * 0.02);
+  }
+  // tier3+: 裏ハット
+  if (tier >= 3 && inBar % 2 === 1) noise(0.02, 0.05);
+  // tier4+: オクターブ・ベース駆動
+  if (tier >= 4 && inBar % 2 === 0) tone(inBar % 4 === 0 ? chord.root : chord.root * 2, 0.13, "sawtooth", 0.14);
+  // tier5+: アルペジオ復帰
+  if (tier >= 5) {
+    const an = chord.arp[ARP_SHAPES[(bar % 8) % ARP_SHAPES.length][step & 3]];
+    if (an) tone(an, 0.1, "square", 0.05);
+  }
+  // tier6+: ブラスstab + バックビートのクラップ
+  if (tier >= 6) {
+    if (inBar === 0) {
+      voice(chord.root, 0.4, "sawtooth", 0.07, 0, -0.5, 0.2);
+      voice(chord.fifth, 0.4, "sawtooth", 0.06, 0, 0.5, 0.2);
+    }
+    if (inBar === 4 || inBar === 12) noisePan(0.05, 0.12, 0, 0.2);
+  }
+  // tier7(最後の2小節 30–31): ドロップ直前のスネアロール加速 + riser
+  if (tier >= 7) {
+    const p = (lb - 30 + inBar / 16) / 2; // 0..1
+    if (inBar % (p < 0.5 ? 2 : 1) === 0) noise(0.03, 0.08 + p * 0.24);
+    if (inBar % 2 === 0) slideTone(300, 1600, 0.14, "sawtooth", 0.03 + p * 0.07);
+  }
 }
 
 // ===== Casino renderer (落ち着いた煌びやかラウンジ) =====
@@ -868,6 +1120,82 @@ function dungeonTick(): void {
   if (isBoss && mode !== "A" && inBar % 2 === 0) noise(0.018, 0.035);
 }
 
+// ===== Credits renderer ("Running Toward Light") =====
+// 全合成のクレジット曲。スパークリングなパルス・アルペジオ + 明るいパルス・リードで
+// 始まり(イントロ)、トライアングル・ベースとドラムでAメロ、密度を上げてプリサビ、
+// ワイドに開いたサビへ。装備や場所のテーマと同じ step クロックに乗る。
+function creditsTick(): void {
+  if (muted) return;
+  const T = bgmTranspose;
+  const step = bgmStep;
+  const bar = Math.floor(step / BAR); // 0..31
+  const inBar = step % BAR;
+  const chord = CREDITS_PROG[bar];
+  const sect = creditsSection(bar);
+  const intro = sect === "intro";
+  const verse = sect === "verse";
+  const pre = sect === "pre";
+  const chorus = sect === "chorus";
+  const duck = inBar === 0 ? 0.7 : 1;
+
+  // ---- Bass(triangle): イントロは静かなペダル、以降は駆けるオクターブ8分 ----
+  if (intro) {
+    if (inBar === 0) tone(chord.root * T, 1.4, "triangle", 0.12);
+  } else if (inBar % 2 === 0) {
+    const oct = inBar % 4 === 0 ? 1 : 2; // root → octave のバウンス
+    tone(chord.root * oct * T, 0.16, "triangle", chorus ? 0.2 : 0.16);
+  }
+
+  // ---- 暖かいデチューン・パッド(小節頭) ----
+  if (inBar === 0) {
+    pad(chord.root * T, 1.5, intro ? 0.04 : 0.055);
+    if (!intro) pad(chord.fifth * T, 1.5, 0.04);
+  }
+
+  // ---- きらめくパルス・アルペジオ(本曲の signature。通常8分 / ビルド・サビは16分) ----
+  const arpRate = pre || chorus ? 1 : 2;
+  if (inBar % arpRate === 0) {
+    const shape = ARP_SHAPES[bar % ARP_SHAPES.length];
+    const note = chord.arp[shape[Math.floor(step / arpRate) & 3]];
+    if (note) tone(note * T, 0.12, "square", (intro ? 0.09 : chorus ? 0.07 : 0.06) * duck);
+  }
+
+  // ---- スクエア・リード(作曲した主旋律)。サビはオクターブ重ね＋残響でワイドに ----
+  const lf = CREDITS_LEAD.freq[step];
+  if (lf) {
+    const dur = CREDITS_LEAD.dur[step];
+    const lv = chorus ? 0.13 : intro ? 0.085 : 0.11;
+    voice(lf * T, dur, "square", lv, 0, -0.05, chorus ? 0.18 : 0.08);
+    voice(lf * 2 * T, dur, "square", lv * 0.22, 0, 0.05, 0.12);
+  }
+
+  // ---- 高域のスパークル(イントロの煌めき＋サビのシマー、ステレオ＋残響) ----
+  if ((intro && inBar % 8 === 0) || (chorus && inBar % 4 === 0)) {
+    const n = chord.arp[2] * 2 * T;
+    const pan = (step >> 2) % 2 === 0 ? -0.5 : 0.5;
+    voice(n, 0.3, "sine", 0.045, 0, pan, 0.4);
+  }
+
+  // ---- ドラム ----
+  if (intro) {
+    if (bar >= 2 && inBar % 4 === 2) noise(0.02, 0.04); // 後半だけ軽いハット
+  } else {
+    if (inBar === 0 || inBar === 8) {
+      // キック(1・3拍)
+      noise(0.05, 0.18);
+      slideTone(110 * T, 42 * T, 0.1, "sine", 0.2);
+    }
+    if (inBar === 4 || inBar === 12) {
+      // スネア(2・4拍)
+      noise(0.14, 0.14);
+      tone(190 * T, 0.1, "triangle", 0.1);
+    }
+    if ((verse && inBar % 4 === 2) || ((pre || chorus) && inBar % 2 === 1)) noise(0.025, 0.06); // ハット
+    if (pre && bar === 15 && inBar >= 8) noise(0.03, 0.08 + (inBar - 8) * 0.012); // サビ直前のフィル
+    if (chorus && (bar === 16 || bar === 24) && inBar === 0) noise(0.5, 0.16); // クラッシュ
+  }
+}
+
 // ===== Forge renderer =====
 // Heavy, patient D-dorian: detuned-saw drone + deep sub, half-time kick, an anvil
 // clank with metallic overtones and a ringing echo tail, and a slow hammer-fall
@@ -926,7 +1254,7 @@ function forgeTick(): void {
 // 王道進行のアイドルポップを 16bit ゲーム音源風に。A(Aメロ)→A2(Bメロ/ビルドアップ)
 // →B(サビ)→A'(間奏) の起伏を表現。ステレオパン+共有リバーブで空間の広がりを、
 // クラップ/キラキラ上昇/ワイドstab/高域シマーで特殊アクセントを加えている。
-function idolTick(): void {
+function idolTick(sea = false): void {
   if (muted) return;
   const def = THEMES.idol;
   const T = bgmTranspose;
@@ -1051,6 +1379,36 @@ function idolTick(): void {
       // 主声(やや左) + わずかにデチューンした副声(やや右)で厚みと幅。
       slideVoice(note * 0.985 * T, note * T, 0.26, "square", lv, 0, 0.04, -0.22, 0.3);
       slideVoice(note * 0.985 * 1.006 * T, note * 1.006 * T, 0.26, "square", lv * 0.6, 0.012, 0.04, 0.22, 0.35);
+      // 海リカラー: 1oct上のサイン重ねで“海風”の倍音(エアリー)。
+      if (sea) voice(note * 2 * T, 0.28, "sine", lv * 0.3, 0.01, 0.15, 0.45);
+    }
+  }
+
+  // ================= 海っぽいリカラー（同じ Idol 曲に海の音色を足す） =================
+  // sea=false の通常 idol(ダイスラッシュAT)には一切影響しない加算レイヤー。
+  if (sea) {
+    // ① 波のウォッシュ: セクション頭で「ザァ…」と寄せる残響ノイズ(L/R)。
+    if (inBar === 0) {
+      const swell = isChorus ? 0.05 : 0.035;
+      noisePan(0.6, swell, -0.35, 0.5);
+      noisePan(0.6, swell, 0.35, 0.5);
+    }
+    // ②引き波: サビ前の最終小節で細かく引いていく波。
+    if (secPos === 7 && inBar >= 12) {
+      noisePan(0.18, 0.03, inBar % 2 ? 0.4 : -0.4, 0.45);
+    }
+    // ③ マリンベル(スティールパン風): 和音の頂点をL/Rへピンと響かせる＝南国/海の煌めき。
+    if ((isChorus || isVerse) && inBar % 2 === 0) {
+      const idx = (inBar / 2) % 4;
+      const f = chord.arp[idx] * 2 * T;
+      const pan = (inBar / 2) % 2 === 0 ? -0.5 : 0.5;
+      voice(f, 0.45, "triangle", isChorus ? 0.06 : 0.04, 0, pan, 0.45);
+      voice(f, 0.45, "sine", isChorus ? 0.03 : 0.02, 0.03, -pan, 0.5); // 逆サイドへ反響
+    }
+    // ④ 水面のきらめき: 常時うっすら高域シマー(セクション頭でロングに伸ばす)。
+    if (inBar === 0) {
+      voice(chord.root * 6 * T, 1.6, "sine", 0.018, 0, -0.7, 0.5);
+      voice(chord.root * 6 * 1.01 * T, 1.6, "sine", 0.018, 0, 0.7, 0.5);
     }
   }
 }
@@ -1157,8 +1515,16 @@ const WORLD_TRACKS: MusicTrack[] = WORLD_KEYS.map((key, i) => {
 export const MUSIC_TRACKS: MusicTrack[] = [
   { id: "dungeon", name: "迷宮 / 拠点", desc: "メニューで流れる A-minor のダンジョンループ", theme: "dungeon" },
   ...WORLD_TRACKS,
+  { id: "final", name: "機神デウス＝エクス＝マキナ (1000階)", desc: "メインテーマが荘厳に再臨する長尺の最終決戦曲。盛り上がり→静寂→再構築の大きな起伏", theme: "final" },
   { id: "boss", name: "大ボス戦", desc: "速く緊迫した大ボス階のテーマ", theme: "boss" },
   { id: "casino", name: "カジノ", desc: "落ち着いた煌びやかなラウンジ", theme: "casino" },
   { id: "forge", name: "鍛冶屋", desc: "重厚な D-ドリアン。金床のクランク", theme: "forge" },
   { id: "idol", name: "ダイスラッシュ (AT)", desc: "王道進行のアイドルポップ(BIG中)", theme: "idol" },
+  { id: "seaIdol", name: "甘ダイス連チャン 〜潮騒アイドル〜", desc: "同じアイドルポップを海っぽくリカラー(波/マリンベル/水面の煌めき)。甘ダイス確変中に流れる", theme: "seaIdol" },
+  {
+    id: "credits",
+    name: "スタッフロール 〜光へ走る〜",
+    desc: "明るくほろ苦い D メジャーのクレジット曲。IV→V→vi で駆け上がる",
+    theme: "credits",
+  },
 ];

@@ -311,12 +311,15 @@ export function proceduralSetDef(n: number): SetDef {
       bonuses: override,
     };
   }
-  // Pick three distinct primitives deterministically from n.
+  // Pick three distinct primitives deterministically from n. Walking
+  // consecutive indices from a per-n start guarantees distinct picks in exactly
+  // 3 steps and is bounded by PRIMS.length, so it can never hang regardless of
+  // PRIMS.length / parity. (A previous step-based variant could land on a step
+  // of 0 or PRIMS.length/2, cycling forever and freezing the casino exchange.)
   const picks: number[] = [];
-  let k = (n * 7 + 3) % PRIMS.length;
-  while (picks.length < 3) {
-    if (!picks.includes(k)) picks.push(k);
-    k = (k + 5 + n) % PRIMS.length;
+  const start = (n * 7 + 3) % PRIMS.length;
+  for (let i = 0; i < PRIMS.length && picks.length < 3; i++) {
+    picks.push((start + i) % PRIMS.length);
   }
   const tiers: (2 | 4 | 6)[] = [2, 4, 6];
   return {
@@ -332,7 +335,9 @@ export function proceduralSetDef(n: number): SetDef {
 // getSetDef runs several times per turn via computeSetEffects. Cache by key so the
 // build happens once per unique set (#perf).
 const setDefCache = new Map<string, SetDef | null>();
-const SETDEF_CACHE_MAX = 128;
+// Deep Endless runs touch many gset<n> keys; a larger cache avoids LRU thrash
+// (rebuilding the same procedural set repeatedly) when re-rendering deep inventories.
+const SETDEF_CACHE_MAX = 256;
 
 /** Resolve any set key (fixed or `gset<n>`) into its definition. */
 export function getSetDef(key: string): SetDef | null {
@@ -381,7 +386,9 @@ export function availableSetKeys(floor: number): string[] {
     warmonger: 300,
   };
   for (const s of SET_DEFS) if (floor >= (namedFloor[s.key] ?? 1)) keys.push(s.key);
-  for (let n = 0; proceduralSetFloor(n) <= floor; n++) keys.push(`gset${n}`);
+  // proceduralSetFloor(n) = 150 + n*150 ≤ floor  ⇒  n ≤ (floor-150)/150 (closed form).
+  const maxN = Math.floor((floor - 150) / 150);
+  for (let n = 0; n <= maxN; n++) keys.push(`gset${n}`);
   return keys;
 }
 
@@ -399,6 +406,10 @@ export interface SetEffects {
   healOnReroll: number;
   sixDouble: boolean;
   rollTwoDice: boolean;
+  /** 最終的な攻撃倍率(★スケール後の attack に (1+attackPct) を乗算)。 */
+  attackPct: number;
+  /** 最終的なHP倍率(maxHp に (1+maxHpPct) を乗算)。 */
+  maxHpPct: number;
   activeTiers: { key: string; name: string; pieces: number; icon: string }[];
   /** Active set×job synergies (label + description) for the UI. */
   synergies: { name: string; desc: string }[];
@@ -561,7 +572,18 @@ function gamblerFaceOneToTwo(): DiceModifier {
  * Count equipped pieces per set and resolve the combined bonus effects.
  * Passing `classId` also applies any matching set×job synergies.
  */
+// 1ターンに複数箇所(buildFaces / passiveBonus / currentStats / confirm 等)から呼ばれる
+// ため、(equipped, classId) の参照が一致すれば結果を使い回す1エントリ参照メモ。装備
+// 変更・クラス変更で参照が変われば自動的に再計算される(ストアは不変更新)。戻り値は
+// 呼び出し側で破壊しない前提(全呼び出しが読み取りのみ)。
+let _setEffEquipped: EquippedItems | null = null;
+let _setEffClassId: ClassId | undefined;
+let _setEffResult: SetEffects | null = null;
+
 export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): SetEffects {
+  if (_setEffResult && equipped === _setEffEquipped && classId === _setEffClassId) {
+    return _setEffResult;
+  }
   const counts: Record<string, number> = {};
   for (const slot of EQUIP_SLOTS) {
     const it = equipped[slot];
@@ -580,6 +602,8 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
     healOnReroll: 0,
     sixDouble: false,
     rollTwoDice: false,
+    attackPct: 0,
+    maxHpPct: 0,
     activeTiers: [],
     synergies: [],
   };
@@ -608,6 +632,44 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
     }
   }
 
+  // ===== 固有共鳴 (Signature Resonance) =====
+  // 装備中の固有(signature)装備の数から LIVE 計算するボーナス。装備IDから毎回
+  // 再計算されるためセーブ非互換にならない。固有装備を揃えるほど攻撃/HPが伸び、
+  // 「固有6部位」が耐久メタに匹敵する一つのビルド概念になる。
+  let sigCount = 0;
+  for (const slot of EQUIP_SLOTS) {
+    if (equipped[slot]?.signature) sigCount += 1;
+  }
+  if (sigCount >= 2) {
+    eff.attackPct += 0.12;
+    eff.maxHpPct += 0.12;
+  }
+  if (sigCount >= 4) {
+    eff.attackPct += 0.13; // 累計 .25
+    eff.extraHit = true;
+    eff.statBonus.reroll += 1;
+  }
+  if (sigCount >= 6) {
+    eff.attackPct += 0.2; // 累計 .45
+    eff.maxHpPct += 0.18; // 累計 .30
+    // 大成: 全ての面のミスを消す(出目1などの空振りを無くす)。
+    eff.diceModifiers.push({
+      faces: [1, 2, 3, 4, 5, 6],
+      effect: { isMiss: false },
+      description: "固有共鳴6: 全ての出目がミスしない",
+    });
+  }
+
+  // ===== セット集中ボーナス (single-set focus capstone) =====
+  // 単一の名前付きセットを6部位揃えると攻撃+15%。2pcスイッチ分散ではなく
+  // 一つの概念に振り切る選択を競争力あるものにする(上方修正のみ)。
+  for (const [key, n] of Object.entries(counts)) {
+    if (n >= 6 && getSetDef(key)) {
+      eff.attackPct += 0.15;
+      break;
+    }
+  }
+
   // Set × job synergies.
   if (classId) {
     for (const syn of SYNERGIES) {
@@ -618,5 +680,8 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
     }
   }
 
+  _setEffEquipped = equipped;
+  _setEffClassId = classId;
+  _setEffResult = eff;
   return eff;
 }

@@ -27,19 +27,27 @@ export const COIN_BUY_SCALE = 200;
 /**
  * Gold cost to BUY `amount` coins. Deliberately gets pricier the more coins you
  * already hold, so you can't cheaply stockpile — slotで稼ぐのが本筋(買いづらく)。
- * 単価 = COIN_VALUE × (1 + 所持コイン / COIN_BUY_SCALE)。
+ * 単価は購入の途中でも“積み上がる保有量”に沿って逓増する（held → held+amount を
+ * 積分）。これにより「全部換金して0枚→まとめ買い」で基本レート(20:1)に固定する
+ * 裁定(グリッチ)を封じる。実効平均単価 = COIN_VALUE × (1 + (held + amount/2) / SCALE)。
  */
 export function coinBuyCost(amount: number, held: number): number {
-  const mult = 1 + Math.max(0, held) / COIN_BUY_SCALE;
-  return Math.ceil(Math.max(0, amount) * COIN_VALUE * mult);
+  const amt = Math.max(0, amount);
+  const h = Math.max(0, held);
+  return Math.ceil(amt * COIN_VALUE * (1 + (h + amt / 2) / COIN_BUY_SCALE));
 }
 
-/** Max coins buyable for `gold`, at the current (held-scaled) price. */
+/** Max coins buyable for `gold`, at the current (held-scaled, 逓増) price. */
 export function coinBuyMax(gold: number, held: number): number {
-  const unit = COIN_VALUE * (1 + Math.max(0, held) / COIN_BUY_SCALE);
-  let amt = Math.floor(Math.max(0, gold) / unit);
-  while (amt > 0 && coinBuyCost(amt, held) > gold) amt--; // guard ceil rounding
-  return Math.max(0, amt);
+  const g = Math.max(0, gold);
+  const h = Math.max(0, held);
+  // cost(amt) ≒ a·amt² + b·amt を amt について解いた概算→丸め誤差をループで補正。
+  const a = COIN_VALUE / (2 * COIN_BUY_SCALE);
+  const b = COIN_VALUE * (1 + h / COIN_BUY_SCALE);
+  let amt = Math.max(0, Math.floor((-b + Math.sqrt(b * b + 4 * a * g)) / (2 * a)));
+  while (amt > 0 && coinBuyCost(amt, h) > g) amt--; // ceil丸めで予算超過したら下げる
+  while (coinBuyCost(amt + 1, h) <= g) amt++; // 概算が控えめなら取りこぼしを拾う
+  return amt;
 }
 
 export type SlotOutcome =
@@ -123,6 +131,84 @@ export function ceilingSpins(setting: number): number {
   return 900 - Math.max(1, Math.min(6, setting)) * 60; // 1→840 … 6→540
 }
 
+// ===== 甘ダイス(パチンコ)用の台・設定 =====
+// スロットと同じ「4台・隠し設定1-6・6時間シャッフル」だが、別シードで独立し、
+// 設定差(機械割の幅)はスロットより少し広い（看破の沼を深く）。
+
+/** 甘ダイス4台の隠し設定(1-6)。スロットとは別シードで独立に決まる。 */
+export function pachiMachineSettings(bucket: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < MACHINE_COUNT; i++) {
+    const h = Math.abs(Math.sin((bucket + 1) * 24.137 + (i + 1) * 51.77) * 91271.13);
+    out.push(1 + Math.floor((h % 1) * 6)); // 1..6
+  }
+  return out;
+}
+
+/** 甘ダイスの設定倍率（初当たり率に乗算）。スロット(0.88〜1.28・幅0.40)より広い 0.70〜1.30(幅0.60)。
+ *  3.5を中心に対称＝平均は等倍（基準RTPを保ちつつ台ごとの差を大きく）。 */
+export function pachiSettingMult(setting: number): number {
+  return 1 + (Math.max(1, Math.min(6, setting)) - 3.5) * 0.12; // 1→0.70 … 6→1.30
+}
+
+/** 甘ダイスの天井(回転)。高設定ほど浅い。 */
+export function pachiCeilingSpins(setting: number): number {
+  return 600 - Math.max(1, Math.min(6, setting)) * 30; // 1→570 … 6→420
+}
+
+// ===== イベントデー (カレンダー連動の設定上書き) =====
+// プレイヤーの“今日”の日付(ローカルの日)で隠し設定を一時的に上書きする祭り。
+//  - 0のつく日(10/20/30): スロット＆甘ダイス両方を「polar」上書き。最優先。
+//      低設定(≤3)→1、高設定(≥4)→6 に振り分けて、台選びの明暗をくっきり。
+//  - 1のつく日(1/11/21/31): 甘ダイスのみ「boost」上書き(≤3→3, ≥4→5)。
+//  - 7のつく日(7/17/27): スロットのみ「boost」上書き。
+// 17のように1と7が重なる日は両方boost。0の日は1を含んでいても常にpolar(優先)。
+
+/** 設定の上書きモード。boost: ≤3→3,≥4→5 ／ polar: ≤3→1,≥4→6 */
+export type EventOverride = "boost" | "polar";
+
+export interface CasinoEventDay {
+  slot: EventOverride | null;
+  pachinko: EventOverride | null;
+  label: string; // 例: "1のつく日" / "7のつく日" / "1・7のつく日" / "0のつく日" / 無いとき ""
+  active: boolean;
+}
+
+/** 今日(ローカルの日)からイベント内容を判定。date 省略時は new Date()。 */
+export function casinoEvent(date?: Date): CasinoEventDay {
+  const day = String((date ?? new Date()).getDate());
+  const has0 = day.includes("0");
+  const has1 = day.includes("1");
+  const has7 = day.includes("7");
+  // 0のつく日は最優先：1を含む日(10など)でもpolar両取り。
+  if (has0) {
+    return { slot: "polar", pachinko: "polar", label: "0のつく日", active: true };
+  }
+  const slot: EventOverride | null = has7 ? "boost" : null;
+  const pachinko: EventOverride | null = has1 ? "boost" : null;
+  const label = has1 && has7 ? "1・7のつく日" : has1 ? "1のつく日" : has7 ? "7のつく日" : "";
+  return { slot, pachinko, label, active: !!(slot || pachinko) };
+}
+
+/** 隠し設定をイベントモードで上書き(null はそのまま返す)。 */
+export function overrideSetting(s: number, mode: EventOverride | null): number {
+  if (mode === "boost") return s <= 3 ? 3 : 5;
+  if (mode === "polar") return s <= 3 ? 1 : 6;
+  return s;
+}
+
+/** スロット4台の“実効”設定(イベント上書き適用後)。 */
+export function effectiveSlotSettings(bucket: number, date?: Date): number[] {
+  const mode = casinoEvent(date).slot;
+  return machineSettings(bucket).map((s) => overrideSetting(s, mode));
+}
+
+/** 甘ダイス4台の“実効”設定(イベント上書き適用後)。 */
+export function effectivePachiSettings(bucket: number, date?: Date): number[] {
+  const mode = casinoEvent(date).pachinko;
+  return pachiMachineSettings(bucket).map((s) => overrideSetting(s, mode));
+}
+
 /** 連チャンゾーン: length and BIG/REG odds boost right after an AT ends.
  * 連チャン率は控えめに(倍率・長さを下げた)。 */
 export const ZONE_SPINS = 24;
@@ -140,8 +226,12 @@ export const BAN_BOSSES = 10;
 // 超高額のカジノコインで強力なセット武器・転生ポイントと交換できる(射幸性の出口)。
 /** Coins to exchange for one set-piece weapon. */
 export const SET_WEAPON_COIN = 8000;
+/** おじさんに甘ダイスの台の設定をランダムに1つ聞く値段。 */
+export const SETTING_TIP_COIN = 2000;
 /** Coins per 転生ポイント (deliberately pricier). */
 export const SOULS_COIN = 3000;
+/** Coins to exchange for one random 固有(signature) weapon. */
+export const SIGNATURE_WEAPON_COIN = 2000;
 
 /**
  * Coin payout for an outcome (replay pays 0 — next spin is free instead).
@@ -184,15 +274,15 @@ export function atSpinPayout(): number {
 /**
  * Chance per AT game of an 上乗せ (extra games). Returns the games added (0=none).
  * 重要: 1ゲームの期待上乗せが消化(-1G)を下回らないとATが発散して「終わらない」。
- * 通常上乗せ 2%×平均10 + 特大上乗せ 0.05%×平均475 = 約0.44G/G ＜ 1 なので必ず収束。
- * ただし特大上乗せ(+350〜600G)は約1割のATで降ってくるので、運がいいと700G級まで伸びる。
+ * 通常上乗せ 2%×平均10 + 特大上乗せ 0.05%×平均850 = 約0.625G/G ＜ 1 なので必ず収束。
+ * 特大上乗せ(+500〜1200G)は約1割のATで降る“鬼連チャン”枠＝伸びを強化（運がいいと1500G級）。
  */
 export const AT_RENSHO_CHANCE = 0.02;
-/** 特大上乗せ(運がいいと700G級)の発生率。 */
+/** 特大上乗せ(鬼連チャン＝運がいいと1500G級)の発生率。 */
 export const AT_JACKPOT_CHANCE = 0.0005;
 export function atRensho(): number {
   const r = Math.random();
-  if (r < AT_JACKPOT_CHANCE) return 350 + Math.floor(Math.random() * 251); // +350–600G(特大)
+  if (r < AT_JACKPOT_CHANCE) return 500 + Math.floor(Math.random() * 701); // +500–1200G(特大=鬼連チャン)
   if (r < AT_JACKPOT_CHANCE + AT_RENSHO_CHANCE) return 5 + Math.floor(Math.random() * 11); // +5–15G
   return 0;
 }
@@ -282,21 +372,6 @@ export function pickReach(win: boolean): ReachDef {
 
 /** Chance a losing spin still shows a (gase) reach, for tension. */
 export const GASE_REACH_CHANCE = 0.1;
-
-// ===== 運命の大博打 (Fate gamble) =====
-// 期待値超低めの一撃必殺コンテンツ。ハズレ続きで、まれに「所持している★より2段階上」の
-// 装備 or 転生ポイントが出る。長め・派手な演出は UI 側（FatePanel）が担う。
-
-/** Win chance per spin. Deliberately tiny — most pulls are losses. */
-export const FATE_WIN_CHANCE = 0.08;
-
-/**
- * Gold cost of one Fate spin. Scales with the player's current best gear tier so
- * it stays an expensive sink late-game (gold is plentiful by then).
- */
-export function fateCost(refTier: number): number {
-  return Math.max(3000, Math.round(Math.max(0, refTier) * 80));
-}
 
 // ===== dice blackjack =====
 

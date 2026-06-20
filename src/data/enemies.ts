@@ -1,4 +1,5 @@
 import { applyEnemyModifier, enemyModTierForFloor } from "@/data/modifiers";
+import { FINAL_FLOOR } from "@/data/worlds";
 import type { EnemyScale } from "@/data/difficulty";
 import type { Enemy, EnemyAbility, EnemyTemplate } from "@/types/game";
 
@@ -24,6 +25,17 @@ export const ENEMY_ABILITY_LABEL: Record<EnemyAbility, string> = {
   guardBreak: "防御無視",
   poison: "毒",
   shock: "麻痺",
+};
+
+/** Matchup trait keys an enemy can carry (besides always-on boss executeImmune). */
+export type EnemyTrait = "lifestealImmune" | "multiHitResist" | "statusResist";
+
+/** Bestiary-facing labels for matchup traits. */
+export const ENEMY_TRAIT_LABEL: Record<EnemyTrait | "executeImmune", string> = {
+  lifestealImmune: "吸血無効",
+  multiHitResist: "多段耐性",
+  statusResist: "状態異常耐性",
+  executeImmune: "即死無効",
 };
 
 const ENEMY_DEFS: EnemyDef[] = [
@@ -135,6 +147,28 @@ export const BOSS_TEMPLATES: EnemyTemplate[] = BOSS_DEFS.map(
   }),
 );
 
+/**
+ * 1000F の固定ラスボス。「ダイス×機械神」DEUS EX MACHINA。サイクルするボスとは別枠で、
+ * 最深部だけに出現する固有キャラクター。防御無視の一撃を放つ最終存在。
+ */
+export const FINAL_BOSS: EnemyTemplate = {
+  id: "deus",
+  name: "機神デウス＝エクス＝マキナ",
+  emoji: "🎲",
+  baseHp: 200,
+  baseAttack: 18,
+  baseDefense: 10,
+  baseExp: 50,
+  baseGold: 60,
+  dropRate: 1,
+  isBoss: true,
+  ability: "guardBreak",
+  desc: "全ての出目を支配する機械の神。ダイスと歯車の化身たる最終存在。",
+};
+
+/** All bosses for the bestiary (cycling bosses + the fixed final boss). */
+export const BESTIARY_BOSSES: readonly EnemyTemplate[] = [...BOSS_TEMPLATES, FINAL_BOSS];
+
 /** Backwards-compatible alias to the first boss. */
 export const BOSS_TEMPLATE: EnemyTemplate = BOSS_TEMPLATES[0];
 
@@ -174,7 +208,8 @@ const DEFAULT_SCALE: EnemyScale = {
 export function generateEnemy(floor: number, scale: EnemyScale = DEFAULT_SCALE): Enemy {
   const rank = bossRank(floor);
   const isBossFloor = rank > 0;
-  const template = isBossFloor ? pickBoss(floor) : pickNormalTemplate(floor);
+  const isFinalBoss = floor === FINAL_FLOOR;
+  const template = isFinalBoss ? FINAL_BOSS : isBossFloor ? pickBoss(floor) : pickNormalTemplate(floor);
 
   const tier = Math.floor(floor / 10);
   const hpScale = 1 + floor * scale.hpPerFloor;
@@ -208,7 +243,7 @@ export function generateEnemy(floor: number, scale: EnemyScale = DEFAULT_SCALE):
   const enemy: Enemy = {
     id: `${template.id}_${floor}`,
     templateId: template.id,
-    name: isBossFloor ? `${template.name} Lv${tier}` : template.name,
+    name: isFinalBoss ? template.name : isBossFloor ? `${template.name} Lv${tier}` : template.name,
     emoji: template.emoji,
     maxHp,
     hp: maxHp,
@@ -230,15 +265,75 @@ export function generateEnemy(floor: number, scale: EnemyScale = DEFAULT_SCALE):
     chargeCounter: 0,
     bossTurns: 0,
     modTier: 0,
+    // 相性フラグは既定 false。下で付与する。
+    lifestealImmune: false,
+    multiHitResist: false,
+    statusResist: false,
+    executeImmune: false,
   };
+
+  assignMatchupTraits(enemy, floor, rank, isBossFloor, isFinalBoss);
 
   // Apply the floor's ★ modifier (no-op below floor 50); harder modes grow it faster.
   return applyEnemyModifier(enemy, enemyModTierForFloor(floor), scale.enemyStarBonus);
 }
 
+/** Roster of rollable traits for normal/boss extra traits. */
+const ALL_TRAITS: readonly EnemyTrait[] = ["lifestealImmune", "multiHitResist", "statusResist"];
+
+/**
+ * テンプレIDから自然なフレーバー相性を優先付与する弱マップ。該当しなければ
+ * 単純なランダム抽選にフォールバックする(過剰設計はしない)。
+ */
+const TRAIT_FLAVOR: Record<string, EnemyTrait> = {
+  // アンデッド/スライム系 → 状態異常耐性
+  slime: "statusResist", zombie: "statusResist", skeleton: "statusResist",
+  mummy: "statusResist", slimeking: "statusResist", lich: "statusResist",
+  // 装甲/甲殻系 → 多段耐性
+  golem: "multiHitResist", gargoyle: "multiHitResist", crab: "multiHitResist",
+  titan: "multiHitResist",
+  // 構造体/虚無系 → 吸血無効
+  wisp: "lifestealImmune", specter: "lifestealImmune", voidlord: "lifestealImmune",
+  djinn: "lifestealImmune",
+};
+
+/**
+ * 相性フラグを付与してマッチアップに多様性を与える(単一ビルドで全対応させない)。
+ * - ボス/最終ボス: executeImmune 常時。50階区切りの大ボス(rank>=2、章ボス含む)は
+ *   追加で1相性を必ずランダム付与。小ボス(rank===1、10階毎)は相性なし。
+ * - 通常敵 floor>=300: 8%で [吸血無効/多段耐性/状態異常耐性] のどれか1つだけ付与
+ *   ("スパイス"程度の希少さに抑える)。フレーバーに合う敵は優先、無ければ重み無しランダム。
+ */
+function assignMatchupTraits(
+  enemy: Enemy,
+  floor: number,
+  rank: number,
+  isBossFloor: boolean,
+  isFinalBoss: boolean,
+): void {
+  if (isBossFloor || isFinalBoss) {
+    enemy.executeImmune = true;
+    // 50階毎(rank>=2)の大ボスは相性を必ず1つ持つ。小ボス(rank===1)は無し。
+    if (rank >= 2) {
+      const t = ALL_TRAITS[Math.floor(Math.random() * ALL_TRAITS.length)];
+      enemy[t] = true;
+    }
+    return;
+  }
+  // 通常敵: floor<300 は無相性のまま。深層のみ低確率で抽選("スパイス")。
+  if (floor < 300) return;
+  if (Math.random() < 0.08) {
+    const t = TRAIT_FLAVOR[enemy.templateId] ?? ALL_TRAITS[Math.floor(Math.random() * ALL_TRAITS.length)];
+    enemy[t] = true;
+  }
+}
+
 function pickNormalTemplate(floor: number): EnemyTemplate {
-  // Unlock tougher enemies as floors increase, but keep variety.
-  let pool = ENEMY_TEMPLATES.filter((_, idx) => idx <= Math.floor(floor / 2));
-  if (pool.length === 0) pool = [ENEMY_TEMPLATES[0]];
-  return pool[Math.floor(Math.random() * pool.length)];
+  // Unlock tougher enemies as floors increase, but keep variety. Use index math
+  // instead of Array.filter so enemy generation allocates NOTHING extra per
+  // battle (the old filter built a fresh ~50-element array + closure every call,
+  // which on long deep auto-battle runs added steady GC pressure / jank).
+  const maxIdx = Math.min(ENEMY_TEMPLATES.length - 1, Math.max(0, Math.floor(floor / 2)));
+  const idx = Math.floor(Math.random() * (maxIdx + 1));
+  return ENEMY_TEMPLATES[idx];
 }

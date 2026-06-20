@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { bossRank } from "@/data/enemies";
-import { getWorld } from "@/data/worlds";
+import { FINAL_FLOOR, getWorld } from "@/data/worlds";
 import { initAudio, isMuted, setBgmTheme, startBgm } from "@/lib/audio";
 import type { BgmTheme } from "@/lib/audio";
 import { useGameStore } from "@/store/gameStore";
@@ -31,7 +31,9 @@ export default function AudioController() {
     if (pathname?.startsWith("/casino")) setBgmTheme("casino");
     else if (pathname?.startsWith("/forge")) setBgmTheme("forge");
     else if (pathname?.startsWith("/battle")) {
-      if (bossRank(floor) >= 2) {
+      if (floor === FINAL_FLOOR) {
+        setBgmTheme("final"); // 1000F ラスボス: 専用の最高潮テーマ
+      } else if (bossRank(floor) >= 2) {
         setBgmTheme("boss");
       } else {
         // Each 100-floor chapter has its own location-themed track (w1…w11).

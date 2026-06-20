@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { canEquip, CLASSES } from "@/data/classes";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { computeSetEffects, getSetDef } from "@/data/sets";
@@ -16,7 +16,7 @@ export default function EquipmentPanel() {
   const equipped = useGameStore((s) => s.equipped);
   const unequip = useGameStore((s) => s.unequipItem);
   const classId = useGameStore((s) => s.classId);
-  const setEff = computeSetEffects(equipped, classId);
+  const setEff = useMemo(() => computeSetEffects(equipped, classId), [equipped, classId]);
   const [detail, setDetail] = useState<EquipmentSlot | null>(null);
   const detailItem = detail ? equipped[detail] : null;
 
@@ -44,6 +44,16 @@ export default function EquipmentPanel() {
               );
             })}
           </ul>
+        </div>
+      )}
+
+      {(setEff.attackPct > 0 || setEff.maxHpPct > 0) && (
+        <div className="rounded-xl border border-cyan-400/50 bg-cyan-400/10 p-2">
+          <p className="text-[10px] font-bold text-cyan-200">固有共鳴 / セット集中</p>
+          <p className="mt-1 text-[10px] text-cyan-100">
+            {setEff.attackPct > 0 && <span>攻撃 +{Math.round(setEff.attackPct * 100)}% </span>}
+            {setEff.maxHpPct > 0 && <span>最大HP +{Math.round(setEff.maxHpPct * 100)}%</span>}
+          </p>
         </div>
       )}
 

@@ -11,9 +11,7 @@ import { useGameStore } from "@/store/gameStore";
 export default function ArtifactsPage() {
   const hydrate = useGameStore((s) => s.hydrate);
   const hydrated = useGameStore((s) => s.hydrated);
-  const floor = useGameStore((s) => s.currentFloor);
   const highest = useGameStore((s) => s.progress.highestFloorReached);
-  const rebirth = useGameStore((s) => s.rebirth);
   const nextFloor = nextMilestoneFloor(highest);
 
   useEffect(() => {
@@ -50,24 +48,6 @@ export default function ArtifactsPage() {
       </div>
 
       <ArtifactPanel />
-
-      <div className="mt-auto rounded-xl border border-rose-500/40 bg-rose-500/10 p-3">
-        <h2 className="text-sm font-bold text-rose-200">転生（リセット）</h2>
-        <p className="mt-1 text-[10px] text-gray-400">
-          進行をリセットして最初からやり直す。レベル・装備・ゴールドは失うが、
-          アーティファクトと最高到達記録は引き継がれる。（魂は転生では増えない）
-        </p>
-        <button
-          onClick={() => {
-            if (confirm(`転生しますか？\n現在の進行(${floor}階)を失います。`)) {
-              rebirth();
-            }
-          }}
-          className="mt-2 h-12 w-full rounded-xl bg-rose-600 font-bold text-white active:scale-95"
-        >
-          転生する
-        </button>
-      </div>
     </main>
   );
 }

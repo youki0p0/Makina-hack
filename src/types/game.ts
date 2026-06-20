@@ -159,6 +159,8 @@ export interface Equipment {
   forgeLevel?: number;
   /** Consecutive forge failures (pity counter). */
   forgeStreak?: number;
+  /** 固有装備: 手作りの名前付きレジェ/エピック。6部位揃えると固有共鳴が発動する。 */
+  signature?: boolean;
 }
 
 export type EquippedItems = {
@@ -288,6 +290,15 @@ export interface Enemy {
   bossTurns?: number;
   /** Infinite ★ modifier tier (0 = none). Boosts HP/attack/drops. */
   modTier: number;
+  // ===== Matchup traits (相性) — ビルド多様化のための耐性フラグ(既定 false) =====
+  /** 吸血無効: 与ダメージによる回復が発生しない(純サステイン対策)。 */
+  lifestealImmune?: boolean;
+  /** 多段耐性: 2ヒット目以降のダメージが40%に減衰(手数ビルド対策)。 */
+  multiHitResist?: boolean;
+  /** 状態異常耐性: 毒/燃焼などの状態異常を付与できない(DoT対策)。 */
+  statusResist?: boolean;
+  /** 即死無効: executePct による即死を受けない(ボス/最終ボスは常時)。 */
+  executeImmune?: boolean;
 }
 
 // ===== Consumables =====
@@ -368,6 +379,8 @@ export interface Progress {
   claimedMilestones: number[];
   /** Ids of floor achievements already claimed. */
   claimedFloorAchievements: string[];
+  /** Achievement ids already shown as an unlock toast (so each fires only once). */
+  notifiedAchievements: string[];
   /** The 1000F DEUS EX MACHINA ending has been witnessed (one-time, unskippable). */
   endingSeen: boolean;
   /** New Game+ count (強くてニューゲーム). */
@@ -380,6 +393,35 @@ export interface Progress {
   rankPoints: number;
   /** Rough accumulated play time in seconds (incremented per battle). */
   playSeconds: number;
+  // ===== Title (称号) system =====
+  /** Title ids already unlocked + soul-rewarded (idempotency ledger). */
+  claimedTitles: string[];
+  /** Carried fractional soul remainder from title rewards (0 ≤ f < 1). */
+  soulsFraction: number;
+  /** Casino: cumulative slot BIG (ダイスラッシュ) hits. */
+  slotBigCount: number;
+  /** Casino: cumulative coins won from payouts. */
+  totalCoinsWon: number;
+  /** Casino: cumulative 台パン count, and whether ever banned (出禁). */
+  daipanCount: number;
+  casinoBanned: boolean;
+  /** @deprecated 運命の大博打は廃止。セーブ互換のため残置（常に0）。 */
+  fateWins: number;
+  /** Forge: successful forges + highest forge level reached. */
+  forgeCount: number;
+  maxForgeLevel: number;
+  /** Echo Battle wins. */
+  echoWins: number;
+  /** Class ids ever equipped (職業経験). */
+  classesUsed: string[];
+  /** Set keys ever completed (full set bonus reached). */
+  setsCompleted: string[];
+  /** Bosses defeated without taking any damage that battle. */
+  noDamageBossKills: number;
+  /** Floors cleared without taking any damage that battle. */
+  perfectClears: number;
+  /** Biggest single-confirm damage ever dealt. */
+  maxSingleHit: number;
 }
 
 // ===== Persistence =====

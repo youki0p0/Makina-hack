@@ -23,6 +23,29 @@ function emptyEquipped(): EquippedItems {
   };
 }
 
+describe("proceduralSetDef never hangs (casino freeze regression)", () => {
+  it("returns 3 distinct primitives for every index", () => {
+    // The old pick-loop used a step that could be 0 or PRIMS.length/2 for some
+    // n, cycling forever and freezing the casino exchange at deep floors.
+    // Guard against any regression by exercising a wide range of indices.
+    for (let n = 0; n < 600; n++) {
+      const def = proceduralSetDef(n);
+      expect(def.bonuses).toHaveLength(3);
+      expect(def.bonuses.map((b) => b.pieces)).toEqual([2, 4, 6]);
+      expect(def.procedural).toBe(true);
+      // The three primitives backing the tiers must be distinct.
+      const sigs = def.bonuses.map((b) => JSON.stringify({ ...b, pieces: 0, desc: "" }));
+      expect(new Set(sigs).size).toBe(3);
+    }
+  });
+
+  it("getSetDef resolves deep procedural keys quickly", () => {
+    for (const n of [8, 21, 34, 47, 268]) {
+      expect(getSetDef(`gset${n}`)).not.toBeNull();
+    }
+  });
+});
+
 /** Equip the first `n` slots with pieces of the given set. */
 function equipSet(key: string, n: number): EquippedItems {
   const eq = emptyEquipped();
@@ -32,6 +55,65 @@ function equipSet(key: string, n: number): EquippedItems {
   }
   return eq;
 }
+
+describe("signature resonance (固有共鳴)", () => {
+  // One signature item per slot so we can dial the count exactly.
+  const SIG_BY_SLOT: Record<EquipmentSlot, string> = {
+    weapon: "vampiric_sword",
+    helm: "sentinel_helm",
+    armor: "heavy_armor",
+    gloves: "duelist_gloves",
+    boots: "windstep_boots",
+    accessory: "gambler_ring",
+  };
+
+  function equipSignature(n: number): EquippedItems {
+    const eq = emptyEquipped();
+    const slots = EQUIP_SLOTS.slice(0, n) as EquipmentSlot[];
+    for (const slot of slots) {
+      const item = getItemById(SIG_BY_SLOT[slot])!;
+      expect(item.signature).toBe(true);
+      eq[slot] = item;
+    }
+    return eq;
+  }
+
+  it("grants no resonance with fewer than 2 signature pieces", () => {
+    const eff = computeSetEffects(equipSignature(1));
+    expect(eff.attackPct).toBe(0);
+    expect(eff.maxHpPct).toBe(0);
+  });
+
+  it("2 pieces grant +12% attack / +12% maxHp", () => {
+    const eff = computeSetEffects(equipSignature(2));
+    expect(eff.attackPct).toBeCloseTo(0.12);
+    expect(eff.maxHpPct).toBeCloseTo(0.12);
+  });
+
+  it("4 pieces grant +25% attack, extraHit, +1 reroll", () => {
+    const eff = computeSetEffects(equipSignature(4));
+    expect(eff.attackPct).toBeCloseTo(0.25);
+    expect(eff.maxHpPct).toBeCloseTo(0.12);
+    expect(eff.extraHit).toBe(true);
+    expect(eff.statBonus.reroll).toBe(1);
+  });
+
+  it("6 pieces grant +45% attack / +30% maxHp and a no-miss capstone", () => {
+    const eff = computeSetEffects(equipSignature(6));
+    expect(eff.attackPct).toBeCloseTo(0.45);
+    expect(eff.maxHpPct).toBeCloseTo(0.3);
+    // Capstone pushes a no-miss dice modifier covering all faces.
+    const noMiss = eff.diceModifiers.find((m) => m.faces.length === 6 && m.effect.isMiss === false);
+    expect(noMiss).toBeDefined();
+  });
+});
+
+describe("single-set focus capstone", () => {
+  it("6 pieces of one named set grant +15% attack", () => {
+    const eff = computeSetEffects(equipSet("vampire", 6));
+    expect(eff.attackPct).toBeCloseTo(0.15);
+  });
+});
 
 describe("set bonuses", () => {
   it("gambler unlocks reroll / 1→2 / six-double at 2/4/6", () => {

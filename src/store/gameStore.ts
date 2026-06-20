@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { defaultProgress } from "@/data/achievements";
+import { defaultProgress, newlyEarnedAchievements } from "@/data/achievements";
 import { difficultyScale, getDifficulty, normalizeDifficulty, type Difficulty } from "@/data/difficulty";
 import { getDailyBonus } from "@/lib/daily";
 import {
@@ -18,10 +18,23 @@ import {
   isClassUnlocked,
 } from "@/data/classes";
 import { generateEnemy } from "@/data/enemies";
-import { estimateTier, genItem, genSetItem, getItemById, getItemInstance, makeMakina, MAKINA_ID } from "@/data/items";
-import { forgeCost, rollForge, starInjectCost, FORGE_MAX, type ForgeKind } from "@/data/forge";
+import {
+  estimateTier,
+  genItem,
+  genSetItem,
+  getItemById,
+  getItemInstance,
+  makeMakina,
+  MAKINA_ID,
+  rollGenDrop,
+  SIGNATURE_WEAPON_IDS,
+  SLOT_LIST,
+} from "@/data/items";
+import { forgeCost, forgeMax, rollForge, starInjectCost, type ForgeKind } from "@/data/forge";
 import { applyModifier, modTierForFloor, rollDropModTier } from "@/data/modifiers";
 import { computeSetEffects, getSetDef } from "@/data/sets";
+import { getTitle, titleSouls } from "@/data/titles";
+import { grantTitles } from "@/lib/titleAward";
 import { jobAttackMult } from "@/data/jobBalance";
 import {
   crossedMilestones,
@@ -39,6 +52,7 @@ import {
   expForLevel,
   luckFloor,
   resolveBossTurn,
+  resolveFinalBossTurn,
   resolveEnemyTurn,
   resolvePlayerAction,
   tickBuffs,
@@ -59,8 +73,6 @@ import {
   SCRAP_VALUE,
 } from "@/lib/loot";
 import {
-  FATE_WIN_CHANCE,
-  fateCost,
   COIN_VALUE,
   SLOT_BET,
   GASE_REACH_CHANCE,
@@ -78,19 +90,20 @@ import {
   HIT_WINDOW_MS,
   MACHINE_COUNT,
   SET_WEAPON_COIN,
+  SIGNATURE_WEAPON_COIN,
   SOULS_COIN,
   settingBucket,
-  machineSettings,
+  effectiveSlotSettings,
   settingMult,
   ceilingSpins,
   coinBuyCost,
-  coinBuyMax,
   randomCasinoPrize,
   type ReachDef,
   type SlotOutcome,
 } from "@/lib/casino";
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState } from "@/lib/save";
+import { runDailyMaintenance } from "@/lib/maintenance";
 import { itemKey, rarityRank } from "@/lib/ui";
 import type {
   ActiveBuff,
@@ -117,6 +130,11 @@ import type {
 import { faceByValue } from "@/data/diceFaces";
 
 const LOG_LIMIT = 14;
+
+/** 1000階(DEUS EX MACHINA)を踏破済みか（到達 or エンディング視聴）。 */
+function isCleared1000(progress: Progress): boolean {
+  return progress.highestFloorReached >= FINAL_FLOOR || progress.endingSeen;
+}
 
 /** セーブポイントの階層（1, 51, 101…）。ここでは転職を常に許可する。 */
 function isSavePointFloor(floor: number): boolean {
@@ -238,12 +256,6 @@ function equippedResist(eq: EquippedItems): { poison: number; stun: number } {
   return { poison: Math.min(0.9, poison), stun: Math.min(0.9, stun) };
 }
 
-/** Outcome of a 運命の大博打 spin. */
-export type FateResult =
-  | { kind: "lose"; cost: number }
-  | { kind: "item"; cost: number; item: Equipment }
-  | { kind: "souls"; cost: number; souls: number };
-
 /** Result of one slot spin (the RNG is resolved up-front; the UI animates it). */
 export interface SlotSpinResult {
   outcome: SlotOutcome;
@@ -280,6 +292,8 @@ interface GameState {
   diceFaces: DiceFace[];
   rerollsLeft: number;
   battleLog: BattleLogEntry[];
+  /** Pending achievement-unlock toasts (FIFO of achievement ids). Not persisted. */
+  achievementQueue: string[];
   lastResult: BattleResult | null;
   /** Temporary consumable buffs in effect, counting down per battle. */
   activeBuffs: ActiveBuff[];
@@ -328,6 +342,9 @@ interface GameState {
   classId: ClassId;
   /** Consecutive-win count. */
   winStreak: number;
+  /** Transient (non-persisted) per-battle flags for no-damage / big-hit titles. */
+  battleTookDamage: boolean;
+  battleMaxHit: number;
   /** Cumulative progress for achievements/collection. */
   progress: Progress;
   /** Favorited item keys (id:affix) pinned to the inventory top. */
@@ -399,6 +416,8 @@ interface GameState {
   // misc
   toggleFavorite: (key: string) => void;
   markHelpSeen: () => void;
+  /** Dismiss the current achievement-unlock toast (advance the queue). */
+  dismissAchievement: () => void;
   setTitle: (id: string) => void;
   setDifficulty: (id: Difficulty) => void;
   setHandedness: (h: "right" | "left") => void;
@@ -436,14 +455,12 @@ interface GameState {
 
   // casino
   casinoSettle: (goldDelta: number, prize?: Equipment | null) => void;
-  /** 運命の大博打: spend gold for a tiny chance at huge reward (★+2 gear or souls). */
-  fateGamble: () => FateResult;
   /** Buy slot coins with gold (price scales with held coins). */
   buyCoins: (coinAmount: number) => void;
-  /** Buy as many coins as the current gold allows (全購入). */
-  buyCoinsAll: () => void;
   /** Cash all slot coins back into gold. */
   cashoutCoins: () => void;
+  /** カジノコインを増減（甘ダイス発射/払い出し・BJ 用。0未満にはしない）。 */
+  addCoins: (delta: number) => void;
   /** Spin the slot. Returns the resolved result, or null if coins are short. */
   slotSpin: () => SlotSpinResult | null;
   /** Sit at a different slot machine (resets 天井/ゾーン for that 台). */
@@ -452,6 +469,8 @@ interface GameState {
   daiPan: () => { count: number; banned: boolean };
   /** カジノコイン交換所: spend coins for a set-piece weapon. Returns it or null. */
   coinBuySetWeapon: (setKey: string) => Equipment | null;
+  /** カジノコイン交換所: spend 2000 coins for one random 固有(signature) weapon. Returns it or null. */
+  coinBuySignatureWeapon: () => Equipment | null;
   /** カジノコイン交換所: spend coins for 転生ポイント (souls). */
   coinBuySouls: (n: number) => void;
 
@@ -476,7 +495,22 @@ export const useGameStore = create<GameState>((set, get) => {
       saveTimer = null;
     }
   }
+  // Detect newly-earned achievements on every state-change (persist is called
+  // after every mutating action) and queue an unlock toast. Single chokepoint so
+  // we don't have to wire each victory/casino/rebirth site. Does NOT call persist
+  // (the outer persist will save the updated notifiedAchievements).
+  function syncAchievementToasts(): void {
+    const p = get().progress;
+    if (!p) return;
+    const earned = newlyEarnedAchievements(p);
+    if (earned.length === 0) return;
+    set({
+      progress: { ...p, notifiedAchievements: [...p.notifiedAchievements, ...earned] },
+      achievementQueue: [...get().achievementQueue, ...earned],
+    });
+  }
   function persist(): void {
+    syncAchievementToasts();
     if (saveTimer != null) return; // a write is already scheduled
     saveTimer = setTimeout(() => {
       saveTimer = null;
@@ -486,6 +520,18 @@ export const useGameStore = create<GameState>((set, get) => {
   function flushSave(): void {
     cancelSave();
     writeSaveNow();
+  }
+  /**
+   * Reconcile titles against current progress: unlock + grant souls (0.5–1 each)
+   * for any newly-satisfied title, one-time via progress.claimedTitles. Used by
+   * non-battle actions (casino/forge/class/echo) and once on hydrate (retroactive).
+   */
+  function applyTitleGrants(): void {
+    const s = get();
+    const res = grantTitles(s.progress, s.souls);
+    if (res.unlocked.length === 0) return;
+    set({ progress: res.progress, souls: res.souls });
+    persist();
   }
   function writeSaveNow(): void {
     const s = get();
@@ -608,8 +654,13 @@ export const useGameStore = create<GameState>((set, get) => {
     buffs: ActiveBuff[] = [],
   ): ComputedStats {
     const base = computeStats(player, equipped, buffs, passiveBonus());
+    // 固有共鳴/セット集中の最終倍率(★スケール後に乗算)。装備IDからLIVE計算され
+    // セーブ非互換にならない。
+    const setEff = computeSetEffects(equipped, get().classId);
     // Job balance: per-class attack multiplier (centralized in jobBalance.ts).
-    return { ...base, attack: Math.round(base.attack * jobAttackMult(get().classId)) };
+    const attack = Math.round(base.attack * jobAttackMult(get().classId) * (1 + setEff.attackPct));
+    const maxHp = Math.round(base.maxHp * (1 + setEff.maxHpPct));
+    return { ...base, attack, maxHp };
   }
 
   /** Apply a loaded save into state (used by hydrate and import). */
@@ -683,6 +734,7 @@ export const useGameStore = create<GameState>((set, get) => {
     diceFaces: [],
     rerollsLeft: 1,
     battleLog: [],
+    achievementQueue: [],
     lastResult: null,
     activeBuffs: [],
     playerStatuses: [],
@@ -708,6 +760,8 @@ export const useGameStore = create<GameState>((set, get) => {
     artifacts: defaultArtifactLevels(),
     classId: DEFAULT_CLASS_ID,
     winStreak: 0,
+    battleTookDamage: false,
+    battleMaxHit: 0,
     progress: defaultProgress(),
     favorites: [],
     seenHelp: false,
@@ -730,9 +784,18 @@ export const useGameStore = create<GameState>((set, get) => {
 
     hydrate: () => {
       if (get().hydrated) return;
+      // 1日1回（＋更新後の初回）、メモリ解放のためページをリロードする。必要な時
+      // だけ即リロードし、解放後の新しいページで改めて読み込みが走る。
+      runDailyMaintenance();
       const loaded = loadGame();
       if (loaded) {
         applyLoaded(loaded);
+        // Retroactive one-time title grant: existing players unlock every
+        // already-satisfied title and receive its souls once (claimedTitles gates
+        // re-granting). flushSave persists immediately so a reload can't double it.
+        const before = get().progress.claimedTitles.length;
+        applyTitleGrants();
+        if (get().progress.claimedTitles.length !== before) flushSave();
       } else {
         // Fresh save: start with a humble weapon already equipped.
         const starter = getItemById("rusty_sword");
@@ -801,6 +864,9 @@ export const useGameStore = create<GameState>((set, get) => {
         // Player statuses are battle-scoped — clear at the start of each fight.
         playerStatuses: [],
         playerStunTurns: 0,
+        // Per-battle title flags reset each fight.
+        battleTookDamage: false,
+        battleMaxHit: 0,
         battleLog: pushLogs([], [
           { text: `${currentFloor}階 — ${enemy.name} が現れた！`, tone: "neutral" },
         ]),
@@ -868,9 +934,11 @@ export const useGameStore = create<GameState>((set, get) => {
         bonusHeal += Math.round(totalEnemyDamage * setEff.lifestealHighFacePct);
       }
       // Executioner 6pc: execute non-boss enemies at ≤15% HP.
+      // executeImmune の敵(ボス/最終ボス/一部章ボス)は即死しない。
       if (
         setEff.executePct > 0 &&
         !enemy.isBoss &&
+        !enemy.executeImmune &&
         attackHp > 0 &&
         enemy.hp <= enemy.maxHp * setEff.executePct
       ) {
@@ -892,7 +960,10 @@ export const useGameStore = create<GameState>((set, get) => {
       if (enemyHp <= 0) {
         const updatedEnemy = { ...enemy, hp: 0 };
         log = pushLogs(log, [{ text: `${enemy.name} を倒した！`, tone: "good" }]);
-        const result = finishVictory(state, log, playerHp, updatedEnemy);
+        const result = finishVictory(state, log, playerHp, updatedEnemy, {
+          tookDamage: state.battleTookDamage,
+          maxHit: Math.max(state.battleMaxHit, totalEnemyDamage),
+        });
         set(result);
         persistFromSnapshot(result);
         return;
@@ -918,7 +989,10 @@ export const useGameStore = create<GameState>((set, get) => {
       if (enemyHp <= 0) {
         const updatedEnemy = { ...enemy, hp: 0, statuses };
         log = pushLogs(log, [{ text: `${enemy.name} は力尽きた！`, tone: "good" }]);
-        const result = finishVictory(state, log, playerHp, updatedEnemy);
+        const result = finishVictory(state, log, playerHp, updatedEnemy, {
+          tookDamage: state.battleTookDamage,
+          maxHit: Math.max(state.battleMaxHit, totalEnemyDamage),
+        });
         set(result);
         persistFromSnapshot(result);
         return;
@@ -960,18 +1034,35 @@ export const useGameStore = create<GameState>((set, get) => {
         }
       };
 
+      // Track enemy-dealt damage this turn (for no-damage / perfect-clear titles).
+      let enemyDamageThisTurn = 0;
+
       if (stunTurns > 0) {
         stunTurns -= 1;
         log = pushLogs(log, [{ text: `${enemy.name} はスタンして動けない！`, tone: "good" }]);
       } else if (enemy.isBoss) {
-        // Boss-specific gimmick turn (enrage + charge cycle + heal).
-        const turn = resolveBossTurn({ ...enemy, enraged, weakenAmount, weakenTurns }, stats, action.guard);
+        // Boss-specific gimmick turn. 1000F final boss uses a JRPG "last boss"
+        // pattern (phases / multi-action / charged ultimate); others use the
+        // standard enrage + charge cycle + heal.
+        const turn =
+          enemy.templateId === "deus"
+            ? resolveFinalBossTurn({ ...enemy, hp: enemyHp, enraged, weakenAmount, weakenTurns }, stats, action.guard)
+            : resolveBossTurn({ ...enemy, enraged, weakenAmount, weakenTurns }, stats, action.guard);
         if (turn.enemyHeal > 0) enemyHp = Math.min(enemy.maxHp, enemyHp + turn.enemyHeal);
         charging = turn.charging;
         chargeCounter = turn.chargeCounter;
         decayWeaken();
         playerHp -= turn.playerDamage;
+        enemyDamageThisTurn += turn.playerDamage;
         log = pushLogs(log, turn.logs.map((text) => ({ text, tone: "bad" as const })));
+        // Final boss can disrupt the player's dice (lose rerolls), mitigated by stun-resist gear.
+        if (turn.playerStun && turn.playerStun > 0) {
+          if (Math.random() < equippedResist(state.equipped).stun) {
+            log = pushLogs(log, [{ text: "出目の乱れを耐えた！", tone: "good" }]);
+          } else {
+            playerStunTurns += turn.playerStun;
+          }
+        }
 
         if (playerHp <= 0) {
           const lost = finishDefeat(
@@ -999,6 +1090,7 @@ export const useGameStore = create<GameState>((set, get) => {
         }
         decayWeaken();
         playerHp -= turn.playerDamage;
+        enemyDamageThisTurn += turn.playerDamage;
         log = pushLogs(log, turn.logs.map((text) => ({ text, tone: "bad" as const })));
         // Enemy-inflicted player statuses (mitigated by resistance gear).
         const resist = equippedResist(state.equipped);
@@ -1042,6 +1134,7 @@ export const useGameStore = create<GameState>((set, get) => {
         playerStatuses = remain;
         if (dot > 0) {
           playerHp -= dot;
+          enemyDamageThisTurn += dot;
           log = pushLogs(log, [{ text: `毒で ${dot} ダメージ`, tone: "bad" }]);
           if (playerHp <= 0) {
             const lost = finishDefeat(
@@ -1064,7 +1157,7 @@ export const useGameStore = create<GameState>((set, get) => {
         log = pushLogs(log, [{ text: "スタン！ 次のターンはリロール不可", tone: "bad" }]);
       }
 
-      // Next turn: fresh roll + rerolls.
+      // Next turn: fresh roll + rerolls. Carry the per-battle title flags forward.
       set({
         currentEnemy: { ...enemy, hp: enemyHp, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns, enraged, charging, chargeCounter, bossTurns: (enemy.bossTurns ?? 0) + 1 },
         player: { ...state.player, hp: playerHp },
@@ -1072,6 +1165,8 @@ export const useGameStore = create<GameState>((set, get) => {
         rerollsLeft: nextRerolls,
         playerStatuses,
         playerStunTurns: nextStun,
+        battleTookDamage: state.battleTookDamage || enemyDamageThisTurn > 0,
+        battleMaxHit: Math.max(state.battleMaxHit, totalEnemyDamage),
         battleLog: log,
       });
     },
@@ -1159,12 +1254,28 @@ export const useGameStore = create<GameState>((set, get) => {
       const stats = currentStats(state.player, equipped);
       const player = { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) };
 
+      // 称号用: フル装備に達したセットを記録。
+      let setsCompleted = state.progress.setsCompleted;
+      const counts: Record<string, number> = {};
+      for (const sl of EQUIP_SLOTS) {
+        const it = equipped[sl];
+        if (it?.setId) counts[it.setId] = (counts[it.setId] ?? 0) + 1;
+      }
+      for (const [key, n] of Object.entries(counts)) {
+        const def = getSetDef(key);
+        if (!def) continue;
+        const maxPieces = Math.max(...def.bonuses.map((b) => b.pieces));
+        if (n >= maxPieces) setsCompleted = addUnique(setsCompleted, key);
+      }
+
       set({
         equipped,
         inventory,
         player,
         diceFaces: buildFaces(equipped, state.classId),
+        progress: setsCompleted === state.progress.setsCompleted ? state.progress : { ...state.progress, setsCompleted },
       });
+      applyTitleGrants();
       persist();
     },
 
@@ -1226,24 +1337,32 @@ export const useGameStore = create<GameState>((set, get) => {
       const item = loc === "inv" ? state.inventory[index] : state.equipped[loc];
       if (!item || item.noModifier) return;
       const level = item.forgeLevel ?? 0;
-      if (level >= FORGE_MAX) return;
+      const fmax = forgeMax(isCleared1000(state.progress)); // 1000階踏破で上限解放
+      if (level >= fmax) return;
       let cost = forgeCost(level);
       if (protect) cost = Math.round(cost * 1.5);
       if (state.gachaPoints < cost) return;
 
       const streak = item.forgeStreak ?? 0;
       const out = rollForge(level, streak, protect);
-      const newLevel = out.kind === "fail" ? level : Math.min(FORGE_MAX, level + out.delta);
+      const newLevel = out.kind === "fail" ? level : Math.min(fmax, level + out.delta);
       const newStreak = out.kind === "fail" ? streak + 1 : 0;
       const forged = getItemInstance(item.id, item.affixId, item.modTier, item.quality, newLevel, newStreak);
       if (!forged) return;
 
       const partial = placeForged(state, loc, index, forged);
+      const success = out.kind !== "fail";
       set({
         ...partial,
         gachaPoints: state.gachaPoints - cost + out.refund,
         lastForge: { kind: out.kind, from: level, to: newLevel },
+        progress: {
+          ...state.progress,
+          forgeCount: state.progress.forgeCount + (success ? 1 : 0),
+          maxForgeLevel: Math.max(state.progress.maxForgeLevel, newLevel),
+        },
       });
+      applyTitleGrants();
       persist();
     },
 
@@ -1252,7 +1371,8 @@ export const useGameStore = create<GameState>((set, get) => {
       const item = loc === "inv" ? state.inventory[index] : state.equipped[loc];
       if (!item || item.noModifier) return;
       const level = item.forgeLevel ?? 0;
-      if (level >= FORGE_MAX) return;
+      const fmax = forgeMax(isCleared1000(state.progress)); // 1000階踏破で上限解放
+      if (level >= fmax) return;
       // Cheapest same-slot spare in inventory (not the target, not locked).
       const score = (it: Equipment) => it.attack + it.defense + it.maxHp + (it.modTier ?? 0) * 5;
       let feederIdx = -1;
@@ -1271,17 +1391,22 @@ export const useGameStore = create<GameState>((set, get) => {
       const feeder = state.inventory[feederIdx];
       // Same base id → +2 (duplicate rescue), else +1.
       const delta = feeder.id === item.id ? 2 : 1;
-      const newLevel = Math.min(FORGE_MAX, level + delta);
+      const newLevel = Math.min(fmax, level + delta);
       const forged = getItemInstance(item.id, item.affixId, item.modTier, item.quality, newLevel, item.forgeStreak);
       if (!forged) return;
 
       // Remove the feeder, then place the forged target.
       let inventory = state.inventory.filter((_, i) => i !== feederIdx);
       const lastForge = { kind: "normal" as ForgeKind, from: level, to: newLevel };
+      const forgeProgress = {
+        ...state.progress,
+        forgeCount: state.progress.forgeCount + 1,
+        maxForgeLevel: Math.max(state.progress.maxForgeLevel, newLevel),
+      };
       if (loc === "inv") {
         const tIdx = feederIdx < index ? index - 1 : index;
         inventory = inventory.map((it, i) => (i === tIdx ? forged : it));
-        set({ inventory, lastForge });
+        set({ inventory, lastForge, progress: forgeProgress });
       } else {
         const equipped: EquippedItems = { ...state.equipped, [loc]: forged };
         const stats = currentStats(state.player, equipped, state.activeBuffs);
@@ -1291,8 +1416,10 @@ export const useGameStore = create<GameState>((set, get) => {
           player: { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) },
           diceFaces: buildFaces(equipped, state.classId),
           lastForge,
+          progress: forgeProgress,
         });
       }
+      applyTitleGrants();
       persist();
     },
 
@@ -1329,6 +1456,12 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
+    dismissAchievement: () => {
+      const q = get().achievementQueue;
+      if (q.length === 0) return;
+      set({ achievementQueue: q.slice(1) });
+    },
+
     setTitle: (id: string) => {
       set({ titleId: id });
       persist();
@@ -1351,10 +1484,12 @@ export const useGameStore = create<GameState>((set, get) => {
 
     setStartFloor: (floor: number) => {
       const state = get();
-      // Only floor 1, or one floor past a reached 50-mark checkpoint (51,101…).
+      // Only floor 1, one floor past a reached 50-mark checkpoint (51,101…), or
+      // the 1000F final boss once it has been reached (retry the last battle).
       const allowed =
         floor === 1 ||
-        (floor > 1 && (floor - 1) % 50 === 0 && floor - 1 <= state.checkpoint);
+        (floor > 1 && (floor - 1) % 50 === 0 && floor - 1 <= state.checkpoint) ||
+        (floor === FINAL_FLOOR && state.progress.highestFloorReached >= FINAL_FLOOR);
       if (!allowed) return;
       // Start a chosen run at full HP.
       const maxHp = currentStats(state.player, state.equipped).maxHp;
@@ -1455,8 +1590,9 @@ export const useGameStore = create<GameState>((set, get) => {
         player: { ...s.player, gold: s.player.gold + r.gold },
         gachaPoints: s.gachaPoints + r.gachaPoints + capped.material,
         inventory: capped.kept,
-        progress: { ...s.progress, rankPoints: s.progress.rankPoints + r.rankPoints },
+        progress: { ...s.progress, rankPoints: s.progress.rankPoints + r.rankPoints, echoWins: s.progress.echoWins + 1 },
       });
+      applyTitleGrants();
       persist();
     },
 
@@ -1598,61 +1734,6 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
-    fateGamble: (): FateResult => {
-      const state = get();
-      // Reference power = the player's current best owned gear (equipped + bag).
-      let refTier = 0;
-      let refMod = 0;
-      const consider = (it: Equipment | null) => {
-        if (!it) return;
-        refTier = Math.max(refTier, estimateTier(it));
-        refMod = Math.max(refMod, it.modTier ?? 0);
-      };
-      for (const slot of EQUIP_SLOTS) consider(state.equipped[slot]);
-      for (const it of state.inventory) consider(it);
-
-      const cost = fateCost(refTier);
-      if (state.player.gold < cost) return { kind: "lose", cost };
-
-      const goldLeft = state.player.gold - cost;
-
-      // Almost always a loss — that's the thrill.
-      if (Math.random() >= FATE_WIN_CHANCE) {
-        set({ player: { ...state.player, gold: goldLeft } });
-        persist();
-        return { kind: "lose", cost };
-      }
-
-      // Jackpot! 75% a piece of gear two stars above your best, 25% souls.
-      if (Math.random() < 0.75) {
-        const slot = EQUIP_SLOTS[Math.floor(Math.random() * EQUIP_SLOTS.length)];
-        const tier = Math.max(refTier, 30);
-        const item = applyModifier(genItem(slot, tier), refMod + 2);
-        const capped = capInventory([...state.inventory, item], state.favorites);
-        set({
-          player: { ...state.player, gold: goldLeft },
-          inventory: capped.kept,
-          gachaPoints: state.gachaPoints + capped.material,
-          progress: {
-            ...state.progress,
-            jackpots: state.progress.jackpots + 1,
-            discoveredItems: discover(state.progress.discoveredItems, item.id),
-          },
-        });
-        persist();
-        return { kind: "item", cost, item };
-      }
-
-      const souls = 3 + Math.floor(Math.random() * 4); // 3–6 転生ポイント
-      set({
-        player: { ...state.player, gold: goldLeft },
-        souls: state.souls + souls,
-        progress: { ...state.progress, jackpots: state.progress.jackpots + 1 },
-      });
-      persist();
-      return { kind: "souls", cost, souls };
-    },
-
     buyCoins: (coinAmount: number) => {
       const s = get();
       const amt = Math.max(0, Math.floor(coinAmount));
@@ -1663,19 +1744,16 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
-    buyCoinsAll: () => {
-      const s = get();
-      const amt = coinBuyMax(s.player.gold, s.coins);
-      if (amt <= 0) return;
-      const cost = coinBuyCost(amt, s.coins);
-      set({ player: { ...s.player, gold: s.player.gold - cost }, coins: s.coins + amt });
-      persist();
-    },
-
     cashoutCoins: () => {
       const s = get();
       if (s.coins <= 0) return;
       set({ player: { ...s.player, gold: s.player.gold + s.coins * COIN_VALUE }, coins: 0, slotReplay: false });
+      persist();
+    },
+
+    addCoins: (delta: number) => {
+      const s = get();
+      set({ coins: Math.max(0, s.coins + Math.round(delta)) });
       persist();
     },
 
@@ -1715,7 +1793,9 @@ export const useGameStore = create<GameState>((set, get) => {
           slotReg: cur.reg,
           slotMaxHamari: cur.maxHamari,
           slotHits: cur.hits,
+          progress: { ...state.progress, totalCoinsWon: state.progress.totalCoinsWon + Math.max(0, pay) },
         });
+        applyTitleGrants();
         persist();
         return {
           outcome: "at",
@@ -1737,7 +1817,8 @@ export const useGameStore = create<GameState>((set, get) => {
       if (state.coins < cost) return null;
 
       // 設定差(隠し設定1-6) × 連チャンゾーン でBIG/REG確率を底上げ。
-      const setting = machineSettings(bucket)[state.slotMachine] ?? 1;
+      // イベントデー中は実効設定(上書き後)で抽選する。
+      const setting = effectiveSlotSettings(bucket)[state.slotMachine] ?? 1;
       const inZone = cur.zone > 0;
       const bonusMult = settingMult(setting) * (inZone ? ZONE_MULT : 1);
       // 天井: ハマるほど近づく救済(設定で天井Gが変動)。到達でBIG確定。
@@ -1761,7 +1842,12 @@ export const useGameStore = create<GameState>((set, get) => {
         atGames = AT_GAMES;
         progress = { ...progress, jackpots: progress.jackpots + 1 };
         if (Math.random() < 0.5) {
-          prize = randomCasinoPrize();
+          // 賞品の3割は「現在階に見合う手続き生成武器」(残りは従来のカジノ専用賞品)。
+          // 深層ほど強い武器が当たり、序盤の入れ食いにはならない形でプールに混ぜる。
+          prize =
+            Math.random() < 0.3
+              ? applyModifier(rollGenDrop(state.currentFloor, 0, "weapon"), modTierForFloor(state.currentFloor))
+              : randomCasinoPrize();
           const capped = capInventory([...inventory, { ...prize }], state.favorites);
           inventory = capped.kept;
           gachaPoints += capped.material;
@@ -1769,14 +1855,22 @@ export const useGameStore = create<GameState>((set, get) => {
         }
       }
 
+      progress = {
+        ...progress,
+        slotBigCount: progress.slotBigCount + (outcome === "big" ? 1 : 0),
+        totalCoinsWon: progress.totalCoinsWon + Math.max(0, payout),
+      };
       const coins = state.coins - cost + payout;
       // データカウンタ: 総回転/BIG/REG/最大ハマり/直近の当たり履歴。
       const reachedHamari = outcome === "big" ? cur.spins : cur.spins + 1;
       const isBonus = outcome === "big" || outcome === "reg";
       const now = Date.now();
-      const slotHits = isBonus
-        ? [...cur.hits, now].filter((t) => now - t <= HIT_WINDOW_MS)
-        : cur.hits.filter((t) => now - t <= HIT_WINDOW_MS);
+      // スピン毎に呼ばれるため spread+filter の二重確保を避け、1ループで構築する。
+      const slotHits: number[] = [];
+      for (const t of cur.hits) {
+        if (now - t <= HIT_WINDOW_MS) slotHits.push(t);
+      }
+      if (isBonus) slotHits.push(now); // BIG/REGの当たりを履歴に追加(now-now=0で必ず窓内)
       set({
         coins,
         slotReplay: outcome === "replay",
@@ -1794,6 +1888,7 @@ export const useGameStore = create<GameState>((set, get) => {
         gachaPoints,
         progress,
       });
+      applyTitleGrants();
       persist();
       return {
         outcome,
@@ -1831,13 +1926,17 @@ export const useGameStore = create<GameState>((set, get) => {
     daiPan: () => {
       const s = get();
       const count = s.daiPanCount + 1;
+      // 累計の台パン回数(称号用)はリセットされない別カウンタ。
+      const progress = { ...s.progress, daipanCount: s.progress.daipanCount + 1 };
       if (count >= DAIPAN_LIMIT) {
         // 出禁: ボスを BAN_BOSSES 体倒すまでカジノ入店禁止。
-        set({ daiPanCount: 0, casinoBan: s.progress.bossKills + BAN_BOSSES });
+        set({ daiPanCount: 0, casinoBan: s.progress.bossKills + BAN_BOSSES, progress: { ...progress, casinoBanned: true } });
+        applyTitleGrants();
         persist();
         return { count, banned: true };
       }
-      set({ daiPanCount: count });
+      set({ daiPanCount: count, progress });
+      applyTitleGrants();
       return { count, banned: false };
     },
 
@@ -1855,10 +1954,41 @@ export const useGameStore = create<GameState>((set, get) => {
       };
       for (const slot of EQUIP_SLOTS) consider(state.equipped[slot]);
       for (const it of state.inventory) consider(it);
-      const weapon = applyModifier(genSetItem(setKey, "weapon", Math.max(refTier, 30)), refMod);
-      const capped = capInventory([...state.inventory, weapon], state.favorites);
+      // 武器に限らず、防具・アクセも含めたランダム部位を交換（セット完成を狙える）。
+      const slot = SLOT_LIST[Math.floor(Math.random() * SLOT_LIST.length)];
+      const piece = applyModifier(genSetItem(setKey, slot, Math.max(refTier, 30)), refMod);
+      const capped = capInventory([...state.inventory, piece], state.favorites);
       set({
         coins: state.coins - SET_WEAPON_COIN,
+        inventory: capped.kept,
+        gachaPoints: state.gachaPoints + capped.material,
+        lastPull: piece,
+        progress: { ...state.progress, discoveredItems: discover(state.progress.discoveredItems, piece.id) },
+      });
+      persist();
+      return piece;
+    },
+
+    coinBuySignatureWeapon: (): Equipment | null => {
+      const state = get();
+      // コイン不足ガード(2000枚)。
+      if (state.coins < SIGNATURE_WEAPON_COIN) return null;
+      if (SIGNATURE_WEAPON_IDS.length === 0) return null;
+      // 固有武器をランダムに1つ抽選。固有武器は通常アイテム(id持ち)なのでセーブ互換に影響なし。
+      const id = SIGNATURE_WEAPON_IDS[Math.floor(Math.random() * SIGNATURE_WEAPON_IDS.length)];
+      const base = getItemById(id);
+      if (!base) return null;
+      // 終盤でも腐らないよう、所持ベスト装備の★modを引き継いで付与。
+      let refMod = 0;
+      const consider = (it: Equipment | null) => {
+        if (it) refMod = Math.max(refMod, it.modTier ?? 0);
+      };
+      for (const slot of EQUIP_SLOTS) consider(state.equipped[slot]);
+      for (const it of state.inventory) consider(it);
+      const weapon = refMod > 0 && !base.noModifier ? applyModifier(base, refMod) : base;
+      const capped = capInventory([...state.inventory, weapon], state.favorites);
+      set({
+        coins: state.coins - SIGNATURE_WEAPON_COIN,
         inventory: capped.kept,
         gachaPoints: state.gachaPoints + capped.material,
         lastPull: weapon,
@@ -1958,7 +2088,9 @@ export const useGameStore = create<GameState>((set, get) => {
         inventory,
         diceFaces,
         player: { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) },
+        progress: { ...state.progress, classesUsed: addUnique(state.progress.classesUsed, id) },
       });
+      applyTitleGrants();
       persist();
     },
   };
@@ -1972,6 +2104,7 @@ export const useGameStore = create<GameState>((set, get) => {
     log: BattleLogEntry[],
     playerHp: number,
     enemy: Enemy,
+    battle: { tookDamage: boolean; maxHit: number } = { tookDamage: true, maxHit: 0 },
   ): Snapshot {
     // Win-streak bonus: +10% gold/exp per consecutive win after the first, capped +50%.
     const winStreak = state.winStreak + 1;
@@ -2070,6 +2203,14 @@ export const useGameStore = create<GameState>((set, get) => {
         { text: `💾 セーブポイント到達！(${checkpoint}階クリア) 以降の敗北は${checkpoint + 1}階から再開`, tone: "good" },
       ]);
     }
+    // 最終決戦のセーブポイント: 1000階(ラスボス)に到達したら、敗北しても1000階から
+    // 再挑戦できるよう復帰アンカーを1000に固定する。
+    if (newFloor === FINAL_FLOOR) {
+      startFloorPref = FINAL_FLOOR;
+      finalLog = pushLogs(finalLog, [
+        { text: `💾 最終セーブポイント！ ラスボス 機神デウス＝エクス＝マキナ。敗北しても1000階から再挑戦できる。`, tone: "good" },
+      ]);
+    }
     let discoveredItems = state.progress.discoveredItems;
     for (const d of drops) discoveredItems = discover(discoveredItems, d.id);
 
@@ -2130,7 +2271,8 @@ export const useGameStore = create<GameState>((set, get) => {
       }
     }
 
-    const progress: Progress = {
+    const noDmg = !battle.tookDamage;
+    let progress: Progress = {
       ...state.progress,
       kills: state.progress.kills + 1,
       bossKills: state.progress.bossKills + (enemy.isBoss ? 1 : 0),
@@ -2144,7 +2286,28 @@ export const useGameStore = create<GameState>((set, get) => {
       makinaGranted,
       claimedEndlessMessages,
       playSeconds: state.progress.playSeconds + 8,
+      // Title tracking: biggest single hit, no-damage clears / boss kills.
+      maxSingleHit: Math.max(state.progress.maxSingleHit, battle.maxHit),
+      perfectClears: state.progress.perfectClears + (noDmg ? 1 : 0),
+      noDamageBossKills: state.progress.noDamageBossKills + (enemy.isBoss && noDmg ? 1 : 0),
     };
+
+    // Unlock + soul-reward any newly satisfied titles (one-time via claimedTitles).
+    let soulsAfter = souls;
+    {
+      const granted = grantTitles(progress, soulsAfter);
+      progress = granted.progress;
+      soulsAfter = granted.souls;
+      if (granted.unlocked.length > 0) {
+        finalLog = pushLogs(
+          finalLog,
+          granted.unlocked.map((id) => ({
+            text: `🎖️ 称号「${getTitle(id).name}」獲得！ 転生ポイント+${titleSouls(getTitle(id))}`,
+            tone: "good" as const,
+          })),
+        );
+      }
+    }
 
     // World-clear overlay when a 100th-floor world boss falls — except the 1000F
     // boss, where the ending takes over instead (#3).
@@ -2175,7 +2338,7 @@ export const useGameStore = create<GameState>((set, get) => {
       progress,
       checkpoint,
       startFloorPref,
-      souls,
+      souls: soulsAfter,
       gachaPoints: state.gachaPoints + bonusGacha + capped.material,
       worldCleared,
       pendingEnding: endingPending,

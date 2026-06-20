@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import SoundToggle from "@/components/SoundToggle";
 import PixelGlyph from "@/components/PixelGlyph";
-import { DIFFICULTY_LIST } from "@/data/difficulty";
+import EventBadge from "@/components/EventBadge";
+import { casinoEvent } from "@/lib/casino";
+import { FINAL_FLOOR } from "@/data/worlds";
 import { isFeatureUnlocked, FEATURE_UNLOCKS } from "@/data/unlocks";
 import { getDailyBonus } from "@/lib/daily";
 import { useGameStore } from "@/store/gameStore";
@@ -12,7 +14,6 @@ import { useGameStore } from "@/store/gameStore";
 export default function TitlePage() {
   const hydrate = useGameStore((s) => s.hydrate);
   const hydrated = useGameStore((s) => s.hydrated);
-  const newGame = useGameStore((s) => s.newGame);
   const floor = useGameStore((s) => s.currentFloor);
   const player = useGameStore((s) => s.player);
   const progress = useGameStore((s) => s.progress);
@@ -23,12 +24,6 @@ export default function TitlePage() {
 
   const seenHelp = useGameStore((s) => s.seenHelp);
   const markHelpSeen = useGameStore((s) => s.markHelpSeen);
-  const difficulty = useGameStore((s) => s.difficulty);
-  const setDifficulty = useGameStore((s) => s.setDifficulty);
-  const handedness = useGameStore((s) => s.handedness);
-  const setHandedness = useGameStore((s) => s.setHandedness);
-  const tapToBuy = useGameStore((s) => s.tapToBuy);
-  const setTapToBuy = useGameStore((s) => s.setTapToBuy);
   const checkpoint = useGameStore((s) => s.checkpoint);
   const setStartFloor = useGameStore((s) => s.setStartFloor);
   const startFloorPref = useGameStore((s) => s.startFloorPref);
@@ -38,12 +33,39 @@ export default function TitlePage() {
   // checkpoint (51, 101, …) so you resume after the cleared boss.
   const startFloors: number[] = [1];
   for (let f = 50; f <= checkpoint; f += 50) startFloors.push(f + 1);
+  // Once the 1000F final boss has been reached, offer it directly so you can
+  // retry the last battle from its save point.
+  if (progress.highestFloorReached >= FINAL_FLOOR && !startFloors.includes(FINAL_FLOOR)) {
+    startFloors.push(FINAL_FLOOR);
+    startFloors.sort((a, b) => a - b);
+  }
+
+  // 1000階踏破で鍛冶屋の強化上限が解放される。プレイヤーが気づくよう、未確認なら鍛冶屋に「New」。
+  const cleared1000 = hydrated && (progress.highestFloorReached >= FINAL_FLOOR || progress.endingSeen);
+  const [forgeUnlockNew, setForgeUnlockNew] = useState(false);
+  useEffect(() => {
+    if (!cleared1000) {
+      setForgeUnlockNew(false);
+      return;
+    }
+    setForgeUnlockNew(window.localStorage.getItem("forgeUnlockSeen") !== "1");
+  }, [cleared1000]);
 
   const hasProgress = hydrated && (floor > 1 || player.level > 1);
   const artifactsUnlocked = isFeatureUnlocked("artifacts", progress);
   const casinoUnlocked = isFeatureUnlocked("casino", progress);
   const forgeUnlocked = isFeatureUnlocked("forge", progress);
   const showFirstRun = hydrated && !seenHelp;
+
+  /** A half-width locked placeholder (feature not yet unlocked). */
+  const lockedCell = (label: string, hint: string) => (
+    <div className="flex h-12 flex-1 flex-col items-center justify-center rounded-2xl bg-white/5 text-gray-500">
+      <span className="flex items-center gap-1 text-sm font-bold">
+        <PixelGlyph kind="lock" size={14} /> {label}
+      </span>
+      <span className="text-[9px]">{hint}</span>
+    </div>
+  );
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6 text-center">
@@ -57,8 +79,6 @@ export default function TitlePage() {
           Machina
         </h1>
         <p className="mt-3 text-sm text-gray-400">
-          ダイス版 Diablo
-          <br />
           装備で出目が書き換わるハクスラRPG
         </p>
       </div>
@@ -84,59 +104,70 @@ export default function TitlePage() {
               >
                 {startFloors.map((f) => (
                   <option key={f} value={f}>
-                    {f === 1 ? "1階から（最初）" : `${f}階から（セーブポイント）`}{/* 51,101… */}
+                    {f === 1
+                      ? "1階から（最初）"
+                      : f === FINAL_FLOOR
+                        ? "1000階 ラスボスから（再挑戦）"
+                        : `${f}階から（セーブポイント）`}
                   </option>
                 ))}
               </select>
             </div>
           )}
 
-          <Link
-            href="/inventory"
-            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/10 font-bold active:scale-95"
-          >
-            <PixelGlyph kind="bag" size={18} /> 装備を見る
-          </Link>
-
-          <Link
-            href="/class"
-            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/10 font-bold active:scale-95"
-          >
-            <PixelGlyph kind="attack" size={18} /> 転職
-          </Link>
-
-          {artifactsUnlocked ? (
+          {/* 装備 / 鍛冶屋 */}
+          <div className="flex gap-2">
             <Link
-              href="/artifacts"
-              className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-indigo-600/80 font-bold active:scale-95"
+              href="/inventory"
+              className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/10 font-bold active:scale-95"
             >
-              <PixelGlyph kind="soul" size={18} /> アーティファクト / 転生
+              <PixelGlyph kind="bag" size={18} /> 装備
             </Link>
-          ) : (
-            <div className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/5 text-sm text-gray-500">
-              <PixelGlyph kind="lock" size={16} /> アーティファクト（{FEATURE_UNLOCKS.artifacts.hint}）
-            </div>
-          )}
+            {forgeUnlocked ? (
+              <Link
+                href="/forge"
+                className="relative flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-amber-700/80 font-bold active:scale-95"
+              >
+                <PixelGlyph kind="attack" size={18} /> 鍛冶屋
+                {forgeUnlockNew && (
+                  <span className="absolute -right-1 -top-1 animate-pulse rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-black text-white shadow">
+                    New
+                  </span>
+                )}
+              </Link>
+            ) : (
+              lockedCell("鍛冶屋", FEATURE_UNLOCKS.forge.hint)
+            )}
+          </div>
 
-          {forgeUnlocked ? (
+          {/* 転職 / アーティファクト */}
+          <div className="flex gap-2">
             <Link
-              href="/forge"
-              className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-amber-700/80 font-bold active:scale-95"
+              href="/class"
+              className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/10 font-bold active:scale-95"
             >
-              <PixelGlyph kind="attack" size={18} /> 鍛冶屋
+              <PixelGlyph kind="attack" size={18} /> 転職
             </Link>
-          ) : (
-            <div className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/5 text-sm text-gray-500">
-              <PixelGlyph kind="lock" size={16} /> 鍛冶屋（{FEATURE_UNLOCKS.forge.hint}）
-            </div>
-          )}
+            {artifactsUnlocked ? (
+              <Link
+                href="/artifacts"
+                className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-indigo-600/80 font-bold active:scale-95"
+              >
+                <PixelGlyph kind="soul" size={18} /> アーティファクト
+              </Link>
+            ) : (
+              lockedCell("アーティファクト", FEATURE_UNLOCKS.artifacts.hint)
+            )}
+          </div>
 
+          {/* カジノ */}
           {casinoUnlocked ? (
             <Link
               href="/casino"
               className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-fuchsia-600/80 font-bold active:scale-95"
             >
               <PixelGlyph kind="casino" size={18} /> カジノ
+              {casinoEvent().active && <EventBadge />}
             </Link>
           ) : (
             <div className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/5 text-sm text-gray-500">
@@ -144,6 +175,7 @@ export default function TitlePage() {
             </div>
           )}
 
+          {/* ランキング / 残響戦 */}
           <div className="flex gap-2">
             <Link
               href="/ranking"
@@ -159,6 +191,7 @@ export default function TitlePage() {
             </Link>
           </div>
 
+          {/* 実績 / 図鑑 */}
           <Link
             href="/collection"
             className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/10 font-bold active:scale-95"
@@ -166,93 +199,34 @@ export default function TitlePage() {
             <PixelGlyph kind="codex" size={18} /> 実績 / 図鑑
           </Link>
 
-          <Link
-            href="/help"
-            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/10 font-bold active:scale-95"
-          >
-            <PixelGlyph kind="help" size={18} /> 遊び方
-          </Link>
+          {/* 遊び方 / 設定 */}
+          <div className="flex gap-2">
+            <Link
+              href="/help"
+              className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/10 font-bold active:scale-95"
+            >
+              <PixelGlyph kind="help" size={18} /> 遊び方
+            </Link>
+            <Link
+              href="/settings"
+              className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/10 font-bold active:scale-95"
+            >
+              ⚙️ 設定
+            </Link>
+          </div>
 
-          <div className="mt-1 flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
+          {/* 本日のボーナス */}
+          <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
             <PixelGlyph kind="star" size={14} /> 本日のボーナス: <span className="font-bold">{daily.label}</span>
           </div>
 
-          <div>
-            <p className="text-[10px] text-gray-500">難易度（高いほどドロップ数・高レア率UP）</p>
-            <div className="mt-1 grid grid-cols-2 gap-1">
-              {DIFFICULTY_LIST.map((d) => (
-                <button
-                  key={d.id}
-                  onClick={() => setDifficulty(d.id)}
-                  className={`h-8 rounded-lg text-[11px] font-bold active:scale-95 ${
-                    difficulty === d.id ? "bg-rose-600 text-white" : "bg-white/10 text-gray-300"
-                  }`}
-                >
-                  {d.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-[10px] text-gray-500">利き手（決定ボタンの位置）</p>
-            <div className="mt-1 flex gap-1">
-              {([
-                ["left", "👈 左手"],
-                ["right", "右手 👉"],
-              ] as const).map(([h, label]) => (
-                <button
-                  key={h}
-                  onClick={() => setHandedness(h)}
-                  className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 ${
-                    handedness === h ? "bg-sky-600 text-white" : "bg-white/10 text-gray-300"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-[10px] text-gray-500">ショップ購入</p>
-            <div className="mt-1 flex gap-1">
-              {([
-                [false, "ボタンで購入"],
-                [true, "タップで購入"],
-              ] as const).map(([v, label]) => (
-                <button
-                  key={String(v)}
-                  onClick={() => setTapToBuy(v)}
-                  className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 ${
-                    tapToBuy === v ? "bg-emerald-600 text-white" : "bg-white/10 text-gray-300"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
+          {/* リリースノート */}
           <Link
-            href="/data"
-            className="mt-1 text-xs text-gray-500 underline active:scale-95"
+            href="/news"
+            className="text-xs text-gray-500 underline active:scale-95"
           >
-            💾 データ引き継ぎ
+            📜 リリースノート（更新履歴）
           </Link>
-
-          {hasProgress && (
-            <button
-              onClick={() => {
-                if (confirm("最初からやり直しますか？ 進行状況は消えます。")) {
-                  newGame();
-                }
-              }}
-              className="mt-2 text-xs text-gray-500 underline active:scale-95"
-            >
-              最初からやり直す
-            </button>
-          )}
         </div>
       )}
 

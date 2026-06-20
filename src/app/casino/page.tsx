@@ -8,28 +8,33 @@ import {
   dealerPlay,
   doubleUp,
   drawDie,
-  fateCost,
   COIN_VALUE,
   SLOT_BET,
   DAIPAN_LIMIT,
   MACHINE_COUNT,
   SET_WEAPON_COIN,
+  SIGNATURE_WEAPON_COIN,
   SOULS_COIN,
+  SETTING_TIP_COIN,
   HIT_WINDOW_MS,
   coinBuyCost,
-  coinBuyMax,
+  settingBucket,
+  effectiveSlotSettings,
+  effectivePachiSettings,
+  casinoEvent,
   type BjOutcome,
 } from "@/lib/casino";
 import { estimateTier } from "@/data/items";
-import { availableSetKeys, getSetDef } from "@/data/sets";
+import { SET_DEFS, getSetDef, availableSetKeys } from "@/data/sets";
 import { EQUIP_SLOTS } from "@/lib/battle";
 import { ENEMY_TEMPLATES, BOSS_TEMPLATES } from "@/data/enemies";
 import { getSlotIconDataUrl } from "@/lib/itemIcon";
 import { slotSfx, setBgmTheme } from "@/lib/audio";
 import EnemyIcon from "@/components/EnemyIcon";
 import PixelGlyph from "@/components/PixelGlyph";
+import EventBadge from "@/components/EventBadge";
 import { fmt } from "@/lib/ui";
-import { useGameStore, type FateResult, type SlotSpinResult } from "@/store/gameStore";
+import { useGameStore, type SlotSpinResult } from "@/store/gameStore";
 
 const PIPS = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 const BETS = [10, 50, 100];
@@ -42,7 +47,7 @@ export default function CasinoPage() {
   const bossKills = useGameStore((s) => s.progress.bossKills);
   const atGames = useGameStore((s) => s.atGames);
   const daiPan = useGameStore((s) => s.daiPan);
-  const [tab, setTab] = useState<"slots" | "bj" | "fate" | "shop">("slots");
+  const [tab, setTab] = useState<"slots" | "bj" | "shop">("slots");
   const [shaking, setShaking] = useState(false);
   const [panMsg, setPanMsg] = useState<string | null>(null);
   const shakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,6 +89,9 @@ export default function CasinoPage() {
     );
   }
 
+  // イベントデー判定(ローカルの日)。ヘッダーのお祭り表示・各ゲームのEVENTバッジに使う。
+  const event = casinoEvent();
+
   const onPan = () => {
     const r = daiPan();
     slotSfx("pan");
@@ -108,25 +116,40 @@ export default function CasinoPage() {
 
       <div className="rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 p-3 text-center">
         <div className="text-3xl">🎰</div>
-        <h1 className="font-bold text-fuchsia-200">カジノ</h1>
-        <p className="text-[10px] text-gray-400">カジノコインで遊ぶ。ダイスラッシュで一攫千金。</p>
+        <h1 className="flex items-center justify-center gap-1 font-bold text-fuchsia-200">
+          カジノ
+          {event.active && <EventBadge />}
+        </h1>
+        {event.active ? (
+          <p className="text-[11px] font-bold text-amber-300">🎉 {event.label}・激アツ設定デー！</p>
+        ) : (
+          <p className="text-[10px] text-gray-400">カジノコインで遊ぶ。ダイスラッシュで一攫千金。</p>
+        )}
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <Link
+        href="/casino/pachinko"
+        className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-cyan-600/80 font-bold active:scale-95"
+      >
+        🎲 甘ダイスへ
+        {event.pachinko && <EventBadge />}
+      </Link>
+
+      <div className="grid grid-cols-3 gap-2">
         {([
           ["slots", "🎲 スロット"],
           ["bj", "🃏 BJ"],
-          ["fate", "🔮 運命"],
           ["shop", "🪙 交換所"],
         ] as const).map(([k, label]) => (
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`h-10 rounded-xl text-[11px] font-bold active:scale-95 ${
+            className={`flex h-10 items-center justify-center gap-1 rounded-xl text-[11px] font-bold active:scale-95 ${
               tab === k ? "bg-fuchsia-600 text-white" : "bg-white/10 text-gray-300"
             }`}
           >
             {label}
+            {k === "slots" && event.slot && <EventBadge />}
           </button>
         ))}
       </div>
@@ -135,8 +158,6 @@ export default function CasinoPage() {
         <Slots onPan={onPan} />
       ) : tab === "bj" ? (
         <Blackjack />
-      ) : tab === "fate" ? (
-        <FatePanel />
       ) : (
         <CoinShop />
       )}
@@ -153,11 +174,11 @@ export default function CasinoPage() {
 function BetSelector({
   bet,
   setBet,
-  gold,
+  coins,
 }: {
   bet: number;
   setBet: (n: number) => void;
-  gold: number;
+  coins: number;
 }) {
   return (
     <div className="flex gap-2">
@@ -165,12 +186,12 @@ function BetSelector({
         <button
           key={b}
           onClick={() => setBet(b)}
-          disabled={b > gold}
+          disabled={b > coins}
           className={`h-9 flex-1 rounded-lg text-xs font-bold active:scale-95 disabled:opacity-30 ${
             bet === b ? "bg-amber-600 text-white" : "bg-white/10 text-gray-300"
           }`}
         >
-          💰{b}
+          🎲{b}
         </button>
       ))}
     </div>
@@ -286,7 +307,6 @@ function Slots({ onPan }: { onPan: () => void }) {
   const slotHits = useGameStore((s) => s.slotHits);
   const selectMachine = useGameStore((s) => s.selectMachine);
   const buyCoins = useGameStore((s) => s.buyCoins);
-  const buyCoinsAll = useGameStore((s) => s.buyCoinsAll);
   const cashout = useGameStore((s) => s.cashoutCoins);
   const slotSpin = useGameStore((s) => s.slotSpin);
 
@@ -296,6 +316,19 @@ function Slots({ onPan }: { onPan: () => void }) {
   const [foe, setFoe] = useState<ReachFoe | null>(null);
   const [result, setResult] = useState<SlotSpinResult | null>(null);
   const [auto, setAuto] = useState(false);
+
+  // おじさんに暴かれたこの台群(スロット)の設定。交換所での購入に追従。
+  const [slotTips, setSlotTips] = useState<Record<number, number>>({});
+  useEffect(() => {
+    const load = () => setSlotTips(readCasinoTips().slot);
+    load();
+    window.addEventListener("casinoTips", load);
+    window.addEventListener("storage", load);
+    return () => {
+      window.removeEventListener("casinoTips", load);
+      window.removeEventListener("storage", load);
+    };
+  }, []);
   const [flash, setFlash] = useState(false); // 確定当たりリーチの虹色明滅
 
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -474,11 +507,11 @@ function Slots({ onPan }: { onPan: () => void }) {
           +200（💰{fmt(coinBuyCost(200, coins))}）
         </button>
         <button
-          onClick={buyCoinsAll}
-          disabled={spinning || coinBuyMax(gold, coins) <= 0}
-          className="h-9 flex-1 rounded-lg bg-amber-500 text-[11px] font-extrabold text-black active:scale-95 disabled:opacity-30"
+          onClick={() => buyCoins(1000)}
+          disabled={spinning || gold < coinBuyCost(1000, coins)}
+          className="h-9 flex-1 rounded-lg bg-amber-600/80 text-[11px] font-bold text-white active:scale-95 disabled:opacity-30"
         >
-          全購入（+{fmt(coinBuyMax(gold, coins))}）
+          +1000（💰{fmt(coinBuyCost(1000, coins))}）
         </button>
         <button
           onClick={cashout}
@@ -496,11 +529,12 @@ function Slots({ onPan }: { onPan: () => void }) {
             key={i}
             onClick={() => selectMachine(i)}
             disabled={spinning || atActive}
-            className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 disabled:opacity-40 ${
+            className={`flex h-9 flex-1 flex-col items-center justify-center rounded-lg text-[11px] font-bold leading-none active:scale-95 disabled:opacity-40 ${
               machine === i ? "bg-fuchsia-600 text-white" : "bg-white/10 text-gray-300"
             }`}
           >
             台{i + 1}
+            {slotTips[i] != null && <span className="mt-0.5 text-[9px] text-amber-300">設定{slotTips[i]}</span>}
           </button>
         ))}
       </div>
@@ -655,8 +689,8 @@ function Slots({ onPan }: { onPan: () => void }) {
 type BjPhase = "bet" | "player" | "result";
 
 function Blackjack() {
-  const gold = useGameStore((s) => s.player.gold);
-  const settle = useGameStore((s) => s.casinoSettle);
+  const coins = useGameStore((s) => s.coins);
+  const addCoins = useGameStore((s) => s.addCoins);
   const [bet, setBet] = useState(10);
   const [phase, setPhase] = useState<BjPhase>("bet");
   const [player, setPlayer] = useState<number[]>([]);
@@ -666,8 +700,8 @@ function Blackjack() {
   const [msg, setMsg] = useState("");
 
   const deal = () => {
-    if (gold < bet) return;
-    settle(-bet);
+    if (coins < bet) return;
+    addCoins(-bet);
     setPlayer([drawDie(), drawDie()]);
     setDealer([]);
     setOutcome(null);
@@ -710,7 +744,7 @@ function Blackjack() {
     if (r.won) {
       const np = pot * 2;
       setPot(np);
-      setMsg(`${PIPS[r.die]} 当たり！ ポット 💰${np}`);
+      setMsg(`${PIPS[r.die]} 当たり！ ポット 🎲${np}`);
     } else {
       setPot(0);
       setOutcome("lose");
@@ -719,7 +753,7 @@ function Blackjack() {
   };
 
   const cashOut = () => {
-    if (pot > 0) settle(pot);
+    if (pot > 0) addCoins(pot);
     setPhase("bet");
     setMsg("");
     setOutcome(null);
@@ -749,19 +783,20 @@ function Blackjack() {
           </p>
         )}
         {phase === "result" && pot > 0 && (
-          <p className="mt-1 text-center text-sm text-amber-300">ポット: 💰{pot}</p>
+          <p className="mt-1 text-center text-sm text-amber-300">ポット: 🎲{pot}</p>
         )}
       </div>
 
       {phase === "bet" && (
         <>
-          <BetSelector bet={bet} setBet={setBet} gold={gold} />
+          <div className="text-center text-xs text-amber-300">🎲 カジノコイン {fmt(coins)}</div>
+          <BetSelector bet={bet} setBet={setBet} coins={coins} />
           <button
             onClick={deal}
-            disabled={gold < bet}
+            disabled={coins < bet}
             className="h-16 rounded-2xl bg-fuchsia-600 text-xl font-extrabold text-white active:scale-95 disabled:opacity-40"
           >
-            🃏 配る（💰{bet}）
+            🃏 配る（🎲{bet}）
           </button>
           <p className="text-center text-[10px] text-gray-500">21に近づけて勝負。勝てばダブルアップに挑戦。</p>
         </>
@@ -791,7 +826,7 @@ function Blackjack() {
             </div>
           )}
           <button onClick={cashOut} className="h-16 rounded-2xl bg-amber-600 text-xl font-extrabold text-white active:scale-95">
-            {pot > 0 ? `受け取る（💰${pot}）` : "終了"}
+            {pot > 0 ? `受け取る（🎲${pot}）` : "終了"}
           </button>
         </div>
       )}
@@ -801,27 +836,88 @@ function Blackjack() {
 
 // ===== カジノコイン交換所 =====
 
+/** おじさんに聞いて暴いた台の設定（当該6時間バケットぶん）を読む。 */
+function readCasinoTips(): { slot: Record<number, number>; pachi: Record<number, number> } {
+  if (typeof window === "undefined") return { slot: {}, pachi: {} };
+  try {
+    const raw = window.localStorage.getItem("casinoTips");
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && p.bucket === settingBucket()) return { slot: p.slot ?? {}, pachi: p.pachi ?? {} };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { slot: {}, pachi: {} };
+}
+
 function CoinShop() {
   const coins = useGameStore((s) => s.coins);
   const souls = useGameStore((s) => s.souls);
-  const highest = useGameStore((s) => s.progress.highestFloorReached);
+  const addCoins = useGameStore((s) => s.addCoins);
   const buyWeapon = useGameStore((s) => s.coinBuySetWeapon);
+  const buySignature = useGameStore((s) => s.coinBuySignatureWeapon);
   const buySouls = useGameStore((s) => s.coinBuySouls);
 
-  const keys = useMemo(
-    () => availableSetKeys(highest).filter((k) => !getSetDef(k)?.procedural),
+  // 怪しいおじさん: 2000コインで「スロット4台＋甘ダイス4台＝計8台」からランダムに1台の設定を
+  // “こっそり”教える。暴いた設定は localStorage(当該バケット)に貯まり、各台ボタンに表示される。
+  const buyTip = () => {
+    if (coins < SETTING_TIP_COIN) return;
+    addCoins(-SETTING_TIP_COIN);
+    const bucket = settingBucket();
+    const pick = Math.floor(Math.random() * (MACHINE_COUNT * 2)); // 0..7
+    const isSlot = pick < MACHINE_COUNT;
+    const m = pick % MACHINE_COUNT;
+    // 看破はイベント上書き後の“実効設定”を暴く（実際に効いている値と一致させる）。
+    const s = (isSlot ? effectiveSlotSettings(bucket) : effectivePachiSettings(bucket))[m];
+    try {
+      let store: { bucket: number; slot: Record<number, number>; pachi: Record<number, number> } = {
+        bucket,
+        slot: {},
+        pachi: {},
+      };
+      const raw = window.localStorage.getItem("casinoTips");
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && p.bucket === bucket) store = { bucket, slot: p.slot ?? {}, pachi: p.pachi ?? {} };
+      }
+      (isSlot ? store.slot : store.pachi)[m] = s;
+      window.localStorage.setItem("casinoTips", JSON.stringify(store));
+      window.dispatchEvent(new Event("casinoTips"));
+    } catch {
+      /* localStorage 不可でも会話は成立させる */
+    }
+    slotSfx("small");
+    setMsg(`🕵️ おじさん「${isSlot ? "スロット" : "甘ダイス"}の台${m + 1}は…たぶん設定${s}だよ。たぶんね」`);
+    setTimeout(() => setMsg(null), 4500);
+  };
+
+  // 固有セット（常設）＋ 到達済みの「生成セット（深層）」も交換できるように
+  // （欲しい深層セットが買えない不満の解消）。生成セットは highestFloorReached で解放。
+  const highest = useGameStore((s) => s.progress.highestFloorReached);
+  const namedKeys = useMemo(() => SET_DEFS.map((s) => s.key), []);
+  const procKeys = useMemo(
+    () => availableSetKeys(highest).filter((k) => k.startsWith("gset")),
     [highest],
   );
-  const [sel, setSel] = useState(keys[0] ?? "gambler");
+  const [sel, setSel] = useState(namedKeys[0] ?? "gambler");
   const [msg, setMsg] = useState<string | null>(null);
 
   const canWeapon = coins >= SET_WEAPON_COIN;
+  const canSignature = coins >= SIGNATURE_WEAPON_COIN;
   const canSoul = coins >= SOULS_COIN;
 
   const doWeapon = () => {
     const w = buyWeapon(sel);
     if (w) {
-      setMsg(`⚔️ ${w.name} を交換！`);
+      setMsg(`🎁 ${w.name} を交換！`);
+      setTimeout(() => setMsg(null), 2500);
+    }
+  };
+  const doSignature = () => {
+    const w = buySignature();
+    if (w) {
+      setMsg(`🌟 固有武器「${w.name}」を交換！`);
       setTimeout(() => setMsg(null), 2500);
     }
   };
@@ -831,20 +927,6 @@ function CoinShop() {
     setMsg(`🔮 転生ポイント +${n}！`);
     setTimeout(() => setMsg(null), 2500);
   };
-
-  // カジノコイン0枚では交換所に入れない(冷やかし防止 / フリーズ回避)。
-  if (coins <= 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16">
-        <div className="w-full max-w-xs animate-pop rounded-2xl border border-fuchsia-500/40 bg-[#15131f] p-6 text-center shadow-lg">
-          <div className="text-4xl">🪙</div>
-          <p className="mt-3 text-base font-extrabold text-fuchsia-200">カジノコイン持っていないよ。</p>
-          <p className="mt-1 text-sm text-gray-300">冷やかしはやめよう。</p>
-          <p className="mt-3 text-[10px] text-gray-500">スロットでカジノコインを稼いでから来てね。</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -863,24 +945,35 @@ function CoinShop() {
         </div>
       )}
 
-      {/* Set weapon exchange */}
+      {/* Set gear exchange (random slot) */}
       <div className="rounded-2xl border border-fuchsia-500/40 bg-fuchsia-500/5 p-3">
         <p className="flex items-center gap-1 text-sm font-bold text-fuchsia-200">
-          <PixelGlyph kind="drop" size={14} /> セット武器と交換
+          <PixelGlyph kind="drop" size={14} /> セット装備と交換（ランダム部位）
         </p>
         <p className="mt-0.5 text-[10px] text-gray-400">
-          所持装備に見合うティアのセット武器（ビルドの軸）を入手。
+          所持装備に見合うティアのセット装備を入手（武器・防具・アクセからランダム＝セット完成を狙える）。深層で出会った生成セットも選べる。
         </p>
         <select
           value={sel}
           onChange={(e) => setSel(e.target.value)}
           className="mt-2 h-9 w-full rounded-lg bg-black/40 px-2 text-xs text-gray-100"
         >
-          {keys.map((k) => (
-            <option key={k} value={k}>
-              {getSetDef(k)?.name ?? k} セット
-            </option>
-          ))}
+          <optgroup label="固有セット">
+            {namedKeys.map((k) => (
+              <option key={k} value={k}>
+                {getSetDef(k)?.name ?? k} セット
+              </option>
+            ))}
+          </optgroup>
+          {procKeys.length > 0 && (
+            <optgroup label="生成セット（深層で解放）">
+              {procKeys.map((k) => (
+                <option key={k} value={k}>
+                  {getSetDef(k)?.name ?? k} セット
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
         <button
           onClick={doWeapon}
@@ -888,6 +981,23 @@ function CoinShop() {
           className="mt-2 h-12 w-full rounded-xl bg-fuchsia-600 text-sm font-extrabold text-white active:scale-95 disabled:opacity-40"
         >
           交換（🪙{fmt(SET_WEAPON_COIN)}）
+        </button>
+      </div>
+
+      {/* 固有(signature)武器 exchange — ランダム1種 */}
+      <div className="rounded-2xl border border-amber-400/40 bg-amber-400/5 p-3">
+        <p className="flex items-center gap-1 text-sm font-bold text-amber-200">
+          <PixelGlyph kind="drop" size={14} /> 固有武器と交換
+        </p>
+        <p className="mt-0.5 text-[10px] text-gray-400">
+          ダイス目を書き換える固有(銘入り)武器をランダムに1つ入手。
+        </p>
+        <button
+          onClick={doSignature}
+          disabled={!canSignature}
+          className="mt-2 h-12 w-full rounded-xl bg-amber-500 text-sm font-extrabold text-black active:scale-95 disabled:opacity-40"
+        >
+          交換（🪙{fmt(SIGNATURE_WEAPON_COIN)}）
         </button>
       </div>
 
@@ -917,6 +1027,21 @@ function CoinShop() {
         </div>
       </div>
 
+      {/* 怪しいおじさん（設定看破の裏ルート） */}
+      <div className="rounded-2xl border border-cyan-500/40 bg-cyan-500/5 p-3">
+        <p className="flex items-center gap-1 text-sm font-bold text-cyan-200">🕵️ 設定を聞く（おじさん）</p>
+        <p className="mt-0.5 text-[10px] text-gray-400">
+          スロット＆甘ダイスの計8台から、ランダムで1台の隠し設定をこっそり教えてもらう（当たり台ボタンに表示）。
+        </p>
+        <button
+          onClick={buyTip}
+          disabled={coins < SETTING_TIP_COIN}
+          className="mt-2 h-12 w-full rounded-xl bg-cyan-600 text-sm font-extrabold text-white active:scale-95 disabled:opacity-40"
+        >
+          聞く（🪙{fmt(SETTING_TIP_COIN)}）
+        </button>
+      </div>
+
       <p className="text-center text-[10px] text-gray-500">
         カジノコインはスロットで稼ぐ。超高額なので一攫千金（ダイスラッシュ）が近道。
       </p>
@@ -924,137 +1049,3 @@ function CoinShop() {
   );
 }
 
-// ===== 運命の大博打 (Fate gamble) =====
-
-const FATE_GLYPHS = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅", "💀", "🔮", "✦", "🌈", "💎", "👑"];
-
-function FatePanel() {
-  const gold = useGameStore((s) => s.player.gold);
-  const equipped = useGameStore((s) => s.equipped);
-  const inventory = useGameStore((s) => s.inventory);
-  const gamble = useGameStore((s) => s.fateGamble);
-
-  const [spinning, setSpinning] = useState(false);
-  const [glyphs, setGlyphs] = useState<string[]>(["🔮", "🔮", "🔮"]);
-  const [result, setResult] = useState<FateResult | null>(null);
-  const timers = useRef<ReturnType<typeof setInterval>[]>([]);
-
-  // Reference power = the player's current best owned gear → drives the price.
-  const refTier = useMemo(() => {
-    let t = 0;
-    for (const slot of EQUIP_SLOTS) {
-      const it = equipped[slot];
-      if (it) t = Math.max(t, estimateTier(it));
-    }
-    for (const it of inventory) t = Math.max(t, estimateTier(it));
-    return t;
-  }, [equipped, inventory]);
-
-  const cost = fateCost(refTier);
-  const canAfford = gold >= cost && !spinning;
-
-  useEffect(() => {
-    return () => timers.current.forEach(clearInterval);
-  }, []);
-
-  const spin = () => {
-    if (!canAfford) return;
-    const r = gamble(); // RNG decided up-front; the animation is pure suspense.
-    if (r.cost > gold) return;
-    setResult(null);
-    setSpinning(true);
-
-    const cycle = setInterval(() => {
-      setGlyphs([
-        FATE_GLYPHS[Math.floor(Math.random() * FATE_GLYPHS.length)],
-        FATE_GLYPHS[Math.floor(Math.random() * FATE_GLYPHS.length)],
-        FATE_GLYPHS[Math.floor(Math.random() * FATE_GLYPHS.length)],
-      ]);
-    }, 80);
-    timers.current.push(cycle);
-
-    // Long, flashy reveal (~2.6s).
-    const finish = setTimeout(() => {
-      clearInterval(cycle);
-      const face =
-        r.kind === "item" ? "💎" : r.kind === "souls" ? "🌈" : "💀";
-      setGlyphs([face, face, face]);
-      setSpinning(false);
-      setResult(r);
-    }, 2600);
-    timers.current.push(finish as unknown as ReturnType<typeof setInterval>);
-  };
-
-  const won = result && result.kind !== "lose";
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div
-        className={`relative overflow-hidden rounded-2xl border p-5 text-center transition-colors ${
-          spinning
-            ? "border-amber-400/60 bg-gradient-to-br from-amber-500/20 via-fuchsia-600/20 to-rose-600/20"
-            : won
-              ? "border-amber-300 bg-gradient-to-br from-amber-400/30 to-rose-500/30"
-              : "border-white/10 bg-black/40"
-        }`}
-      >
-        <div
-          className={`flex justify-center gap-2 text-5xl ${
-            spinning ? "animate-pulse" : won ? "fate-pop" : ""
-          }`}
-        >
-          {glyphs.map((g, i) => (
-            <span key={i}>{g}</span>
-          ))}
-        </div>
-
-        {spinning && (
-          <p className="mt-3 animate-pulse text-sm font-bold text-amber-200">
-            運命を回しています…
-          </p>
-        )}
-
-        {result && !spinning && (
-          <div className="mt-3">
-            {result.kind === "item" && (
-              <>
-                <p className="text-lg font-extrabold text-amber-300">🎉 大当たり！</p>
-                <p className="mt-1 text-sm font-bold text-amber-200">
-                  💎 {result.item.name} を獲得！
-                </p>
-              </>
-            )}
-            {result.kind === "souls" && (
-              <>
-                <p className="text-lg font-extrabold text-fuchsia-300">🎉 大当たり！</p>
-                <p className="mt-1 text-sm font-bold text-fuchsia-200">
-                  🌈 転生ポイント +{result.souls}！
-                </p>
-              </>
-            )}
-            {result.kind === "lose" && (
-              <p className="text-lg font-extrabold text-gray-400">💀 ハズレ…</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-xl border border-white/10 bg-black/20 p-2 text-[10px] leading-relaxed text-gray-400">
-        🔮 <b className="text-amber-300">運命の大博打</b>：超低確率・特大報酬。
-        当たれば<b className="text-amber-200">所持している★より2段階上の装備</b>、
-        または<b className="text-fuchsia-200">転生ポイント</b>。ほとんどはハズレ。
-      </div>
-
-      <button
-        onClick={spin}
-        disabled={!canAfford}
-        className="h-16 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-600 text-xl font-extrabold text-white shadow-lg active:scale-95 disabled:opacity-40"
-      >
-        🔮 運命を回す（💰{fmt(cost)}）
-      </button>
-      {gold < cost && (
-        <p className="text-center text-[10px] text-red-300">ゴールドが足りません。</p>
-      )}
-    </div>
-  );
-}

@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  fateCost,
-  FATE_WIN_CHANCE,
   drawSlotOutcome,
   slotPayout,
   slotReels,
@@ -14,6 +12,13 @@ import {
   machineSettings,
   settingMult,
   ceilingSpins,
+  pachiMachineSettings,
+  pachiSettingMult,
+  pachiCeilingSpins,
+  casinoEvent,
+  overrideSetting,
+  effectiveSlotSettings,
+  effectivePachiSettings,
   MACHINE_COUNT,
   SLOT_LUCK,
   coinBuyCost,
@@ -21,20 +26,6 @@ import {
   COIN_VALUE,
   type SlotOutcome,
 } from "@/lib/casino";
-
-describe("運命の大博打 (fate gamble)", () => {
-  it("keeps a deliberately tiny win chance (低期待値)", () => {
-    expect(FATE_WIN_CHANCE).toBeGreaterThan(0);
-    expect(FATE_WIN_CHANCE).toBeLessThanOrEqual(0.1);
-  });
-
-  it("fateCost has a floor and scales with the player's best tier", () => {
-    expect(fateCost(0)).toBe(3000); // floor for fresh saves
-    expect(fateCost(10)).toBe(3000); // still under the floor
-    expect(fateCost(60)).toBe(60 * 80); // late-game gold sink
-    expect(fateCost(100)).toBeGreaterThan(fateCost(60));
-  });
-});
 
 describe("slot machine (パチスロ4号機フレーバー)", () => {
   it("drawSlotOutcome always returns a valid outcome", () => {
@@ -118,12 +109,33 @@ describe("slot machine (パチスロ4号機フレーバー)", () => {
     expect(a.join() === b.join()).toBe(false);
   });
 
+  it("甘ダイス(パチンコ)も4台・設定1-6＝スロットより設定差が広い", () => {
+    const p = pachiMachineSettings(100);
+    expect(p).toHaveLength(MACHINE_COUNT);
+    for (const s of p) {
+      expect(s).toBeGreaterThanOrEqual(1);
+      expect(s).toBeLessThanOrEqual(6);
+    }
+    expect(pachiMachineSettings(100)).toEqual(p); // 決定論的
+    expect(pachiMachineSettings(100).join() === pachiMachineSettings(101).join()).toBe(false);
+    // スロットとは独立シード（同一バケットで一致しないことが多い）。
+    // 機械割の幅がスロットより広い。
+    const slotSpread = settingMult(6) - settingMult(1);
+    const pachiSpread = pachiSettingMult(6) - pachiSettingMult(1);
+    expect(pachiSpread).toBeGreaterThan(slotSpread);
+    // 高設定ほど天井が浅い。
+    expect(pachiCeilingSpins(6)).toBeLessThan(pachiCeilingSpins(1));
+  });
+
   it("カジノコインの買値は所持枚数が多いほど割高(買いづらく)", () => {
-    // 0枚のときは基本レート、保有が増えるほど単価が上がる。
-    expect(coinBuyCost(50, 0)).toBe(50 * COIN_VALUE);
+    // 0枚からでも、まとめ買いは購入中に単価が逓増する→基本レートより必ず高い。
+    // （全換金→0枚にして20:1で買い戻す裁定グリッチを封じる。）
+    expect(coinBuyCost(50, 0)).toBeGreaterThan(50 * COIN_VALUE);
     expect(coinBuyCost(50, 400)).toBeGreaterThan(coinBuyCost(50, 0));
     // 換金(COIN_VALUE)より買値の単価が常に高い→裁定取引にならない。
-    expect(coinBuyCost(100, 100) / 100).toBeGreaterThanOrEqual(COIN_VALUE);
+    expect(coinBuyCost(100, 100) / 100).toBeGreaterThan(COIN_VALUE);
+    // 1枚でも基本レート超え（端数の取りこぼしが無い）。
+    expect(coinBuyCost(1, 0)).toBeGreaterThan(COIN_VALUE);
   });
 
   it("全購入(coinBuyMax)は所持ゴールドで買える最大枚数を返す(超過しない)", () => {
@@ -174,5 +186,90 @@ describe("slot machine (パチスロ4号機フレーバー)", () => {
     }
     // there are ~10 named reach productions
     expect(SLOT_REACHES.length).toBeGreaterThanOrEqual(10);
+  });
+});
+
+describe("イベントデー (カレンダー連動の設定上書き)", () => {
+  // month 0 = Jan なので getDate() がそのまま D になる。
+  const day = (d: number) => new Date(2026, 0, d);
+
+  it("1のつく日は甘ダイスのみboost、スロットは無し", () => {
+    for (const d of [1, 11, 21, 31]) {
+      const e = casinoEvent(day(d));
+      expect(e.pachinko).toBe("boost");
+      expect(e.slot).toBe(null);
+      expect(e.active).toBe(true);
+    }
+    expect(casinoEvent(day(1)).label).toBe("1のつく日");
+  });
+
+  it("7のつく日はスロットのみboost", () => {
+    for (const d of [7, 27]) {
+      const e = casinoEvent(day(d));
+      expect(e.slot).toBe("boost");
+      expect(e.pachinko).toBe(null);
+    }
+    expect(casinoEvent(day(7)).label).toBe("7のつく日");
+  });
+
+  it("17は1と7が重なって両方boost", () => {
+    const e = casinoEvent(day(17));
+    expect(e.slot).toBe("boost");
+    expect(e.pachinko).toBe("boost");
+    expect(e.label).toBe("1・7のつく日");
+  });
+
+  it("0のつく日は両方polar、ラベルは0のつく日(1を含む10でも優先)", () => {
+    for (const d of [10, 20, 30]) {
+      const e = casinoEvent(day(d));
+      expect(e.slot).toBe("polar");
+      expect(e.pachinko).toBe("polar");
+      expect(e.label).toBe("0のつく日");
+      expect(e.active).toBe(true);
+    }
+  });
+
+  it("素の日(5)はイベント無し", () => {
+    const e = casinoEvent(day(5));
+    expect(e.slot).toBe(null);
+    expect(e.pachinko).toBe(null);
+    expect(e.active).toBe(false);
+    expect(e.label).toBe("");
+  });
+
+  it("overrideSetting: boost/polar/null の振り分け", () => {
+    // boost: ≤3→3, ≥4→5
+    expect(overrideSetting(1, "boost")).toBe(3);
+    expect(overrideSetting(3, "boost")).toBe(3);
+    expect(overrideSetting(4, "boost")).toBe(5);
+    expect(overrideSetting(6, "boost")).toBe(5);
+    // polar: ≤3→1, ≥4→6
+    expect(overrideSetting(1, "polar")).toBe(1);
+    expect(overrideSetting(3, "polar")).toBe(1);
+    expect(overrideSetting(4, "polar")).toBe(6);
+    expect(overrideSetting(6, "polar")).toBe(6);
+    // null はそのまま
+    expect(overrideSetting(2, null)).toBe(2);
+    expect(overrideSetting(5, null)).toBe(5);
+  });
+
+  it("effectiveSlotSettings: イベント日は上書き後、非イベント日はベースのまま", () => {
+    const bucket = 100;
+    const base = machineSettings(bucket);
+    // 7のつく日＝スロットboost。
+    const eff = effectiveSlotSettings(bucket, day(7));
+    eff.forEach((v, i) => expect(v).toBe(overrideSetting(base[i], "boost")));
+    // 素の日はベースと一致。
+    expect(effectiveSlotSettings(bucket, day(5))).toEqual(base);
+  });
+
+  it("effectivePachiSettings: イベント日は上書き後、非イベント日はベースのまま", () => {
+    const bucket = 100;
+    const base = pachiMachineSettings(bucket);
+    // 0のつく日＝甘ダイスpolar。
+    const eff = effectivePachiSettings(bucket, day(20));
+    eff.forEach((v, i) => expect(v).toBe(overrideSetting(base[i], "polar")));
+    // 5は素の日(甘ダイスのイベント無し)。
+    expect(effectivePachiSettings(bucket, day(5))).toEqual(base);
   });
 });
