@@ -17,6 +17,7 @@ export default function DiceDisplay() {
   const diceValue = useGameStore((s) => s.diceValue);
   const faces = useGameStore((s) => s.diceFaces);
   const face = useGameStore((s) => s.currentFace());
+  const twoDice = useGameStore((s) => s.twoDice);
 
   return (
     <div className="flex flex-col items-center">
@@ -27,6 +28,25 @@ export default function DiceDisplay() {
       >
         {PIPS[diceValue]}
       </div>
+
+      {/* 「2個振り(高い方を採用)」が発動したターンの目印。両出目を見せ、採用した目を強調。 */}
+      {twoDice && (
+        <div
+          key={`two-${twoDice[0]}-${twoDice[1]}-${diceValue}`}
+          className="animate-pop mt-1 flex items-center gap-1 rounded-full border border-violet-400/50 bg-violet-500/15 px-2 py-0.5 text-[11px] font-bold text-violet-200"
+        >
+          <span>🎲×2</span>
+          {twoDice.map((d, i) => (
+            <span
+              key={i}
+              className={d === diceValue ? "text-base text-white" : "text-gray-400 line-through"}
+            >
+              {PIPS[d]}
+            </span>
+          ))}
+          <span className="text-violet-300">高い方を採用！</span>
+        </div>
+      )}
 
       {/* Resolved effect for the current face */}
       <div
