@@ -8,7 +8,6 @@ import {
   dealerPlay,
   doubleUp,
   drawDie,
-  COIN_VALUE,
   SLOT_BET,
   DAIPAN_LIMIT,
   MACHINE_COUNT,
@@ -320,7 +319,6 @@ function Slots({ onPan }: { onPan: () => void }) {
   const slotHits = useGameStore((s) => s.slotHits);
   const selectMachine = useGameStore((s) => s.selectMachine);
   const buyCoins = useGameStore((s) => s.buyCoins);
-  const cashout = useGameStore((s) => s.cashoutCoins);
   const slotSpin = useGameStore((s) => s.slotSpin);
 
   const [reels, setReels] = useState<[number, number, number]>([7, 7, 7]);
@@ -526,13 +524,6 @@ function Slots({ onPan }: { onPan: () => void }) {
         >
           +1000（💰{fmt(coinBuyCost(1000, coins))}）
         </button>
-        <button
-          onClick={cashout}
-          disabled={spinning || coins <= 0}
-          className="h-9 flex-1 rounded-lg bg-white/10 text-[11px] font-bold text-gray-200 active:scale-95 disabled:opacity-30"
-        >
-          換金
-        </button>
       </div>
 
       {/* 台選択(設定は隠し・6時間ごとにシャッフル) + 天井/高確 */}
@@ -690,7 +681,7 @@ function Slots({ onPan }: { onPan: () => void }) {
         3枚掛け。<b className="text-red-300">7・7・7</b>で<b className="text-red-300">ダイスラッシュ</b>(AT)突入＝
         継続抽選で出玉が上乗せ（まれに大量出玉）。<b className="text-amber-300">BAR=REG</b> /
         <b className="text-cyan-300"> RP=リプレイ</b>（次回無料）/ ベル・スイカ・🍒で小役。
-        2つ揃うと<b className="text-red-300">リーチ</b>（演出が激アツなほど信頼度UP）。換金は1枚=💰{COIN_VALUE}、
+        2つ揃うと<b className="text-red-300">リーチ</b>（演出が激アツなほど信頼度UP）。
         買値は<b className="text-amber-200">所持枚数が多いほど割高</b>（買いづらい）。
       </div>
     </div>

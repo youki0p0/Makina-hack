@@ -73,7 +73,6 @@ import {
   SCRAP_VALUE,
 } from "@/lib/loot";
 import {
-  COIN_VALUE,
   SLOT_BET,
   GASE_REACH_CHANCE,
   drawSlotOutcome,
@@ -467,7 +466,6 @@ interface GameState {
   /** Buy slot coins with gold (price scales with held coins). */
   buyCoins: (coinAmount: number) => void;
   /** Cash all slot coins back into gold. */
-  cashoutCoins: () => void;
   /** カジノコインを増減（甘ダイス発射/払い出し・BJ 用。0未満にはしない）。 */
   addCoins: (delta: number) => void;
   addHiCoins: (delta: number) => void;
@@ -1806,13 +1804,6 @@ export const useGameStore = create<GameState>((set, get) => {
       const cost = coinBuyCost(amt, s.coins);
       if (amt <= 0 || s.player.gold < cost) return;
       set({ player: { ...s.player, gold: s.player.gold - cost }, coins: s.coins + amt });
-      persist();
-    },
-
-    cashoutCoins: () => {
-      const s = get();
-      if (s.coins <= 0) return;
-      set({ player: { ...s.player, gold: s.player.gold + s.coins * COIN_VALUE }, coins: 0, slotReplay: false });
       persist();
     },
 
