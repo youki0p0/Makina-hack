@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import EnemyIcon from "@/components/EnemyIcon";
 import { fmt } from "@/lib/ui";
 import type { BattleBoss } from "@/lib/pachinko/battle";
+import { getHeroSpriteDataUrl } from "@/lib/pachinko/heroSprite";
 
 /**
  * 中央モニターに重ねるバトル映像（演出専用・タイミングは親が setTimeout で駆動）。
@@ -52,19 +53,33 @@ export default function PachinkoBattle({
   );
 }
 
-/** 勇者スプライト（v1=絵文字。画像アセットは増やさない）。 */
+/** 勇者スプライト（手続き生成の16×16ドット絵。画像アセットは増やさない）。 */
 function Hero({ className = "", size = 56 }: { className?: string; size?: number }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    setUrl(getHeroSpriteDataUrl());
+  }, []);
   return (
     <span
-      className={`select-none ${className}`}
+      className={`inline-block select-none ${className}`}
       style={{
-        fontSize: size,
-        lineHeight: 1,
-        filter: "drop-shadow(0 0 8px rgba(120,200,255,.6))",
+        width: size,
+        height: size,
+        lineHeight: 0,
+        filter: "drop-shadow(0 0 6px rgba(120,200,255,.55))",
       }}
       aria-hidden
     >
-      ⚔️
+      {url && (
+        <img
+          src={url}
+          width={size}
+          height={size}
+          alt=""
+          draggable={false}
+          style={{ width: size, height: size, imageRendering: "pixelated" }}
+        />
+      )}
     </span>
   );
 }
@@ -80,31 +95,31 @@ function Fight({ boss, reduced }: { boss: BattleBoss; reduced: boolean }) {
       <div className="relative flex flex-col items-center">
         <Hero className={reduced ? "" : "fx-hero-slash"} size={56} />
       </div>
-      {/* 上昇スパーク（火花）。 */}
+      {/* 上昇スパーク（火花）はドット＝小さな四角ピクセルで表現。 */}
       {!reduced && (
         <div className="pointer-events-none absolute inset-0">
           {Array.from({ length: 3 }, (_, i) => (
             <span
               key={i}
-              className="fx-rise absolute left-1/2 top-1/2 text-amber-300"
+              className="fx-rise absolute left-1/2 top-1/2 block"
               style={{
                 marginLeft: (i - 1) * 22,
-                fontSize: 13,
+                width: 4,
+                height: 4,
+                background: "#fcd34d",
+                boxShadow: "0 0 4px #fbbf24",
                 animationDelay: `${i * 0.3}s`,
                 animationIterationCount: "infinite",
               }}
-            >
-              ✦
-            </span>
+            />
           ))}
         </div>
       )}
-      {/* ボス（右）：ピクセルアイコンで鼓動。 */}
+      {/* ボス（右）：手続き生成のドット絵アイコンで鼓動。 */}
       <div className="relative flex flex-col items-center">
         <span className={reduced ? "" : "fx-throb inline-block"}>
           <EnemyIcon enemy={{ templateId: boss.id, isBoss: true, modTier: 0 }} size={72} />
         </span>
-        <span className="mt-0.5 text-base">{boss.emoji}</span>
       </div>
     </div>
   );
@@ -127,7 +142,6 @@ function Decide({ boss, win, reduced }: { boss: BattleBoss; win: boolean; reduce
         <span className={reduced ? "" : win ? "fx-boss-die inline-block" : "fx-throb inline-block"}>
           <EnemyIcon enemy={{ templateId: boss.id, isBoss: true, modTier: 0 }} size={72} />
         </span>
-        <span className="mt-0.5 text-base">{boss.emoji}</span>
       </div>
 
       {/* 決着フラッシュ・リング。 */}
