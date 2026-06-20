@@ -104,7 +104,7 @@ import {
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState } from "@/lib/save";
 import { runDailyMaintenance } from "@/lib/maintenance";
-import { kingSpinWithPity, KING_BET, LEGEND_PIECE_HI, KING_COMP_COINS, type KingResult } from "@/lib/casinoKing";
+import { kingSpinWithPity, KING_BET, LEGEND_PIECE_HI, type KingResult } from "@/lib/casinoKing";
 import { itemKey, rarityRank } from "@/lib/ui";
 import type {
   ActiveBuff,
@@ -747,19 +747,19 @@ export const useGameStore = create<GameState>((set, get) => {
     set({ diceFaces: refreshFaces() });
 
     // 一度きりの補填(#125): カジノ王を回した「痕跡がある人」へ30万コイン。
-    // 過去の回転履歴は保存されていないため、痕跡(ハイコイン保有/伝説セット所持/天井カウンタ>0)で判定。
-    if (!loaded.kingComped) {
-      const playedKing =
-        loaded.hiCoins > 0 ||
-        loaded.kingPity > 0 ||
-        EQUIP_SLOTS.some((sl) => loaded.equipped[sl]?.setId === "legendgambler") ||
-        loaded.inventory.some((it) => it.setId === "legendgambler");
-      set({
-        coins: get().coins + (playedKing ? KING_COMP_COINS : 0),
-        kingComped: true,
-      });
-      persist();
-    }
+    // すでに配布済みのため一旦無効化（再付与・誤判定の事故防止）。再開時はこのブロックを戻す。
+    // if (!loaded.kingComped) {
+    //   const playedKing =
+    //     loaded.hiCoins > 0 ||
+    //     loaded.kingPity > 0 ||
+    //     EQUIP_SLOTS.some((sl) => loaded.equipped[sl]?.setId === "legendgambler") ||
+    //     loaded.inventory.some((it) => it.setId === "legendgambler");
+    //   set({
+    //     coins: get().coins + (playedKing ? KING_COMP_COINS : 0),
+    //     kingComped: true,
+    //   });
+    //   persist();
+    // }
   }
 
   return {
