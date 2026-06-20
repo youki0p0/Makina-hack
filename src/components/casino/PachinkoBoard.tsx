@@ -51,6 +51,9 @@ const PachinkoBoard = forwardRef<
     const pegs = useRef<Peg[]>([]);
     const raf = useRef<number | null>(null);
     const visible = useRef(true);
+    // アイドル時（動く玉も吸い込みも無い）に毎フレーム全面再描画し続けると発熱する。
+    // 動きが無いフレームは描画をスキップし、idle へ入る瞬間だけ1回描いて止める。
+    const idleDrawn = useRef(false);
     const onPocketRef = useRef(onPocket);
     onPocketRef.current = onPocket;
     const onAttackerRef = useRef(onAttacker);
@@ -272,12 +275,17 @@ const PachinkoBoard = forwardRef<
       const frame = () => {
         raf.current = requestAnimationFrame(frame);
         if (!visible.current) return;
+        let busy = false; // 動く玉 or 吸い込みアニメ中の玉があるか
         for (const b of balls.current) {
           if (!b.active) {
             // 入賞済みの吸い込みアニメを進める。
-            if (b.sinking !== undefined && b.sinking < 1) b.sinking += 0.12;
+            if (b.sinking !== undefined && b.sinking < 1) {
+              b.sinking += 0.12;
+              busy = true;
+            }
             continue;
           }
+          busy = true;
           const ev = stepBall(b, pegs.current, BOARD, denchuRef.current);
           if (ev === "pocket") {
             b.sinking = 0; // ヘソへ吸い込まれる“間”を描く
@@ -286,7 +294,14 @@ const PachinkoBoard = forwardRef<
             onAttackerRef.current?.(); // 大入賞口入賞＝出玉(当たり中)
           }
         }
-        draw();
+        // 動きがあるフレームだけ再描画。idle はもう変化しないので描かない（発熱対策）。
+        if (busy) {
+          draw();
+          idleDrawn.current = false;
+        } else if (!idleDrawn.current) {
+          draw(); // idle へ入る瞬間に1回だけ描いて最後の玉を消す
+          idleDrawn.current = true;
+        }
       };
       draw();
       raf.current = requestAnimationFrame(frame);
@@ -300,6 +315,12 @@ const PachinkoBoard = forwardRef<
         document.removeEventListener("visibilitychange", onVis);
       };
     }, []);
+
+    // 右打ち⇄左打ち(電サポ)の切替で入賞口/アタッカーの光り方が変わる。idle中でも
+    // 1回は描き直すよう促す（idleDrawn を倒すと次フレームで1回だけ再描画される）。
+    useEffect(() => {
+      idleDrawn.current = false;
+    }, [denchu]);
 
     return (
       <canvas

@@ -27,19 +27,27 @@ export const COIN_BUY_SCALE = 200;
 /**
  * Gold cost to BUY `amount` coins. Deliberately gets pricier the more coins you
  * already hold, so you can't cheaply stockpile — slotで稼ぐのが本筋(買いづらく)。
- * 単価 = COIN_VALUE × (1 + 所持コイン / COIN_BUY_SCALE)。
+ * 単価は購入の途中でも“積み上がる保有量”に沿って逓増する（held → held+amount を
+ * 積分）。これにより「全部換金して0枚→まとめ買い」で基本レート(20:1)に固定する
+ * 裁定(グリッチ)を封じる。実効平均単価 = COIN_VALUE × (1 + (held + amount/2) / SCALE)。
  */
 export function coinBuyCost(amount: number, held: number): number {
-  const mult = 1 + Math.max(0, held) / COIN_BUY_SCALE;
-  return Math.ceil(Math.max(0, amount) * COIN_VALUE * mult);
+  const amt = Math.max(0, amount);
+  const h = Math.max(0, held);
+  return Math.ceil(amt * COIN_VALUE * (1 + (h + amt / 2) / COIN_BUY_SCALE));
 }
 
-/** Max coins buyable for `gold`, at the current (held-scaled) price. */
+/** Max coins buyable for `gold`, at the current (held-scaled, 逓増) price. */
 export function coinBuyMax(gold: number, held: number): number {
-  const unit = COIN_VALUE * (1 + Math.max(0, held) / COIN_BUY_SCALE);
-  let amt = Math.floor(Math.max(0, gold) / unit);
-  while (amt > 0 && coinBuyCost(amt, held) > gold) amt--; // guard ceil rounding
-  return Math.max(0, amt);
+  const g = Math.max(0, gold);
+  const h = Math.max(0, held);
+  // cost(amt) ≒ a·amt² + b·amt を amt について解いた概算→丸め誤差をループで補正。
+  const a = COIN_VALUE / (2 * COIN_BUY_SCALE);
+  const b = COIN_VALUE * (1 + h / COIN_BUY_SCALE);
+  let amt = Math.max(0, Math.floor((-b + Math.sqrt(b * b + 4 * a * g)) / (2 * a)));
+  while (amt > 0 && coinBuyCost(amt, h) > g) amt--; // ceil丸めで予算超過したら下げる
+  while (coinBuyCost(amt + 1, h) <= g) amt++; // 概算が控えめなら取りこぼしを拾う
+  return amt;
 }
 
 export type SlotOutcome =

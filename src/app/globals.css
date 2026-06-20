@@ -157,14 +157,6 @@ button {
 }
 .fx-ring { animation: fxRing 0.6s ease-out forwards; }
 
-/* SU予告のチャージpip（段階点灯）。 */
-@keyframes fxCharge {
-  0% { transform: scale(0.4); opacity: 0.2; }
-  60% { transform: scale(1.45); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
-}
-.fx-charge { animation: fxCharge 0.3s ease-out both; }
-
 /* プレミアの巨大図柄スピン（回転＋虹相）。 */
 @keyframes fxHueSpin {
   0% { transform: rotate(0deg) scale(0.6); filter: hue-rotate(0deg); opacity: 0; }
@@ -234,6 +226,50 @@ button {
   80% { transform: translate(4px, 2px); }
 }
 .fx-shake { animation: fxShake 0.35s ease-in-out infinite; }
+
+/* ===== 甘ダイス バトル映像（RUSH中の中央演出。transform/opacity のみ） ===== */
+/* 勇者の動き（構え/振りかぶり/斬撃/よろけ/ダウン）は手続き生成のドット絵を
+   フレーム送りで表現する（heroSprite.ts）。CSSはボス・画面演出・寄せ移動を担当。 */
+
+/* RUSH中の対峙：勇者が軽く上下に揺れて“構えている”。その場の素振りはしない。 */
+@keyframes fxHeroIdle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+.fx-hero-idle { animation: fxHeroIdle 1.1s ease-in-out infinite; }
+
+/* 連チャン継続：勇者がボス（右）へ踏み込んで斬る。45%で間合いを詰め、以降は留まる。 */
+@keyframes fxHeroAdvance {
+  0% { transform: translateX(0); }
+  45% { transform: translateX(52px); }
+  100% { transform: translateX(46px); }
+}
+.fx-hero-advance { animation: fxHeroAdvance 1.5s cubic-bezier(.35, .85, .35, 1) both; }
+
+/* 連チャン終了：ボスが勇者（左）へ突進して攻撃。詰める→叩く→留まる。 */
+@keyframes fxBossCharge {
+  0% { transform: translateX(0) scale(1); }
+  45% { transform: translateX(-50px) scale(1.08); }
+  58% { transform: translateX(-44px) scale(1.14); }
+  100% { transform: translateX(-38px) scale(1.04); }
+}
+.fx-boss-charge { animation: fxBossCharge 1.8s cubic-bezier(.35, .85, .35, 1) both; }
+
+/* ボス撃破：フラッシュ→縮小→消滅。 */
+@keyframes fxBossDie {
+  0% { transform: scale(1) rotate(0deg); opacity: 1; filter: brightness(1); }
+  20% { transform: scale(1.18); filter: brightness(2.4); }
+  55% { transform: scale(0.9) rotate(14deg); opacity: 1; filter: brightness(1.4); }
+  100% { transform: scale(0.1) rotate(40deg); opacity: 0; filter: brightness(0.6); }
+}
+.fx-boss-die { animation: fxBossDie 1.2s ease-in both; }
+
+/* 敗北時の暗転フェード。 */
+@keyframes fxScreenDark {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.fx-screen-dark { animation: fxScreenDark 1.2s ease-in both; }
 
 /* 甘ダイス: ヘソ/大入賞の獲得枚数を“その場で”ふわっと表示（floatUp 流用）。 */
 .coin-float {

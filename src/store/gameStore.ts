@@ -97,7 +97,6 @@ import {
   settingMult,
   ceilingSpins,
   coinBuyCost,
-  coinBuyMax,
   randomCasinoPrize,
   type ReachDef,
   type SlotOutcome,
@@ -461,8 +460,6 @@ interface GameState {
   casinoSettle: (goldDelta: number, prize?: Equipment | null) => void;
   /** Buy slot coins with gold (price scales with held coins). */
   buyCoins: (coinAmount: number) => void;
-  /** Buy as many coins as the current gold allows (全購入). */
-  buyCoinsAll: () => void;
   /** Cash all slot coins back into gold. */
   cashoutCoins: () => void;
   /** カジノコインを増減（甘ダイス発射/払い出し・BJ 用。0未満にはしない）。 */
@@ -1767,15 +1764,6 @@ export const useGameStore = create<GameState>((set, get) => {
       // 価格は所持カジノコインに応じて上昇(買いづらく)。
       const cost = coinBuyCost(amt, s.coins);
       if (amt <= 0 || s.player.gold < cost) return;
-      set({ player: { ...s.player, gold: s.player.gold - cost }, coins: s.coins + amt });
-      persist();
-    },
-
-    buyCoinsAll: () => {
-      const s = get();
-      const amt = coinBuyMax(s.player.gold, s.coins);
-      if (amt <= 0) return;
-      const cost = coinBuyCost(amt, s.coins);
       set({ player: { ...s.player, gold: s.player.gold - cost }, coins: s.coins + amt });
       persist();
     },

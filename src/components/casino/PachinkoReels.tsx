@@ -11,6 +11,8 @@ export interface PachinkoReelsHandle {
   /** 図柄変動を開始。完了で onDone を呼ぶ。多重呼び出しは無視（busy）。 */
   spin: (result: ReelResult, onDone: () => void) => boolean;
   busy: () => boolean;
+  /** すべての演出オーバーレイを消す（RUSH中はリールが回らずリセットが走らないため）。 */
+  clearEffects: () => void;
 }
 
 interface Tween {
@@ -24,8 +26,6 @@ interface Tween {
 // ドラム位置(コマ単位) → 図柄 1..7（固定並び）。
 const idAt = (off: number) => ((((Math.round(off) % 7) + 7) % 7) + 1) as number;
 const CELL = 100 / 3; // 1コマ＝表示幅の1/3（横3コマ表示）
-// SU予告（ステップアップ予告）の段階色（1→4で青→緑→赤→金にエスカレート）。
-const SU_HEX = ["#38bdf8", "#34d399", "#fb7185", "#fbbf24"];
 
 /**
  * 中央の巨大ドラム表示（海物語式・横ドラム）。
@@ -48,7 +48,6 @@ const PachinkoReels = forwardRef<
   const [bonus, setBonus] = useState<string | null>(null);
   const [promo, setPromo] = useState<number[]>([]);
   // 海物語式リーチ演出の段階表示（文字ではなくグラフィック/動きで見せる）。
-  const [su, setSu] = useState(0); // SU予告ステップ（0=非表示）
   const [spId, setSpId] = useState<number | null>(null); // SP発展＝この図柄でカットイン
   const [cu, setCu] = useState(0); // チャンスアップ（バースト再生トリガ）
   const [premium, setPremium] = useState(false); // プレミア（当確）
@@ -122,6 +121,20 @@ const PachinkoReels = forwardRef<
 
   useImperativeHandle(ref, () => ({
     busy: () => busy.current,
+    // 直前スピンの演出（群予告/SU pip/カットイン/プレミア/全画面リーチ等）を一括で消す。
+    // RUSH中はリールが回らず spin() のリセットが走らないため、突入時にこれで掃除する。
+    clearEffects() {
+      setGroup(null);
+      setBonus(null);
+      setPromo([]);
+      setReach(false);
+      setSpId(null);
+      setCu(0);
+      setPremium(false);
+      setWinId(null);
+      setFullReach(null);
+      setFlash(0);
+    },
     spin(result, onDone) {
       if (busy.current) return false;
       busy.current = true;
@@ -130,7 +143,6 @@ const PachinkoReels = forwardRef<
       setPromo([]);
       setReach(false);
       setGroup(result.group);
-      setSu(0);
       setSpId(null);
       setCu(0);
       setPremium(false);
@@ -148,11 +160,6 @@ const PachinkoReels = forwardRef<
       tweens.current = [null, null, null];
       spinning.current = true;
       raf.current = requestAnimationFrame(animate);
-
-      // フェーズ②予告: SU予告（ステップアップ）を順に点灯（テンパイ前の煽り）。
-      if (!fast && result.su > 0) {
-        for (let s = 1; s <= result.su; s++) at(60 + s * 150, () => setSu(s));
-      }
 
       // フェーズ③順次減速: 上 → 下。
       const t0 = fast ? 90 : 380;
@@ -274,28 +281,6 @@ const PachinkoReels = forwardRef<
           )}
           <Swarm url={groupUrl} count={group === "makina" ? 14 : 7} hot={group === "makina"} />
         </>
-      )}
-
-      {/* SU予告（ステップアップ予告）: チャージ pip が段階点灯。色が上がるほど激アツ。 */}
-      {su > 0 && !bonus && (
-        <div key={su} className="fx-charge pointer-events-none absolute left-1/2 top-1 z-30 flex -translate-x-1/2 gap-1">
-          {Array.from({ length: 4 }, (_, i) => {
-            const lit = i < su;
-            const c = SU_HEX[su - 1];
-            return (
-              <span
-                key={i}
-                style={{
-                  width: 9,
-                  height: 9,
-                  transform: "rotate(45deg)",
-                  background: lit ? c : "rgba(255,255,255,.12)",
-                  boxShadow: lit ? `0 0 8px ${c}, 0 0 3px ${c}` : "none",
-                }}
-              />
-            );
-          })}
-        </div>
       )}
 
       {/* SP発展: テンパイ図柄をドンとカットイン＋衝撃リング（文字なし）。 */}
