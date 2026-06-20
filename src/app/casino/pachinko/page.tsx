@@ -534,10 +534,11 @@ export default function PachinkoPage() {
             height: `${(BOARD.monitorH / BOARD.height) * 100}%`,
           }}
         >
-          {/* RUSH中はリールドラムをフェードでバトル映像に差し替える（クロスフェード）。 */}
+          {/* RUSH中はリールドラムを隠す（バトル映像へ差し替え／演出OFFでも予告などの残留を出さない）。
+              リールは通常時の変動・当たり目表示専用。RUSH中(rush!=null)は完全に伏せる。 */}
           <div
             className={`absolute inset-0 transition-opacity ${reduced ? "duration-150" : "duration-500"} ${
-              battle.kind !== "off" ? "opacity-0" : "opacity-100"
+              rush || battle.kind !== "off" ? "pointer-events-none opacity-0" : "opacity-100"
             }`}
           >
             <PachinkoReels ref={reelsRef} effects={effects} reduced={reduced} />
