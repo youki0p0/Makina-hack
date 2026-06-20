@@ -235,6 +235,26 @@ button {
 }
 .fx-shake { animation: fxShake 0.35s ease-in-out infinite; }
 
+/* ===== 甘ダイス バトル映像（RUSH中の中央演出。transform/opacity のみ） ===== */
+/* 勇者の動き（構え/振りかぶり/斬撃/よろけ/ダウン）は手続き生成のドット絵を
+   フレーム送りで表現する（heroSprite.ts）。CSSはボス・画面演出のみ担当。 */
+
+/* ボス撃破：フラッシュ→縮小→消滅。 */
+@keyframes fxBossDie {
+  0% { transform: scale(1) rotate(0deg); opacity: 1; filter: brightness(1); }
+  20% { transform: scale(1.18); filter: brightness(2.4); }
+  55% { transform: scale(0.9) rotate(14deg); opacity: 1; filter: brightness(1.4); }
+  100% { transform: scale(0.1) rotate(40deg); opacity: 0; filter: brightness(0.6); }
+}
+.fx-boss-die { animation: fxBossDie 1.2s ease-in both; }
+
+/* 敗北時の暗転フェード。 */
+@keyframes fxScreenDark {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.fx-screen-dark { animation: fxScreenDark 1.2s ease-in both; }
+
 /* 甘ダイス: ヘソ/大入賞の獲得枚数を“その場で”ふわっと表示（floatUp 流用）。 */
 .coin-float {
   position: absolute;
