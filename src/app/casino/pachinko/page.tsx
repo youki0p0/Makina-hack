@@ -5,12 +5,14 @@ import { useCallbackRef } from "@/lib/useCallbackRef";
 import { useEffect, useRef, useState } from "react";
 import PachinkoBoard, { type PachinkoBoardHandle } from "@/components/casino/PachinkoBoard";
 import PachinkoReels, { type PachinkoReelsHandle } from "@/components/casino/PachinkoReels";
+import PachinkoBattle, { type BattlePhase } from "@/components/casino/PachinkoBattle";
 import PayoutParticles, { type PayoutParticlesHandle } from "@/components/casino/PayoutParticles";
 import EventBadge from "@/components/EventBadge";
 import { PACHINKO_CONFIG, BOARD } from "@/lib/pachinko/config";
 import { spinReels, type Mode, type ReelResult } from "@/lib/pachinko/reels";
 import { getSymbol } from "@/lib/pachinko/symbols";
 import { rollBonus, rollContinue, ATTACKER_PRIZE, type BonusType } from "@/lib/pachinko/bonus";
+import { pickBattleBoss } from "@/lib/pachinko/battle";
 import {
   MACHINE_COUNT,
   settingBucket,
@@ -28,6 +30,13 @@ const HOLD_MAX = 8;
 const REVEAL_MS = 800;
 // ボーナス1ゲーム(回転)の長さ。保証G ぶん消化したらラウンド終了→継続抽選。
 const GAME_MS = 420;
+// バトル映像の決着演出（ボス撃破=継続 / 勇者敗北=終了）の尺。決着結果は本物の
+// rollContinue で先に確定し、勝ち/負け映像は“結果に合わせて”再生するだけ（演出は結果を決めない）。
+const DECIDE_WIN_MS = 1300; // 撃破→継続（短め＝高速連チャンを止めない）
+const DECIDE_LOSE_MS = 1800; // 敗北（ためを作る）
+// 終了画面（連チャン回数・通算払い出し）の表示時間。
+const SUMMARY_MS = 2000;
+const SUMMARY_MS_REDUCED = 1000;
 const PACHI_MACHINE_KEY = "pachiMachine";
 
 // ボーナス(RUSH)の進行状態。出玉は大入賞口に入った玉で payRemaining を削って加算。
@@ -93,6 +102,28 @@ export default function PachinkoPage() {
   const [rush, setRush] = useState<Rush | null>(null);
   const rushRef = useRef<Rush | null>(null);
   rushRef.current = rush;
+
+  // ===== バトル映像（演出レイヤー。mode/rush が本物の状態、battle は見せ方のみ） =====
+  // RUSH中はリールドラムをフェードで「勇者vsボス」のバトル映像に差し替える。
+  const [battle, setBattle] = useState<BattlePhase>({ kind: "off" });
+  const battleRef = useRef<BattlePhase>(battle);
+  battleRef.current = battle;
+  // この連チャン全体の通算払い出し（出玉）。初当たり（ren===1突入）でのみ0クリア。
+  const totalPayRef = useRef(0);
+  // 決着の本物の結果を保持（演出完了時に消費）。多重発火防止のため使い切ったら null。
+  const pendingResolveRef = useRef<{ cont: boolean; ren: number } | null>(null);
+  // バトル演出再生中の再入ガード。
+  const battleLockRef = useRef(false);
+  // バトル演出用タイマー（通常復帰/アンマウントで一括クリア）。
+  const battleTimers = useRef<number[]>([]);
+  const battleAt = (ms: number, fn: () => void) => {
+    battleTimers.current.push(window.setTimeout(fn, ms));
+  };
+  const clearBattleTimers = () => {
+    battleTimers.current.forEach((t) => window.clearTimeout(t));
+    battleTimers.current = [];
+  };
+  useEffect(() => () => clearBattleTimers(), []);
   // 天井カウンタ（通常時の連続ノーヒット回転数）。初当たりで0へ。
   const [spins, setSpins] = useState(0);
   const spinsRef = useRef(0);
@@ -192,6 +223,10 @@ export default function PachinkoPage() {
     // RUSH中はリールが回らないので、直前スピンの演出（◆SU pip/カットイン/赤いモヤ等）が
     // 残って固まる。突入時に演出オーバーレイを掃除してクリーンな盤面で出玉を見せる。
     reelsRef.current?.clearEffects();
+    // バトル映像へ突入（演出ONかつ軽量OFFのときだけ）。それ以外はリール表示のまま（旧仕様）。
+    if (effects && !reduced) {
+      setBattle({ kind: "fight", boss: pickBattleBoss(ren), ren });
+    }
     slotSfx(b.coins >= 300 ? "bonusBig" : "bonus");
     if (effects) {
       if (typeof navigator !== "undefined") navigator.vibrate?.(ren > 1 ? [20, 20, 40] : [40, 30, 80]);
@@ -207,6 +242,7 @@ export default function PachinkoPage() {
     const inc = Math.min(ATTACKER_PRIZE, r.payRemaining);
     r.payRemaining -= inc;
     addCoins(inc);
+    totalPayRef.current += inc; // この連チャンの通算払い出し（終了画面で表示）。
     if (effects) particlesRef.current?.emit(3);
     // 大入賞口の上に +N をふわっと表示（連射で潰れないよう間引き）。
     const now = Date.now();
@@ -216,12 +252,38 @@ export default function PachinkoPage() {
     }
   });
 
+  // ===== バトル決着演出の完了処理（setTimeout 駆動＝タブ非表示でも必ず進む） =====
+  // ★不変条件: 結果は pendingResolveRef（=本物の rollContinue）で確定済み。ここは映像の後始末のみ。
+  const onDecideDone = useCallbackRef(() => {
+    const p = pendingResolveRef.current;
+    if (!p) return; // 二重発火ガード（消費済みなら何もしない）。
+    pendingResolveRef.current = null;
+    if (p.cont) {
+      // 撃破→継続：次ラウンドへ。enterRush が新しい fight をセットする。
+      setBattle({ kind: "off" });
+      enterRush(rollBonus(), p.ren + 1);
+      battleLockRef.current = false;
+    } else {
+      // 敗北→終了画面（連チャン回数＋通算払い出し）を約2秒。
+      setBattle({ kind: "summary", ren: p.ren, total: totalPayRef.current });
+      battleAt(reduced ? SUMMARY_MS_REDUCED : SUMMARY_MS, () => {
+        reelsRef.current?.clearEffects();
+        setBattle({ kind: "off" });
+        setRush(null);
+        setMode("normal");
+        modeRef.current = "normal";
+        totalPayRef.current = 0;
+        battleLockRef.current = false;
+      });
+    }
+  });
+
   // ===== ボーナス進行（保証G消化→ラウンド終了で残出玉フラッシュ＋継続抽選） =====
   useEffect(() => {
     if (mode !== "complete") return;
     const id = setInterval(() => {
       const r = rushRef.current;
-      if (!r) return; // 当たり停止演出(reveal)中はまだ回さない
+      if (!r) return; // 当たり停止演出(reveal)中／バトル決着再生中はまだ回さない
       const left = r.gamesLeft - 1;
       if (left > 0) {
         const nr = { ...r, gamesLeft: left };
@@ -234,22 +296,43 @@ export default function PachinkoPage() {
       // 残りの保証出玉を一気に放出（保証担保）。
       if (r.payRemaining > 0) {
         addCoins(r.payRemaining);
+        totalPayRef.current += r.payRemaining; // 通算払い出しに反映。
         if (effects) particlesRef.current?.emit(Math.min(60, r.payRemaining));
       }
-      if (rollContinue(r.loop)) {
-        // 継続（連チャン）：新ボーナスを抽選してループ。
+      // ★不変条件: 先に本物の継続抽選を確定（映像は結果を決めない）。
+      const cont = rollContinue(r.loop);
+      if (effects && !reduced) {
+        // バトル決着映像：勝ち(撃破=継続)/負け(敗北=終了)を“結果に合わせて”再生。
+        // 完了は animationend ではなく setTimeout で（タブ非表示でも必ず進む）。
+        battleLockRef.current = true;
+        pendingResolveRef.current = { cont, ren: r.ren };
+        setBattle({ kind: "decide", boss: pickBattleBoss(r.ren), ren: r.ren, win: cont });
+        battleAt(cont ? DECIDE_WIN_MS : DECIDE_LOSE_MS, () => onDecideDone());
+      } else if (cont) {
+        // 旧仕様（演出OFF/軽量）：従来どおり即・次ラウンドへ。
         window.setTimeout(() => enterRush(rollBonus(), r.ren + 1), 350);
       } else {
-        // 終了→通常へ。
-        window.setTimeout(() => {
-          setRush(null);
-          setMode("normal");
-          modeRef.current = "normal";
-        }, 500);
+        // 旧仕様の終了。軽量モードのみ、ごく短い終了画面を挟んでから通常へ（安全側）。
+        if (reduced && effects) {
+          setBattle({ kind: "summary", ren: r.ren, total: totalPayRef.current });
+          battleAt(SUMMARY_MS_REDUCED, () => {
+            setBattle({ kind: "off" });
+            setRush(null);
+            setMode("normal");
+            modeRef.current = "normal";
+            totalPayRef.current = 0;
+          });
+        } else {
+          window.setTimeout(() => {
+            setRush(null);
+            setMode("normal");
+            modeRef.current = "normal";
+          }, 500);
+        }
       }
     }, reduced ? 260 : GAME_MS);
     return () => clearInterval(id);
-  }, [mode, reduced, enterRush, effects, addCoins]);
+  }, [mode, reduced, enterRush, effects, addCoins, onDecideDone]);
 
   // ===== 変動の確定処理 =====
   const onReelDone = useCallbackRef((result: ReelResult) => {
@@ -263,6 +346,8 @@ export default function PachinkoPage() {
       modeRef.current = "complete";
       setReveal(getSymbol(result.symbolId ?? 1).color);
       const b = rollBonus();
+      // 初当たり（連チャン開始）の時だけ通算払い出しを0クリア（継続では引き継ぐ）。
+      totalPayRef.current = 0;
       window.setTimeout(() => {
         setReveal(null);
         enterRush(b, 1);
@@ -449,7 +534,21 @@ export default function PachinkoPage() {
             height: `${(BOARD.monitorH / BOARD.height) * 100}%`,
           }}
         >
-          <PachinkoReels ref={reelsRef} effects={effects} reduced={reduced} />
+          {/* RUSH中はリールドラムをフェードでバトル映像に差し替える（クロスフェード）。 */}
+          <div
+            className={`absolute inset-0 transition-opacity ${reduced ? "duration-150" : "duration-500"} ${
+              battle.kind !== "off" ? "opacity-0" : "opacity-100"
+            }`}
+          >
+            <PachinkoReels ref={reelsRef} effects={effects} reduced={reduced} />
+          </div>
+          <div
+            className={`absolute inset-0 transition-opacity ${reduced ? "duration-150" : "duration-500"} ${
+              battle.kind !== "off" ? "opacity-100" : "pointer-events-none opacity-0"
+            }`}
+          >
+            <PachinkoBattle phase={battle} reduced={reduced} />
+          </div>
         </div>
 
         {/* 当たり停止演出（“何が起きたか”を見せる0.5〜1秒） */}
@@ -464,8 +563,8 @@ export default function PachinkoPage() {
           </div>
         )}
 
-        {/* RUSH(ボーナス)バナー：連チャン数・保証枚数・残りG（役物直下） */}
-        {rush && (
+        {/* RUSH(ボーナス)バナー：連チャン数・保証枚数・残りG（役物直下）。終了画面中は隠す。 */}
+        {rush && battle.kind !== "summary" && (
           <div
             className="pointer-events-none absolute inset-x-0 z-20 text-center"
             style={{ top: `${((BOARD.monitorY + BOARD.monitorH + 2) / BOARD.height) * 100}%` }}

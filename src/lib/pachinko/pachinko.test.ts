@@ -4,6 +4,8 @@ import { planPayout, stepTowards, counterStep, particlesThisFrame } from "./payo
 import { buildPegs, launchBall, stepBall } from "./physics";
 import { getSymbol, SYMBOLS } from "./symbols";
 import { BOARD } from "./config";
+import { pickBattleBoss } from "./battle";
+import { BOSS_TEMPLATES } from "@/data/enemies";
 
 // 決定的 RNG（線形合同法）でテストを安定させる。
 function seeded(seed: number): () => number {
@@ -107,6 +109,28 @@ describe("spinReels", () => {
       // 昇格後の最終図柄が結果に一致。
       expect(r.promotion[r.promotion.length - 1]).toBe(r.symbolId);
     }
+  });
+});
+
+describe("pickBattleBoss", () => {
+  it("returns a valid boss for any ren and rotates over BOSS_TEMPLATES", () => {
+    const ids = new Set(BOSS_TEMPLATES.map((b) => b.id));
+    // ren=1 は先頭、以降は順送り（巡回）。
+    expect(pickBattleBoss(1).id).toBe(BOSS_TEMPLATES[0].id);
+    expect(pickBattleBoss(2).id).toBe(BOSS_TEMPLATES[1].id);
+    // 1周回ると先頭に戻る。
+    expect(pickBattleBoss(BOSS_TEMPLATES.length + 1).id).toBe(BOSS_TEMPLATES[0].id);
+    // どんな ren でも有効なボス（id/name/emoji が埋まっている）。
+    for (let ren = -2; ren <= BOSS_TEMPLATES.length * 2 + 1; ren++) {
+      const b = pickBattleBoss(ren);
+      expect(ids.has(b.id)).toBe(true);
+      expect(b.name.length).toBeGreaterThan(0);
+      expect(b.emoji.length).toBeGreaterThan(0);
+    }
+    // 連続する ren で全種類が網羅される。
+    const seen = new Set<string>();
+    for (let ren = 1; ren <= BOSS_TEMPLATES.length; ren++) seen.add(pickBattleBoss(ren).id);
+    expect(seen.size).toBe(BOSS_TEMPLATES.length);
   });
 });
 
