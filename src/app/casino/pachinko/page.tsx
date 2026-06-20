@@ -49,30 +49,56 @@ interface Rush {
 }
 
 // 保留＝ヘソ入賞時に内部抽選済みの1変動（実機どおり）。色は信頼度の先読み示唆。
+// 期待度の序列（低→高）: 白 < 青 < 緑 < 紫 < 赤 < 金 < 虹（虹＝当確級）。
+type HoldColor = "white" | "blue" | "green" | "purple" | "red" | "gold" | "rainbow";
 interface Hold {
   result: ReelResult;
-  color: string;
+  color: HoldColor;
 }
-const HOLD_COLORS: Record<string, string> = {
+const HOLD_HEX: Record<HoldColor, string> = {
   white: "#e5e7eb",
   blue: "#38bdf8",
   green: "#34d399",
+  purple: "#a855f7",
   red: "#f43f5e",
-  rainbow: "#fbbf24",
+  gold: "#fbbf24",
+  rainbow: "#ffffff", // 表示は虹グラデ（HOLD_BG）
+};
+// 虹だけ実体の虹色グラデ、それ以外は単色。
+const HOLD_BG: Record<HoldColor, string> = {
+  ...HOLD_HEX,
+  rainbow: "conic-gradient(from 0deg,#ff0040,#ff8a00,#ffe600,#34d399,#38bdf8,#a855f7,#ff00c8,#ff0040)",
 };
 
-/** 先読み色を抽選（赤/虹はほぼ当たり、まれにガセ＝裏切りで興奮を作る）。 */
-function holdColorFor(result: ReelResult, rng = Math.random): string {
-  if (result.win) {
-    if (result.jackpot) return "rainbow";
-    if (result.tier === "big") return rng() < 0.55 ? "red" : "green";
-    return rng() < 0.5 ? "green" : rng() < 0.5 ? "blue" : "white";
-  }
-  // ハズレ：ほぼ白、まれに高信頼色（ガセ）。
+/**
+ * 先読み色を抽選。期待度の序列 白<青<緑<紫<赤<金<虹 を保つよう、
+ * 当たりほど上位色が出やすく、ハズレは白中心＋上位色ほど激レアなガセ（裏切り）。
+ * 赤=激アツ / 金=超激アツ / 虹=当確級（ハズレ時はほぼ出さない）。
+ */
+function holdColorFor(result: ReelResult, rng = Math.random): HoldColor {
   const r = rng();
-  if (r < 0.012) return "red";
-  if (r < 0.05) return "green";
-  if (r < 0.16) return "blue";
+  if (result.win) {
+    if (result.jackpot) return r < 0.72 ? "rainbow" : "gold"; // 最上位の大当たり
+    if (result.tier === "big") {
+      if (r < 0.12) return "gold";
+      if (r < 0.5) return "red";
+      if (r < 0.78) return "purple";
+      return "green";
+    }
+    // 通常当たり：緑・紫中心。たまに赤、ときどき青/白で“弱色でも当たる”余地を残す。
+    if (r < 0.06) return "red";
+    if (r < 0.3) return "purple";
+    if (r < 0.62) return "green";
+    if (r < 0.85) return "blue";
+    return "white";
+  }
+  // ハズレ：ほぼ白。上位色ほど激レアなガセで緊張感を出す。
+  if (r < 0.0004) return "rainbow"; // 虹は当確級＝ハズレでは滅多に出ない
+  if (r < 0.004) return "gold";
+  if (r < 0.016) return "red";
+  if (r < 0.045) return "purple";
+  if (r < 0.11) return "green";
+  if (r < 0.24) return "blue";
   return "white";
 }
 
@@ -382,7 +408,7 @@ export default function PachinkoPage() {
     const result = spinReels("normal", Math.random, next >= ceilingRef.current, winMultRef.current);
     if (reelsRef.current?.busy()) {
       if (holdsRef.current.length >= HOLD_MAX) return; // 保留満タンは入賞のみ（変動せず）
-      const hold: Hold = { result, color: HOLD_COLORS[holdColorFor(result)] };
+      const hold: Hold = { result, color: holdColorFor(result) };
       holdsRef.current = [...holdsRef.current, hold];
       setHolds(holdsRef.current);
     } else {
@@ -470,13 +496,19 @@ export default function PachinkoPage() {
           <div className="flex gap-1">
             {Array.from({ length: HOLD_MAX }, (_, i) => {
               const h = holds[i];
+              const rainbow = h?.color === "rainbow";
               return (
                 <span
                   key={i}
                   className="h-2.5 w-2.5 rounded-full transition-colors"
                   style={{
-                    background: h ? h.color : "rgba(255,255,255,.15)",
-                    boxShadow: h && h.color !== HOLD_COLORS.white ? `0 0 5px ${h.color}` : "none",
+                    background: h ? HOLD_BG[h.color] : "rgba(255,255,255,.15)",
+                    boxShadow:
+                      h && h.color !== "white"
+                        ? `0 0 5px ${rainbow ? "#fff" : HOLD_HEX[h.color]}`
+                        : "none",
+                    // 虹（当確級）はゆっくり色相が回ってキラキラ。
+                    animation: rainbow ? "legendaryHue 3s linear infinite" : undefined,
                   }}
                 />
               );
