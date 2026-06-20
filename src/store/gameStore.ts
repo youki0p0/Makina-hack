@@ -290,6 +290,8 @@ interface GameState {
   currentFloor: number;
   battleState: BattleState;
   diceValue: DiceValue;
+  /** 「2個振り(高い方を採用)」が発動した直近ロールの両出目。非発動時は null（UIの目印用・非保存）。 */
+  twoDice: [DiceValue, DiceValue] | null;
   diceFaces: DiceFace[];
   rerollsLeft: number;
   battleLog: BattleLogEntry[];
@@ -626,14 +628,19 @@ export const useGameStore = create<GameState>((set, get) => {
     return buildFaces(get().equipped, get().classId);
   }
 
-  /** Roll the die, honoring "luck" buffs and the oracle 6pc (roll 2, keep higher). */
-  function rollWithLuck(): DiceValue {
+  /**
+   * Roll the die, honoring "luck" buffs and the oracle 6pc (roll 2, keep higher).
+   * Returns the kept value plus, when the 2-dice effect fired, BOTH rolled values
+   * so the UI can show a marker (players asked for a visible 目印 #2dice).
+   */
+  function rollWithLuckInfo(): { value: DiceValue; pair: [DiceValue, DiceValue] | null } {
     const min = luckFloor(get().activeBuffs);
-    let r = Math.max(rollDice(), min);
+    const first = Math.max(rollDice(), min) as DiceValue;
     if (computeSetEffects(get().equipped, get().classId).rollTwoDice) {
-      r = Math.max(r, Math.max(rollDice(), min));
+      const second = Math.max(rollDice(), min) as DiceValue;
+      return { value: Math.max(first, second) as DiceValue, pair: [first, second] };
     }
-    return r as DiceValue;
+    return { value: first, pair: null };
   }
 
   /** Sum of artifacts, the current class's mods, set bonuses, and the daily bonus. */
@@ -741,6 +748,7 @@ export const useGameStore = create<GameState>((set, get) => {
     currentFloor: 1,
     battleState: "idle",
     diceValue: 1,
+    twoDice: null,
     diceFaces: [],
     rerollsLeft: 1,
     battleLog: [],
@@ -864,11 +872,13 @@ export const useGameStore = create<GameState>((set, get) => {
       const enemy = generateEnemy(currentFloor, difficultyScale(get().difficulty));
       // Heal a little between fights so runs are survivable but not free.
       const healed = Math.min(stats.maxHp, player.hp + Math.round(stats.maxHp * 0.15));
+      const opening = rollWithLuckInfo();
       set({
         currentEnemy: enemy,
         battleState: "player",
         diceFaces: refreshFaces(),
-        diceValue: rollWithLuck(),
+        diceValue: opening.value,
+        twoDice: opening.pair,
         rerollsLeft: stats.rerolls,
         lastResult: null,
         player: { ...player, hp: healed },
@@ -896,9 +906,13 @@ export const useGameStore = create<GameState>((set, get) => {
         const healed = Math.min(maxHp, player.hp + setEff.healOnReroll);
         if (healed !== player.hp) player = { ...player, hp: healed };
       }
+      // 伝説賭博セット4pc: リロール時に出目6を確定（このとき2個振りの目印は出さない）。
+      const rolled = setEff.rerollSix
+        ? { value: 6 as DiceValue, pair: null }
+        : rollWithLuckInfo();
       set({
-        // 伝説賭博セット4pc: リロール時に出目6を確定。
-        diceValue: setEff.rerollSix ? 6 : rollWithLuck(),
+        diceValue: rolled.value,
+        twoDice: rolled.pair,
         rerollsLeft: rerollsLeft - 1,
         player,
       });
@@ -1182,10 +1196,12 @@ export const useGameStore = create<GameState>((set, get) => {
       }
 
       // Next turn: fresh roll + rerolls. Carry the per-battle title flags forward.
+      const nextRoll = rollWithLuckInfo();
       set({
         currentEnemy: { ...enemy, hp: enemyHp, statuses, stunTurns, bonusDefense, bonusDefenseTurns, weakenAmount, weakenTurns, enraged, charging, chargeCounter, bossTurns: (enemy.bossTurns ?? 0) + 1 },
         player: { ...state.player, hp: playerHp },
-        diceValue: rollWithLuck(),
+        diceValue: nextRoll.value,
+        twoDice: nextRoll.pair,
         rerollsLeft: nextRerolls,
         playerStatuses,
         playerStunTurns: nextStun,
