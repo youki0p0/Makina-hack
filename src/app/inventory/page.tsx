@@ -6,11 +6,14 @@ import EquipmentPanel from "@/components/EquipmentPanel";
 import GachaPanel from "@/components/GachaPanel";
 import InventoryList from "@/components/InventoryList";
 import PlayerStatus from "@/components/PlayerStatus";
+import PixelGlyph from "@/components/PixelGlyph";
+import { isFeatureUnlocked } from "@/data/unlocks";
 import { useGameStore } from "@/store/gameStore";
 
 export default function InventoryPage() {
   const hydrate = useGameStore((s) => s.hydrate);
   const hydrated = useGameStore((s) => s.hydrated);
+  const progress = useGameStore((s) => s.progress);
 
   useEffect(() => {
     hydrate();
@@ -33,12 +36,23 @@ export default function InventoryPage() {
         >
           ← タイトル
         </Link>
-        <Link
-          href="/battle"
-          className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white active:scale-95"
-        >
-          戦闘へ →
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* 装備→鍛冶屋の導線（鍛冶屋→装備の一方通行を解消）。鍛冶屋が解放済みのときだけ表示。 */}
+          {isFeatureUnlocked("forge", progress) && (
+            <Link
+              href="/forge"
+              className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1 text-xs active:scale-95"
+            >
+              <PixelGlyph kind="attack" size={14} /> 鍛冶屋
+            </Link>
+          )}
+          <Link
+            href="/battle"
+            className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white active:scale-95"
+          >
+            戦闘へ →
+          </Link>
+        </div>
       </div>
 
       <PlayerStatus />
