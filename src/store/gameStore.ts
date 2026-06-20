@@ -105,6 +105,7 @@ import {
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState } from "@/lib/save";
 import { runDailyMaintenance } from "@/lib/maintenance";
+import { kingSpin, KING_BET, LEGEND_PIECE_HI } from "@/lib/casinoKing";
 import { itemKey, rarityRank } from "@/lib/ui";
 import type {
   ActiveBuff,
@@ -312,6 +313,8 @@ interface GameState {
   souls: number;
   /** Casino coins (medals) for the slot machine. */
   coins: number;
+  /** ハイコイン: カジノ王の一撃台でのみ稼ぐ上位通貨（伝説賭博セット交換用）。 */
+  hiCoins: number;
   /** Whether the next slot spin is a free replay (transient). */
   slotReplay: boolean;
   /** ダイスラッシュ(AT) games remaining (0 = not in AT; transient). */
@@ -464,6 +467,11 @@ interface GameState {
   cashoutCoins: () => void;
   /** カジノコインを増減（甘ダイス発射/払い出し・BJ 用。0未満にはしない）。 */
   addCoins: (delta: number) => void;
+  addHiCoins: (delta: number) => void;
+  /** カジノ王の一撃台を1回プレイ（100コインBET）。結果を返す。 */
+  kingPlay: () => { coins: number; hi: number; kind: string } | null;
+  /** ハイコインで伝説賭博セットの指定部位を交換。 */
+  kingBuyLegend: (slot: EquipmentSlot) => Equipment | null;
   /** Spin the slot. Returns the resolved result, or null if coins are short. */
   slotSpin: () => SlotSpinResult | null;
   /** Sit at a different slot machine (resets 天井/ゾーン for that 台). */
@@ -546,6 +554,7 @@ export const useGameStore = create<GameState>((set, get) => {
       gachaPoints: s.gachaPoints,
       souls: s.souls,
       coins: s.coins,
+      hiCoins: s.hiCoins,
       casinoBan: s.casinoBan,
       slot: {
         machine: s.slotMachine,
@@ -676,6 +685,7 @@ export const useGameStore = create<GameState>((set, get) => {
       gachaPoints: loaded.gachaPoints,
       souls: loaded.souls,
       coins: loaded.coins,
+      hiCoins: loaded.hiCoins,
       slotReplay: false,
       // Slot state survives reload, but RESETS when the 6h setting bucket changes
       // (settings reshuffled → fresh 天井/ゾーン/カウンタ).
@@ -747,6 +757,7 @@ export const useGameStore = create<GameState>((set, get) => {
     lastForge: null,
     souls: 0,
     coins: 0,
+    hiCoins: 0,
     slotReplay: false,
     atGames: 0,
     slotMachine: 0,
@@ -889,7 +900,8 @@ export const useGameStore = create<GameState>((set, get) => {
         if (healed !== player.hp) player = { ...player, hp: healed };
       }
       set({
-        diceValue: rollWithLuck(),
+        // 伝説賭博セット4pc: リロール時に出目6を確定。
+        diceValue: setEff.rerollSix ? 6 : rollWithLuck(),
         rerollsLeft: rerollsLeft - 1,
         player,
       });
@@ -1055,8 +1067,14 @@ export const useGameStore = create<GameState>((set, get) => {
         charging = turn.charging;
         chargeCounter = turn.chargeCounter;
         decayWeaken();
-        playerHp -= turn.playerDamage;
-        enemyDamageThisTurn += turn.playerDamage;
+        // 伝説賭博セット6pc: 回避（敵の攻撃を確率で無効化）。
+        let bossDmg = turn.playerDamage;
+        if (bossDmg > 0 && setEff.dodgeChance > 0 && Math.random() < setEff.dodgeChance) {
+          bossDmg = 0;
+          log = pushLogs(log, [{ text: "回避！ 伝説賭博セットで見切った！", tone: "good" }]);
+        }
+        playerHp -= bossDmg;
+        enemyDamageThisTurn += bossDmg;
         log = pushLogs(log, turn.logs.map((text) => ({ text, tone: "bad" as const })));
         // Final boss can disrupt the player's dice (lose rerolls), mitigated by stun-resist gear.
         if (turn.playerStun && turn.playerStun > 0) {
@@ -1092,8 +1110,14 @@ export const useGameStore = create<GameState>((set, get) => {
           if (bonusDefenseTurns === 0) bonusDefense = 0;
         }
         decayWeaken();
-        playerHp -= turn.playerDamage;
-        enemyDamageThisTurn += turn.playerDamage;
+        // 伝説賭博セット6pc: 回避（敵の攻撃を確率で無効化）。
+        let normDmg = turn.playerDamage;
+        if (normDmg > 0 && setEff.dodgeChance > 0 && Math.random() < setEff.dodgeChance) {
+          normDmg = 0;
+          log = pushLogs(log, [{ text: "回避！ 伝説賭博セットで見切った！", tone: "good" }]);
+        }
+        playerHp -= normDmg;
+        enemyDamageThisTurn += normDmg;
         log = pushLogs(log, turn.logs.map((text) => ({ text, tone: "bad" as const })));
         // Enemy-inflicted player statuses (mitigated by resistance gear).
         const resist = equippedResist(state.equipped);
@@ -1769,6 +1793,51 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
+    addHiCoins: (delta: number) => {
+      const s = get();
+      set({ hiCoins: Math.max(0, s.hiCoins + Math.round(delta)) });
+      persist();
+    },
+
+    kingPlay: () => {
+      const s = get();
+      if (s.coins < KING_BET) return null;
+      const r = kingSpin();
+      set({
+        coins: Math.max(0, s.coins - KING_BET + r.coins),
+        hiCoins: s.hiCoins + r.hi,
+      });
+      persist();
+      return { coins: r.coins, hi: r.hi, kind: r.kind };
+    },
+
+    kingBuyLegend: (slot: EquipmentSlot): Equipment | null => {
+      const state = get();
+      if (state.hiCoins < LEGEND_PIECE_HI) return null;
+      // バランス壊れ＝所持装備を大きく上回る高ティア＋高★で付与。
+      let refTier = 0;
+      let refMod = 0;
+      const consider = (it: Equipment | null) => {
+        if (!it) return;
+        refTier = Math.max(refTier, estimateTier(it));
+        refMod = Math.max(refMod, it.modTier ?? 0);
+      };
+      for (const sl of EQUIP_SLOTS) consider(state.equipped[sl]);
+      for (const it of state.inventory) consider(it);
+      const tier = Math.max(refTier, 80) + 20;
+      const piece = applyModifier(genSetItem("legendgambler", slot, tier), Math.max(refMod, 10));
+      const capped = capInventory([...state.inventory, piece], state.favorites);
+      set({
+        hiCoins: state.hiCoins - LEGEND_PIECE_HI,
+        inventory: capped.kept,
+        gachaPoints: state.gachaPoints + capped.material,
+        lastPull: piece,
+        progress: { ...state.progress, discoveredItems: discover(state.progress.discoveredItems, piece.id) },
+      });
+      persist();
+      return piece;
+    },
+
     slotSpin: (): SlotSpinResult | null => {
       const state = get();
       // 6時間の設定シャッフルを跨いだら、台の天井/ゾーン/カウンタをリセット。
@@ -2136,11 +2205,13 @@ export const useGameStore = create<GameState>((set, get) => {
     // Smart drops: with 6 slots, bias procedural drops toward the weakest/empty
     // slot so gearing up doesn't take 2× as long as it did with 3 slots.
     const weakSlot = weakestSlot(state.equipped);
+    // 伝説賭博セット2pc: ドロップの★ティアを底上げ。
+    const dropTierBonus = computeSetEffects(state.equipped, state.classId).dropTierBonus;
     const drops: Equipment[] = [];
     for (let i = 0; i < dropCount; i++) {
       const hint = Math.random() < 0.6 ? weakSlot : undefined;
       const d = rollLoot(enemy, state.currentFloor, diff.rareBonus, hint);
-      if (d) drops.push(applyModifier(d, rollDropModTier(state.currentFloor, diff.upswing)));
+      if (d) drops.push(applyModifier(d, rollDropModTier(state.currentFloor, diff.upswing) + dropTierBonus));
     }
     const drop = drops[0] ?? null;
 

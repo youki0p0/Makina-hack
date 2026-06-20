@@ -34,8 +34,10 @@ import { slotSfx, setBgmTheme } from "@/lib/audio";
 import EnemyIcon from "@/components/EnemyIcon";
 import PixelGlyph from "@/components/PixelGlyph";
 import EventBadge from "@/components/EventBadge";
-import { fmt } from "@/lib/ui";
+import { fmt, slotLabel as equipSlotLabel } from "@/lib/ui";
+import { KING_BET, KING_JACKPOT, LEGEND_PIECE_HI } from "@/lib/casinoKing";
 import { useGameStore, type SlotSpinResult } from "@/store/gameStore";
+import type { EquipmentSlot } from "@/types/game";
 
 const PIPS = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 const BETS = [10, 50, 100];
@@ -48,7 +50,7 @@ export default function CasinoPage() {
   const bossKills = useGameStore((s) => s.progress.bossKills);
   const atGames = useGameStore((s) => s.atGames);
   const daiPan = useGameStore((s) => s.daiPan);
-  const [tab, setTab] = useState<"slots" | "bj" | "shop">("slots");
+  const [tab, setTab] = useState<"slots" | "bj" | "shop" | "king">("slots");
   const [shaking, setShaking] = useState(false);
   const [panMsg, setPanMsg] = useState<string | null>(null);
   const shakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -136,11 +138,12 @@ export default function CasinoPage() {
         {event.pachinko && <EventBadge />}
       </Link>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {([
           ["slots", "🎲 スロット"],
           ["bj", "🃏 BJ"],
           ["shop", "🪙 交換所"],
+          ["king", "👑 カジノ王"],
         ] as const).map(([k, label]) => (
           <button
             key={k}
@@ -159,6 +162,8 @@ export default function CasinoPage() {
         <Slots onPan={onPan} />
       ) : tab === "bj" ? (
         <Blackjack />
+      ) : tab === "king" ? (
+        <KingChallenge />
       ) : (
         <CoinShop />
       )}
@@ -836,6 +841,139 @@ function Blackjack() {
   );
 }
 
+// ===== カジノ王への挑戦〜そして伝説へ〜（100コインBETの一撃台＋伝説賭博セット交換）=====
+
+function KingChallenge() {
+  const coins = useGameStore((s) => s.coins);
+  const hiCoins = useGameStore((s) => s.hiCoins);
+  const kingPlay = useGameStore((s) => s.kingPlay);
+  const kingBuyLegend = useGameStore((s) => s.kingBuyLegend);
+  const [last, setLast] = useState<{ coins: number; hi: number; kind: string } | null>(null);
+  const [jpFlash, setJpFlash] = useState(false);
+  const [slot, setSlot] = useState<EquipmentSlot>("weapon");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [auto, setAuto] = useState(false);
+
+  const play = () => {
+    const r = kingPlay();
+    if (!r) return;
+    setLast(r);
+    slotSfx(r.kind === "jackpot" ? "bonusBig" : r.coins > 0 ? "small" : "lever");
+    if (r.kind === "jackpot") {
+      setJpFlash(true);
+      window.setTimeout(() => setJpFlash(false), 5000);
+    }
+  };
+
+  useEffect(() => {
+    if (!auto) return;
+    const id = setInterval(() => {
+      if (useGameStore.getState().coins < KING_BET) {
+        setAuto(false);
+        return;
+      }
+      play();
+    }, 200);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto]);
+
+  const buy = () => {
+    const w = kingBuyLegend(slot);
+    if (w) {
+      setMsg(`👑 ${w.name} を交換！`);
+      window.setTimeout(() => setMsg(null), 2600);
+    }
+  };
+
+  const canPlay = coins >= KING_BET;
+  const canBuy = hiCoins >= LEGEND_PIECE_HI;
+
+  return (
+    <div className="relative flex flex-col gap-3">
+      {jpFlash && <div className="rainbow-flash pointer-events-none fixed inset-0 z-40" />}
+
+      <div className="flex items-center justify-between rounded-xl border border-amber-400/30 bg-black/30 px-3 py-2 text-xs">
+        <span className="font-bold text-amber-200">🪙 コイン {fmt(coins)}</span>
+        <span className="font-bold text-cyan-200">💎 ハイコイン {fmt(hiCoins)}</span>
+      </div>
+
+      <div className="rounded-2xl border-2 border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-black/30 p-3 text-center">
+        <p className="text-sm font-black text-amber-200">👑 カジノ王への挑戦</p>
+        <p className="text-[10px] text-gray-400">〜そして伝説へ〜　100コインBETの一撃台</p>
+        <div
+          className={`my-2 rounded-xl border p-3 ${
+            last?.kind === "jackpot" ? "animate-pulse border-amber-300 bg-amber-400/20" : "border-white/10 bg-black/40"
+          }`}
+        >
+          {last ? (
+            last.kind === "jackpot" ? (
+              <p className="text-base font-black text-amber-200">
+                💥 一撃！ +{fmt(last.coins)} ＆ 💎+{fmt(last.hi)}
+              </p>
+            ) : last.coins > 0 ? (
+              <p className="text-sm font-bold text-emerald-200">+{fmt(last.coins)} コイン</p>
+            ) : (
+              <p className="text-sm text-gray-500">…ハズレ</p>
+            )
+          ) : (
+            <p className="text-xs text-gray-500">レバーを叩いて一撃（最大{fmt(KING_JACKPOT)}コイン＋💎）を狙え</p>
+          )}
+        </div>
+        <button
+          onClick={play}
+          disabled={!canPlay || auto}
+          className="h-14 w-full rounded-2xl bg-amber-500 text-lg font-extrabold text-black active:scale-95 disabled:opacity-40"
+        >
+          ● 一撃台を回す（-{KING_BET}）
+        </button>
+        <button
+          onClick={() => setAuto((v) => !v)}
+          disabled={!canPlay && !auto}
+          className={`mt-2 h-9 w-full rounded-xl text-xs font-bold active:scale-95 disabled:opacity-40 ${
+            auto ? "bg-rose-600 text-white" : "bg-white/10 text-gray-300"
+          }`}
+        >
+          オート: {auto ? "ON（停止）" : "OFF"}
+        </button>
+        {!canPlay && <p className="mt-1 text-[11px] text-rose-300">コインが足りません（スロット/甘ダイスで稼いでね）。</p>}
+        <p className="mt-1 text-[10px] text-gray-500">RTP≈1＝延々打てる。価値はまれな一撃に集中＝一撃で💎を大量獲得。</p>
+      </div>
+
+      <div className="rounded-2xl border border-violet-500/40 bg-violet-500/5 p-3">
+        <p className="text-sm font-bold text-violet-200">👑 伝説賭博セット（部位指定で交換）</p>
+        <p className="mt-0.5 text-[10px] text-gray-400">
+          回避力極大／リロール時6確定／ドロップ超向上の“バランス壊れ”装備。ハイコインでのみ交換。
+        </p>
+        <div className="mt-2 grid grid-cols-3 gap-1">
+          {EQUIP_SLOTS.map((sl) => (
+            <button
+              key={sl}
+              onClick={() => setSlot(sl as EquipmentSlot)}
+              className={`h-9 rounded-lg text-[11px] font-bold active:scale-95 ${
+                slot === sl ? "bg-violet-600 text-white" : "bg-white/10 text-gray-300"
+              }`}
+            >
+              {equipSlotLabel[sl as EquipmentSlot]}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={buy}
+          disabled={!canBuy}
+          className="mt-2 h-12 w-full rounded-xl bg-violet-600 text-sm font-extrabold text-white active:scale-95 disabled:opacity-40"
+        >
+          {equipSlotLabel[slot]}を交換（💎{fmt(LEGEND_PIECE_HI)}）
+        </button>
+        {msg && <p className="mt-1 text-center text-sm font-bold text-emerald-200">{msg}</p>}
+        <p className="mt-1 text-[10px] text-gray-500">
+          6部位そろえると全効果が発動（各部位💎{fmt(LEGEND_PIECE_HI)}＝一撃 約4発ぶん）。
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ===== カジノコイン交換所 =====
 
 /** おじさんに聞いて暴いた台の設定（当該6時間バケットぶん）を読む。 */
@@ -897,7 +1035,7 @@ function CoinShop() {
   // 固有セット（常設）＋ 到達済みの「生成セット（深層）」も交換できるように
   // （欲しい深層セットが買えない不満の解消）。生成セットは highestFloorReached で解放。
   const highest = useGameStore((s) => s.progress.highestFloorReached);
-  const namedKeys = useMemo(() => SET_DEFS.map((s) => s.key), []);
+  const namedKeys = useMemo(() => SET_DEFS.filter((s) => !s.kingOnly).map((s) => s.key), []);
   const procKeys = useMemo(
     () => availableSetKeys(highest).filter((k) => k.startsWith("gset")),
     [highest],

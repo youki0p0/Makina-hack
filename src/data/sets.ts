@@ -31,6 +31,12 @@ export interface SetTierBonus {
   attack?: number;
   defense?: number;
   maxHp?: number;
+  /** 回避率（敵の攻撃を確率で無効化）。 */
+  dodge?: number;
+  /** リロール時に出目6を確定させる。 */
+  rerollSix?: boolean;
+  /** ドロップの★ティアを底上げする量。 */
+  dropTierBonus?: number;
 }
 
 export interface SetDef {
@@ -39,6 +45,8 @@ export interface SetDef {
   icon: string;
   /** Whether this is a procedurally-generated (deep) set. */
   procedural?: boolean;
+  /** カジノ王の景品専用＝通常ドロップ／通常交換には出さない。 */
+  kingOnly?: boolean;
   bonuses: SetTierBonus[];
 }
 
@@ -235,6 +243,19 @@ export const SET_DEFS: readonly SetDef[] = [
       { pieces: 6, desc: "攻撃時に追撃(+1ヒット)", extraHit: true },
     ],
   },
+  // ===== 伝説賭博セット（カジノ王の景品＝バランス壊れ）=====
+  // 「カジノ王への挑戦」の一撃台で稼いだハイコインでのみ部位指定交換できる伝説装備。
+  {
+    key: "legendgambler",
+    name: "伝説賭博",
+    icon: "👑",
+    kingOnly: true,
+    bonuses: [
+      { pieces: 2, desc: "ドロップの★ティア超向上(+10)", dropTierBonus: 10 },
+      { pieces: 4, desc: "リロール時に出目6が確定", rerollSix: true },
+      { pieces: 6, desc: "回避力極大（敵の攻撃を45%無効化）", dodge: 0.45 },
+    ],
+  },
 ];
 
 const FIXED_BY_KEY: Record<string, SetDef> = Object.fromEntries(
@@ -344,7 +365,7 @@ export function availableSetKeys(floor: number): string[] {
     merchant: 285,
     warmonger: 300,
   };
-  for (const s of SET_DEFS) if (floor >= (namedFloor[s.key] ?? 1)) keys.push(s.key);
+  for (const s of SET_DEFS) if (!s.kingOnly && floor >= (namedFloor[s.key] ?? 1)) keys.push(s.key);
   // proceduralSetFloor(n) = 150 + n*150 ≤ floor  ⇒  n ≤ (floor-150)/150 (closed form).
   const maxN = Math.floor((floor - 150) / 150);
   for (let n = 0; n <= maxN; n++) keys.push(`gset${n}`);
@@ -365,6 +386,12 @@ export interface SetEffects {
   healOnReroll: number;
   sixDouble: boolean;
   rollTwoDice: boolean;
+  /** 回避率（0..1）。敵の攻撃をこの確率で無効化。 */
+  dodgeChance: number;
+  /** リロール時に出目6を確定させる。 */
+  rerollSix: boolean;
+  /** ドロップの★ティア底上げ量。 */
+  dropTierBonus: number;
   /** 最終的な攻撃倍率(★スケール後の attack に (1+attackPct) を乗算)。 */
   attackPct: number;
   /** 最終的なHP倍率(maxHp に (1+maxHpPct) を乗算)。 */
@@ -561,6 +588,9 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
     healOnReroll: 0,
     sixDouble: false,
     rollTwoDice: false,
+    dodgeChance: 0,
+    rerollSix: false,
+    dropTierBonus: 0,
     attackPct: 0,
     maxHpPct: 0,
     activeTiers: [],
@@ -587,6 +617,9 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
       if (b.extraHit) eff.extraHit = true;
       if (b.sixDouble) eff.sixDouble = true;
       if (b.rollTwoDice) eff.rollTwoDice = true;
+      if (b.dodge) eff.dodgeChance = Math.max(eff.dodgeChance, b.dodge);
+      if (b.rerollSix) eff.rerollSix = true;
+      if (b.dropTierBonus) eff.dropTierBonus = Math.max(eff.dropTierBonus, b.dropTierBonus);
       if (b.faceOneToTwo) eff.diceModifiers.push(gamblerFaceOneToTwo());
     }
   }
