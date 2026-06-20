@@ -50,6 +50,7 @@ export interface LoadedState {
   gachaPoints: number;
   souls: number;
   coins: number;
+  hiCoins: number;
   casinoBan: number;
   slot: SlotSave;
   artifacts: ArtifactLevels;
@@ -86,6 +87,7 @@ function freshLoaded(equipped: EquippedItems, inventory: Equipment[]): LoadedSta
     gachaPoints: 0,
     souls: 0,
     coins: 0,
+    hiCoins: 0,
     casinoBan: 0,
     slot: emptySlot(),
     artifacts: defaultArtifactLevels(),
@@ -152,6 +154,7 @@ export function saveGame(state: LoadedState): void {
     gachaPoints: state.gachaPoints,
     souls: state.souls,
     coins: state.coins,
+    hiCoins: state.hiCoins,
     casinoBan: state.casinoBan,
     slot: state.slot,
     artifacts: state.artifacts,
@@ -205,6 +208,7 @@ export function loadGame(): LoadedState | null {
       gachaPoints: data.gachaPoints ?? 0,
       souls: data.souls ?? 0,
       coins: data.coins ?? 0,
+      hiCoins: data.hiCoins ?? 0,
       casinoBan: data.casinoBan ?? 0,
       slot: data.slot ? { ...emptySlot(), ...data.slot, hits: Array.isArray(data.slot.hits) ? data.slot.hits : [] } : emptySlot(),
       artifacts: normalizeArtifacts(data.artifacts),

@@ -472,6 +472,8 @@ export interface SaveData {
   souls?: number;
   /** Casino coins (medals) (optional for old saves). */
   coins?: number;
+  /** ハイコイン: カジノ王の一撃台専用の上位通貨 (optional for old saves). */
+  hiCoins?: number;
   /** 出禁: bossKills required before the casino reopens (optional for old saves). */
   casinoBan?: number;
   /** Slot machine state + data counters (optional for old saves). */

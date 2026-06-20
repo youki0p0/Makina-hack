@@ -142,16 +142,19 @@ describe("set bonuses", () => {
     expect(computeSetEffects(equipSet("gambler", 1)).activeTiers).toHaveLength(0);
   });
 
-  it("has 19 named sets including the new variations", () => {
+  it("has 20 named sets including the new variations", () => {
     const keys = SETS.map((s) => s.key);
-    expect(SETS.length).toBe(19);
+    expect(SETS.length).toBe(20);
     expect(keys).toEqual(
       expect.arrayContaining([
         "guardian", "storm", "inferno", "revenant", "trickster",
         "fortress", "assassin", "crusader", "windrunner", "gravekeeper",
         "arcanist", "doomherald", "titanguard", "merchant", "warmonger",
+        "legendgambler",
       ]),
     );
+    // 伝説賭博はカジノ王の景品＝通常ドロップ/交換には出ない。
+    expect(SETS.find((s) => s.key === "legendgambler")?.kingOnly).toBe(true);
     // all set keys are unique
     expect(new Set(keys).size).toBe(keys.length);
   });
