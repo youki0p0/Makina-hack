@@ -474,6 +474,10 @@ export interface SaveData {
   coins?: number;
   /** ハイコイン: カジノ王の一撃台専用の上位通貨 (optional for old saves). */
   hiCoins?: number;
+  /** カジノ王の天井カウンタ: 小当たりなしの回転数 (optional for old saves). */
+  kingPity?: number;
+  /** カジノ王の一度きり補填を適用済みか (optional for old saves). */
+  kingComped?: boolean;
   /** 出禁: bossKills required before the casino reopens (optional for old saves). */
   casinoBan?: number;
   /** Slot machine state + data counters (optional for old saves). */
