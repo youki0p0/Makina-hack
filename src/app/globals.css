@@ -236,38 +236,8 @@ button {
 .fx-shake { animation: fxShake 0.35s ease-in-out infinite; }
 
 /* ===== 甘ダイス バトル映像（RUSH中の中央演出。transform/opacity のみ） ===== */
-/* 勇者の通常斬撃ループ（軽く前後に振る）。 */
-@keyframes fxHeroSlash {
-  0%, 100% { transform: translateX(0) rotate(0deg); }
-  35% { transform: translateX(10px) rotate(-16deg); }
-  55% { transform: translateX(4px) rotate(8deg); }
-}
-.fx-hero-slash { display: inline-block; animation: fxHeroSlash 0.9s ease-in-out infinite; }
-
-/* 勇者の突進斬り（決着・1回）。 */
-@keyframes fxHeroLunge {
-  0% { transform: translateX(0) scale(1); }
-  40% { transform: translateX(46px) rotate(-22deg) scale(1.15); }
-  60% { transform: translateX(46px) rotate(8deg) scale(1.15); }
-  100% { transform: translateX(0) rotate(0deg) scale(1); }
-}
-.fx-hero-lunge { display: inline-block; animation: fxHeroLunge 1.1s cubic-bezier(.3, .9, .3, 1) both; }
-
-/* 勇者がノックバックして倒れる（敗北）。 */
-@keyframes fxHeroDown {
-  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
-  25% { transform: translate(-26px, -6px) rotate(-12deg); }
-  60% { transform: translate(-26px, 18px) rotate(-78deg); opacity: 0.9; }
-  100% { transform: translate(-26px, 26px) rotate(-90deg); opacity: 0.25; }
-}
-.fx-hero-down { display: inline-block; animation: fxHeroDown 1.5s ease-in both; }
-
-/* ノックバック（短い後退）。 */
-@keyframes fxKnockback {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-24px); }
-}
-.fx-knockback { display: inline-block; animation: fxKnockback 0.25s ease-out both; }
+/* 勇者の動き（構え/振りかぶり/斬撃/よろけ/ダウン）は手続き生成のドット絵を
+   フレーム送りで表現する（heroSprite.ts）。CSSはボス・画面演出のみ担当。 */
 
 /* ボス撃破：フラッシュ→縮小→消滅。 */
 @keyframes fxBossDie {

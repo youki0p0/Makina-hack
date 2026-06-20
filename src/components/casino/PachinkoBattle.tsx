@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import EnemyIcon from "@/components/EnemyIcon";
 import { fmt } from "@/lib/ui";
 import type { BattleBoss } from "@/lib/pachinko/battle";
-import { getHeroSpriteDataUrl } from "@/lib/pachinko/heroSprite";
+import { getHeroFrames, type HeroFrame } from "@/lib/pachinko/heroSprite";
 
 /**
  * 中央モニターに重ねるバトル映像（演出専用・タイミングは親が setTimeout で駆動）。
@@ -53,15 +53,47 @@ export default function PachinkoBattle({
   );
 }
 
-/** 勇者スプライト（手続き生成の16×16ドット絵。画像アセットは増やさない）。 */
-function Hero({ className = "", size = 56 }: { className?: string; size?: number }) {
-  const [url, setUrl] = useState("");
+// 勇者の動き：差分フレームを順送りして“なめらかに”見せる（rAFなし、軽いsetInterval）。
+// idle=構え→振りかぶり→斬撃のループ、win=溜め→強打を1回（最後を保持）、lose=よろけ→ダウン。
+type HeroSeq = "idle" | "win" | "lose";
+const HERO_SEQ: Record<HeroSeq, { frames: HeroFrame[]; loop: boolean; ms: number; still: HeroFrame }> = {
+  idle: { frames: ["stance", "raise", "slash"], loop: true, ms: 150, still: "stance" },
+  win: { frames: ["raise", "slash", "slash"], loop: false, ms: 150, still: "slash" },
+  lose: { frames: ["hurt", "down"], loop: false, ms: 220, still: "down" },
+};
+
+/** 勇者スプライト（手続き生成の20×20ドット絵をフレーム送りでアニメ）。 */
+function Hero({ seq, reduced, size = 56 }: { seq: HeroSeq; reduced: boolean; size?: number }) {
+  const [frames, setFrames] = useState<Record<HeroFrame, string> | null>(null);
   useEffect(() => {
-    setUrl(getHeroSpriteDataUrl());
+    setFrames(getHeroFrames());
   }, []);
+
+  const def = HERO_SEQ[seq];
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    setIdx(0);
+    if (reduced || def.frames.length <= 1) return; // 軽量時は静止フレーム。
+    let i = 0;
+    const id = window.setInterval(() => {
+      i++;
+      if (i >= def.frames.length) {
+        if (def.loop) i = 0;
+        else {
+          window.clearInterval(id); // ループしない時は最終フレームを保持。
+          return;
+        }
+      }
+      setIdx(i);
+    }, def.ms);
+    return () => window.clearInterval(id);
+  }, [seq, reduced, def]);
+
+  const name = reduced ? def.still : def.frames[Math.min(idx, def.frames.length - 1)];
+  const url = frames?.[name] ?? "";
   return (
     <span
-      className={`inline-block select-none ${className}`}
+      className="inline-block select-none"
       style={{
         width: size,
         height: size,
@@ -91,9 +123,9 @@ function Fight({ boss, reduced }: { boss: BattleBoss; reduced: boolean }) {
       <p className="pointer-events-none absolute inset-x-0 top-1 text-center text-[9px] font-bold tracking-widest text-cyan-300/80">
         勇者 vs {boss.name}
       </p>
-      {/* 勇者（左）：斬撃ループ。 */}
+      {/* 勇者（左）：構え→振りかぶり→斬撃のフレームループ。 */}
       <div className="relative flex flex-col items-center">
-        <Hero className={reduced ? "" : "fx-hero-slash"} size={56} />
+        <Hero seq="idle" reduced={reduced} size={56} />
       </div>
       {/* 上昇スパーク（火花）はドット＝小さな四角ピクセルで表現。 */}
       {!reduced && (
@@ -129,12 +161,9 @@ function Fight({ boss, reduced }: { boss: BattleBoss; reduced: boolean }) {
 function Decide({ boss, win, reduced }: { boss: BattleBoss; win: boolean; reduced: boolean }) {
   return (
     <div className="relative flex h-full w-full items-center justify-between overflow-hidden px-4">
-      {/* 勇者（左）。win=突進斬り / lose=ノックバックして倒れる。 */}
+      {/* 勇者（左）。win=溜め→強打 / lose=よろけ→ダウン（フレーム送り）。 */}
       <div className="relative flex flex-col items-center">
-        <Hero
-          className={reduced ? "" : win ? "fx-hero-lunge" : "fx-hero-down"}
-          size={56}
-        />
+        <Hero seq={win ? "win" : "lose"} reduced={reduced} size={56} />
       </div>
 
       {/* ボス（右）。win=撃破アニメ / lose=とどめの一撃でフラッシュ。 */}
