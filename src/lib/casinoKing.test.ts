@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { kingSpin, KING_BET, KING_JACKPOT, KING_JACKPOT_HI } from "@/lib/casinoKing";
+import {
+  kingSpin,
+  kingSpinWithPity,
+  KING_BET,
+  KING_JACKPOT,
+  KING_JACKPOT_HI,
+  KING_CEILING,
+} from "@/lib/casinoKing";
 import { computeSetEffects, availableSetKeys, SETS } from "@/data/sets";
 import { genSetItem } from "@/data/items";
 import { EQUIP_SLOTS } from "@/lib/battle";
@@ -32,6 +39,34 @@ describe("カジノ王の一撃台", () => {
     expect(rtp).toBeLessThan(0.85); // ≈0.7
     expect(jp).toBeGreaterThan(0); // まれに一撃が出る
     expect(hi).toBeGreaterThan(0); // 一撃でハイコイン獲得
+  });
+});
+
+describe("カジノ王の天井", () => {
+  it("一撃なしで KING_CEILING 回まわすと、その回で一撃が確定する", () => {
+    // 常にハズレを返すrngでも、天井に到達したら一撃が出る。
+    const alwaysMiss = () => 0.999;
+    let pity = 0;
+    let spins = 0;
+    let hitAtCeiling = false;
+    while (spins < KING_CEILING) {
+      const { result, nextPity } = kingSpinWithPity(pity, alwaysMiss);
+      spins++;
+      pity = nextPity;
+      if (result.kind === "jackpot") {
+        hitAtCeiling = spins === KING_CEILING;
+        expect(result.coins).toBe(KING_JACKPOT);
+        break;
+      }
+    }
+    expect(hitAtCeiling).toBe(true); // ちょうど2000回転目で確定
+  });
+
+  it("一撃が出たら天井カウンタは0に戻る", () => {
+    const alwaysJackpot = () => 0; // x=0 < pJ → 一撃
+    const { result, nextPity } = kingSpinWithPity(123, alwaysJackpot);
+    expect(result.kind).toBe("jackpot");
+    expect(nextPity).toBe(0);
   });
 });
 

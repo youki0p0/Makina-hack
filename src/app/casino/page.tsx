@@ -34,7 +34,7 @@ import EnemyIcon from "@/components/EnemyIcon";
 import PixelGlyph from "@/components/PixelGlyph";
 import EventBadge from "@/components/EventBadge";
 import { fmt, slotLabel as equipSlotLabel } from "@/lib/ui";
-import { KING_BET, KING_JACKPOT, LEGEND_PIECE_HI } from "@/lib/casinoKing";
+import { KING_BET, KING_JACKPOT, LEGEND_PIECE_HI, KING_CEILING } from "@/lib/casinoKing";
 import { useGameStore, type SlotSpinResult } from "@/store/gameStore";
 import type { EquipmentSlot } from "@/types/game";
 
@@ -846,6 +846,7 @@ function KingChallenge() {
   const hiCoins = useGameStore((s) => s.hiCoins);
   const kingPlay = useGameStore((s) => s.kingPlay);
   const kingBuyLegend = useGameStore((s) => s.kingBuyLegend);
+  const kingPity = useGameStore((s) => s.kingPity);
   const [last, setLast] = useState<{ coins: number; hi: number; kind: string } | null>(null);
   const [jpFlash, setJpFlash] = useState(false);
   const [slot, setSlot] = useState<EquipmentSlot>("weapon");
@@ -894,6 +895,20 @@ function KingChallenge() {
       <div className="flex items-center justify-between rounded-xl border border-amber-400/30 bg-black/30 px-3 py-2 text-xs">
         <span className="font-bold text-amber-200">🪙 コイン {fmt(coins)}</span>
         <span className="font-bold text-cyan-200">💎 ハイコイン {fmt(hiCoins)}</span>
+      </div>
+
+      {/* 天井: 一撃なしの回転数。KING_CEILINGで一撃確定。 */}
+      <div className="rounded-xl border border-rose-400/30 bg-rose-500/5 px-3 py-1.5">
+        <div className="flex items-center justify-between text-[11px] font-bold">
+          <span className="text-rose-200">🔥 天井まで</span>
+          <span className="text-rose-100">残り {fmt(Math.max(0, KING_CEILING - kingPity))} 回転</span>
+        </div>
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/40">
+          <div
+            className="h-full bg-rose-500 transition-all"
+            style={{ width: `${Math.min(100, (kingPity / KING_CEILING) * 100)}%` }}
+          />
+        </div>
       </div>
 
       <div className="rounded-2xl border-2 border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-black/30 p-3 text-center">

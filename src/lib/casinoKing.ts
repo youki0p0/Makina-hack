@@ -11,6 +11,9 @@ export const KING_JACKPOT_HI = 2500;
 /** 伝説賭博セット1部位の交換に必要なハイコイン。 */
 export const LEGEND_PIECE_HI = 10000;
 
+/** 天井: 一撃なしでこの回転数に達したら次の1回で一撃を確定させる。 */
+export const KING_CEILING = 2000;
+
 export type KingKind = "jackpot" | "big" | "small" | "miss";
 export interface KingResult {
   /** 払い出し（通常コイン）。 */
@@ -37,4 +40,20 @@ export function kingSpin(rng: () => number = Math.random): KingResult {
   if (x < pJ + pB) return { coins: 300 + Math.floor(rng() * 400), hi: 0, kind: "big" };
   if (x < pJ + pB + pS) return { coins: 60 + Math.floor(rng() * 120), hi: 0, kind: "small" };
   return { coins: 0, hi: 0, kind: "miss" };
+}
+
+/**
+ * 天井つきで1回まわす。`pity` は一撃なしで回した回転数。
+ * pity が KING_CEILING-1 まで来ていれば、この回は一撃を確定（天井）。
+ * 一撃が出たら pity は 0 にリセット、それ以外は +1。
+ */
+export function kingSpinWithPity(
+  pity: number,
+  rng: () => number = Math.random,
+): { result: KingResult; nextPity: number } {
+  if (pity + 1 >= KING_CEILING) {
+    return { result: { coins: KING_JACKPOT, hi: KING_JACKPOT_HI, kind: "jackpot" }, nextPity: 0 };
+  }
+  const result = kingSpin(rng);
+  return { result, nextPity: result.kind === "jackpot" ? 0 : pity + 1 };
 }

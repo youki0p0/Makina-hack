@@ -104,7 +104,7 @@ import {
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState } from "@/lib/save";
 import { runDailyMaintenance } from "@/lib/maintenance";
-import { kingSpin, KING_BET, LEGEND_PIECE_HI } from "@/lib/casinoKing";
+import { kingSpinWithPity, KING_BET, LEGEND_PIECE_HI } from "@/lib/casinoKing";
 import { itemKey, rarityRank } from "@/lib/ui";
 import type {
   ActiveBuff,
@@ -316,6 +316,8 @@ interface GameState {
   coins: number;
   /** ハイコイン: カジノ王の一撃台でのみ稼ぐ上位通貨（伝説賭博セット交換用）。 */
   hiCoins: number;
+  /** カジノ王の天井カウンタ: 一撃なしで回した回転数（KING_CEILINGで一撃確定）。 */
+  kingPity: number;
   /** Whether the next slot spin is a free replay (transient). */
   slotReplay: boolean;
   /** ダイスラッシュ(AT) games remaining (0 = not in AT; transient). */
@@ -554,6 +556,7 @@ export const useGameStore = create<GameState>((set, get) => {
       souls: s.souls,
       coins: s.coins,
       hiCoins: s.hiCoins,
+      kingPity: s.kingPity,
       casinoBan: s.casinoBan,
       slot: {
         machine: s.slotMachine,
@@ -690,6 +693,7 @@ export const useGameStore = create<GameState>((set, get) => {
       souls: loaded.souls,
       coins: loaded.coins,
       hiCoins: loaded.hiCoins,
+      kingPity: loaded.kingPity,
       slotReplay: false,
       // Slot state survives reload, but RESETS when the 6h setting bucket changes
       // (settings reshuffled → fresh 天井/ゾーン/カウンタ).
@@ -763,6 +767,7 @@ export const useGameStore = create<GameState>((set, get) => {
     souls: 0,
     coins: 0,
     hiCoins: 0,
+    kingPity: 0,
     slotReplay: false,
     atGames: 0,
     slotMachine: 0,
@@ -1806,10 +1811,12 @@ export const useGameStore = create<GameState>((set, get) => {
     kingPlay: () => {
       const s = get();
       if (s.coins < KING_BET) return null;
-      const r = kingSpin();
+      // 天井つき: 一撃なしで KING_CEILING 回まわすと次の1回で一撃確定。
+      const { result: r, nextPity } = kingSpinWithPity(s.kingPity);
       set({
         coins: Math.max(0, s.coins - KING_BET + r.coins),
         hiCoins: s.hiCoins + r.hi,
+        kingPity: nextPity,
       });
       persist();
       return { coins: r.coins, hi: r.hi, kind: r.kind };
