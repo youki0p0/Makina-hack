@@ -3,20 +3,39 @@
 // reasoned about in isolation. Nothing here touches Zustand `set`/`get` or any
 // mutable closure state — they are pure functions of their arguments.
 
-import { DEFAULT_CLASS_ID } from "@/data/classes";
+import { DEFAULT_CLASS_ID, getClass } from "@/data/classes";
+import { computeSetEffects } from "@/data/sets";
 import { FINAL_FLOOR } from "@/data/worlds";
 import { EQUIP_SLOTS, expForLevel } from "@/lib/battle";
+import { applyEquipmentModifiers } from "@/lib/dice";
 import { SCRAP_VALUE } from "@/lib/loot";
 import { itemKey } from "@/lib/ui";
 import type {
   BattleState,
   ClassId,
+  DiceFace,
   Equipment,
   EquipmentSlot,
   EquippedItems,
   Player,
   Progress,
 } from "@/types/game";
+
+/**
+ * Resolve the player's final dice faces: class mods first, then each equipped
+ * item (gear overrides class), then set-bonus rewrites last. This is the core
+ * "equipment rewrites dice faces" mechanic — kept pure so it can be tested and
+ * called from the store without touching `get`/`set`.
+ */
+export function buildFaces(equipped: EquippedItems, classId: ClassId): DiceFace[] {
+  const cls = getClass(classId);
+  const setEff = computeSetEffects(equipped, classId);
+  return applyEquipmentModifiers([
+    { name: cls.name, diceModifiers: cls.diceModifiers },
+    ...EQUIP_SLOTS.map((s) => equipped[s]),
+    { name: "セット", diceModifiers: setEff.diceModifiers },
+  ]);
+}
 
 /** 1000階(DEUS EX MACHINA)を踏破済みか（到達 or エンディング視聴）。 */
 export function isCleared1000(progress: Progress): boolean {

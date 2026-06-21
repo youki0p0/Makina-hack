@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CLASS_ID } from "@/data/classes";
+import { getItemById } from "@/data/items";
 import { FINAL_FLOOR } from "@/data/worlds";
 import { itemKey } from "@/lib/ui";
 import type { Equipment, EquippedItems, Progress } from "@/types/game";
 import {
   addUnique,
+  buildFaces,
   canChangeClassNow,
   capInventory,
   createPlayer,
@@ -135,6 +137,24 @@ describe("weakestSlot", () => {
       accessory: mkItem({ slot: "accessory", attack: 9, defense: 9, maxHp: 9 }),
     };
     expect(weakestSlot(eq)).toBe("helm");
+  });
+});
+
+describe("buildFaces (装備がダイス目を書き換える)", () => {
+  it("returns base faces for the default class with no gear (face 1 = miss)", () => {
+    const faces = buildFaces(emptyEquipped(), DEFAULT_CLASS_ID);
+    const f1 = faces.find((f) => f.value === 1)!;
+    expect(f1.effect.isMiss).toBe(true);
+    expect(f1.modifiedBy).toEqual([]);
+  });
+  it("rewrites face 1 (miss → small attack) when 鉄の剣 is equipped", () => {
+    const eq = emptyEquipped();
+    eq.weapon = getItemById("iron_sword");
+    const faces = buildFaces(eq, DEFAULT_CLASS_ID);
+    const f1 = faces.find((f) => f.value === 1)!;
+    expect(f1.effect.isMiss).toBe(false);
+    expect(f1.effect.kind).toBe("small");
+    expect(f1.modifiedBy).toContain("鉄の剣");
   });
 });
 

@@ -59,7 +59,7 @@ import {
   WEAKEN_TURNS,
   PLAYER_POISON_TURNS,
 } from "@/lib/battle";
-import { applyEquipmentModifiers, rollDice } from "@/lib/dice";
+import { rollDice } from "@/lib/dice";
 import {
   GACHA_COST,
   PREMIUM_COST,
@@ -129,6 +129,7 @@ import type {
 import { faceByValue } from "@/data/diceFaces";
 import {
   addUnique,
+  buildFaces,
   canChangeClassNow,
   capInventory,
   createPlayer,
@@ -501,18 +502,6 @@ export const useGameStore = create<GameState>((set, get) => {
       next.push({ id: ++logCounter, text: e.text, tone: e.tone });
     }
     return next.slice(-LOG_LIMIT);
-  }
-
-  /** Build the dice table from class + all equipped slots + set bonuses. */
-  function buildFaces(equipped: EquippedItems, classId: ClassId): DiceFace[] {
-    const cls = getClass(classId);
-    const setEff = computeSetEffects(equipped, classId);
-    // Class first, then equipment (so gear overrides), then set rewrites last.
-    return applyEquipmentModifiers([
-      { name: cls.name, diceModifiers: cls.diceModifiers },
-      ...EQUIP_SLOTS.map((s) => equipped[s]),
-      { name: "セット", diceModifiers: setEff.diceModifiers },
-    ]);
   }
 
   function refreshFaces(): DiceFace[] {
