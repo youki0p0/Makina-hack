@@ -1,8 +1,10 @@
 // ===== Ranking (深層到達者ログ) =====
 // No realtime PvP — only records ("残響/記録"). Works with or without Supabase:
 // if it's unconfigured OR a request fails, we transparently fall back to a local
-// repository (localStorage + bundled dummy data) so /ranking and /echo always
-// function. No personal info is stored — playerName is optional (default Guest).
+// repository (the player's own localStorage records — no fabricated players) so
+// /ranking and /echo always function. One row per player: a returning name
+// updates its record (Supabase upsert / local replace) rather than duplicating.
+// No personal info is stored — playerName is optional (default Guest).
 
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 
@@ -65,20 +67,6 @@ export function rankEntries(entries: RankingEntry[], filter: RankingFilter): Ran
   return out.sort((a, b) => b[key] - a[key] || b.equipmentScore - a.equipmentScore).slice(0, 100);
 }
 
-// ----- bundled dummy data (used when Supabase is unconfigured/unreachable) -----
-const now = Date.now();
-const iso = (daysAgo: number) => new Date(now - daysAgo * 86400000).toISOString();
-
-export const DUMMY_RANKING: RankingEntry[] = [
-  { playerName: "Yuuki", highestFloorReached: 1320, cleared1000: true, endlessAbyssFloor: 320, job: "mage", difficulty: "hell", title: "makina_0001", hasShinkiMakina: true, equippedWeaponName: "神機マキナ", equipmentScore: 8400, totalPlayTime: 54000, updatedAt: iso(1) },
-  { playerName: "Rei", highestFloorReached: 1000, cleared1000: true, endlessAbyssFloor: 0, job: "berserker", difficulty: "expert", title: "dragonslayer", hasShinkiMakina: true, equippedWeaponName: "死神の大鎌★★★", equipmentScore: 7600, totalPlayTime: 61000, updatedAt: iso(2) },
-  { playerName: "Player", highestFloorReached: 980, cleared1000: false, endlessAbyssFloor: 0, job: "paladin", difficulty: "normal", title: "", hasShinkiMakina: false, equippedWeaponName: "守護の盟約", equipmentScore: 5200, totalPlayTime: 40000, updatedAt: iso(3) },
-  { playerName: "Aoi", highestFloorReached: 760, cleared1000: false, endlessAbyssFloor: 0, job: "rogue", difficulty: "hard", title: "veteran", hasShinkiMakina: false, equippedWeaponName: "運命の片刃★", equipmentScore: 3900, totalPlayTime: 28000, updatedAt: iso(2) },
-  { playerName: "Guest", highestFloorReached: 640, cleared1000: false, endlessAbyssFloor: 0, job: "warrior", difficulty: "hard", title: "", hasShinkiMakina: false, equippedWeaponName: "狂戦の大剣", equipmentScore: 3100, totalPlayTime: 21000, updatedAt: iso(5) },
-  { playerName: "Sora", highestFloorReached: 1180, cleared1000: true, endlessAbyssFloor: 180, job: "hexer", difficulty: "hell", title: "abyss", hasShinkiMakina: true, equippedWeaponName: "雷霆の杖★★", equipmentScore: 6900, totalPlayTime: 70000, updatedAt: iso(4) },
-  { playerName: "Kai", highestFloorReached: 430, cleared1000: false, endlessAbyssFloor: 0, job: "mage", difficulty: "normal", title: "explorer", hasShinkiMakina: false, equippedWeaponName: "疫病の香炉", equipmentScore: 1800, totalPlayTime: 12000, updatedAt: iso(6) },
-];
-
 // ----- repositories -----
 export interface RankingRepository {
   list(filter: RankingFilter): Promise<RankingEntry[]>;
@@ -108,12 +96,14 @@ function writeLocal(entries: RankingEntry[]) {
 export const localRankingRepository: RankingRepository = {
   source: "local",
   async list(filter) {
-    return rankEntries([...DUMMY_RANKING, ...readLocal()], filter);
+    return rankEntries(dedupByName(readLocal()), filter);
   },
   async submit(entry) {
     const clean = sanitizeEntry(entry);
     if (!clean) return false;
-    writeLocal([...readLocal(), clean]);
+    // One row per player: replace any prior record with the same name.
+    const others = readLocal().filter((e) => e.playerName !== clean.playerName);
+    writeLocal([...others, clean]);
     return true;
   },
 };
@@ -180,7 +170,9 @@ const supabaseRankingRepository: RankingRepository = {
     if (!clean) return false;
     const sb = getSupabaseClient();
     if (!sb) throw new Error("no client");
-    const { error } = await sb.from(TABLE).insert(toRow(clean));
+    // Upsert on player_name so a returning player updates their row instead of
+    // piling up duplicates (requires a unique constraint on player_name).
+    const { error } = await sb.from(TABLE).upsert(toRow(clean), { onConflict: "player_name" });
     if (error) throw error;
     return true;
   },
@@ -193,34 +185,39 @@ export function rankingSource(): "supabase" | "local" {
   return isSupabaseConfigured() ? "supabase" : "local";
 }
 
-function dedup(entries: RankingEntry[]): RankingEntry[] {
-  const seen = new Set<string>();
-  const out: RankingEntry[] = [];
+/** Collapse to a single entry per player (keep their best floor; newest on tie). */
+function dedupByName(entries: RankingEntry[]): RankingEntry[] {
+  const best = new Map<string, RankingEntry>();
   for (const e of entries) {
-    const k = `${e.playerName}|${e.updatedAt}|${e.highestFloorReached}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(e);
+    const prev = best.get(e.playerName);
+    if (
+      !prev ||
+      e.highestFloorReached > prev.highestFloorReached ||
+      (e.highestFloorReached === prev.highestFloorReached && e.updatedAt > prev.updatedAt)
+    ) {
+      best.set(e.playerName, e);
+    }
   }
-  return out;
+  return [...best.values()];
 }
 
 /**
  * Load ranking entries. ALWAYS merges the local copy so the player sees their
- * own record even if the Supabase insert failed/lagged (the reported "登録しても
- * 追加されない" bug). Falls back to local + dummy when Supabase is absent/erroring.
+ * own record even if the Supabase write failed/lagged (the reported "登録しても
+ * 追加されない" bug). Falls back to the player's local records when Supabase is
+ * absent/erroring — no fabricated players are ever injected.
  */
 export async function loadRanking(filter: RankingFilter): Promise<RankingEntry[]> {
   const local = readLocal();
   if (isSupabaseConfigured()) {
     try {
       const remote = await supabaseRankingRepository.list({ kind: "total" });
-      return rankEntries(dedup([...remote, ...local]), filter);
+      return rankEntries(dedupByName([...remote, ...local]), filter);
     } catch {
       // Supabase outage → local still works.
     }
   }
-  return rankEntries(dedup([...DUMMY_RANKING, ...local]), filter);
+  return rankEntries(dedupByName(local), filter);
 }
 
 /**

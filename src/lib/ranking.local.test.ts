@@ -32,4 +32,13 @@ describe("ranking submit appears in the board (no Supabase)", () => {
     const rows = await loadRanking({ kind: "difficulty", difficulty: "hell" });
     expect(rows.some((r) => r.playerName === "Tester")).toBe(true);
   });
+
+  it("a returning player updates their row instead of duplicating", async () => {
+    await submitRanking({ ...entry, playerName: "Dup", highestFloorReached: 100 });
+    await submitRanking({ ...entry, playerName: "Dup", highestFloorReached: 300 });
+    const rows = await loadRanking({ kind: "total" });
+    const dups = rows.filter((r) => r.playerName === "Dup");
+    expect(dups).toHaveLength(1);
+    expect(dups[0].highestFloorReached).toBe(300);
+  });
 });

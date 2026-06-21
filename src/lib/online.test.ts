@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  DUMMY_RANKING,
   loadRanking,
   localRankingRepository,
   rankEntries,
@@ -49,20 +48,26 @@ describe("ranking validation", () => {
   });
 });
 
+const fixtures: RankingEntry[] = [
+  { ...sample, playerName: "Deep", highestFloorReached: 1320, hasShinkiMakina: true, endlessAbyssFloor: 320 },
+  { ...sample, playerName: "Mid", highestFloorReached: 1000, cleared1000: true },
+  { ...sample, playerName: "Shallow", highestFloorReached: 640, hasShinkiMakina: false },
+];
+
 describe("ranking filtering/sorting", () => {
   it("sorts by floor desc for total", () => {
-    const r = rankEntries(DUMMY_RANKING, { kind: "total" });
+    const r = rankEntries(fixtures, { kind: "total" });
     for (let i = 1; i < r.length; i++) {
       expect(r[i - 1].highestFloorReached).toBeGreaterThanOrEqual(r[i].highestFloorReached);
     }
   });
 
   it("makina filter only shows 神機マキナ holders", () => {
-    expect(rankEntries(DUMMY_RANKING, { kind: "makina" }).every((e) => e.hasShinkiMakina)).toBe(true);
+    expect(rankEntries(fixtures, { kind: "makina" }).every((e) => e.hasShinkiMakina)).toBe(true);
   });
 
   it("endless filter only shows endless divers", () => {
-    expect(rankEntries(DUMMY_RANKING, { kind: "endless" }).every((e) => e.endlessAbyssFloor > 0)).toBe(true);
+    expect(rankEntries(fixtures, { kind: "endless" }).every((e) => e.endlessAbyssFloor > 0)).toBe(true);
   });
 });
 
@@ -71,9 +76,10 @@ describe("ranking repository (no Supabase configured)", () => {
     expect(rankingSource()).toBe("local");
   });
 
-  it("loadRanking falls back to local dummy data", async () => {
+  it("loadRanking never injects fabricated players", async () => {
     const rows = await loadRanking({ kind: "total" });
-    expect(rows.length).toBeGreaterThan(0);
+    // The old bundled dummy players must never appear anymore.
+    expect(rows.some((r) => ["Yuuki", "Rei", "Sora", "Aoi", "Kai"].includes(r.playerName))).toBe(false);
   });
 
   it("local repo accepts a valid submission, rejects garbage", async () => {
