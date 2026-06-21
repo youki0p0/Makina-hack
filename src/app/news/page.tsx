@@ -19,7 +19,7 @@ interface Note {
 const NOTES: Note[] = [
   {
     date: "2026-06-21",
-    tag: "#131「名前は早い者勝ち」",
+    tag: "#132「名前は早い者勝ち」",
     emoji: "🪪",
     title: "ランキングの名前が“早い者勝ち”に！ 重複はブロック",
     items: [
