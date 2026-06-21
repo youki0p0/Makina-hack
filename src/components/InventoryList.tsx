@@ -109,7 +109,7 @@ export default function InventoryList() {
 
   // Keep original indices for equip/scrap while filtering+sorting for display.
   // Memoized so re-renders (opening the detail modal, auto-battle ticks, etc.)
-  // don't re-sort the whole (up to 150-item) inventory every time.
+  // don't re-sort the whole (up to 300-item) inventory every time.
   const rows = useMemo(
     () =>
       inventory
@@ -126,7 +126,7 @@ export default function InventoryList() {
     [inventory, filter, setKeyFilter, sort, favorites],
   );
 
-  // 深層では所持品が150件になり、各行がcanvas生成のアイコンを持つため、全件を一度に
+  // 深層では所持品が上限(300件)まで増え、各行がcanvas生成のアイコンを持つため、全件を一度に
   // 描画/再描画すると重い。表示件数を絞り「もっと見る」で増やして主スレッド負荷を抑える。
   const PAGE = 50;
   const [visible, setVisible] = useState(PAGE);

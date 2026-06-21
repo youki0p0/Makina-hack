@@ -201,8 +201,10 @@ function discover(list: string[], id: string): string[] {
  * inventory would balloon and make every save/render freeze the browser. When
  * it overflows we auto-dismantle the WEAKEST non-locked items into material —
  * locked/favorited and 神機マキナ are never touched.
+ * 描画はInventoryList側でページング(50件ずつ)済みなので、上限を上げても初期描画は重くならない。
+ * エンドレスの★上げ運用で枠が足りないため 150→300 に拡大。
  */
-const MAX_INVENTORY = 150;
+const MAX_INVENTORY = 300;
 
 function capInventory(
   inv: Equipment[],
