@@ -34,6 +34,8 @@ const GAME_MS = 420;
 // rollContinue で先に確定し、勝ち/負け映像は“結果に合わせて”再生するだけ（演出は結果を決めない）。
 const DECIDE_WIN_MS = 1500; // 踏み込み→撃破→継続（寄せる尺を確保しつつ高速連チャンは保つ）
 const DECIDE_LOSE_MS = 1800; // ボス突進→被弾→ダウン（ためを作る）
+// 継続(撃破)が当たる瞬間（PachinkoBattle の WIN_IMPACT_S=0.6s に合わせる）。ここで「○連」を+1。
+const WIN_IMPACT_MS = 650;
 // 終了画面（連チャン回数・通算払い出し）の表示時間。短すぎたので余韻を持たせて延長。
 const SUMMARY_MS = 4000;
 const SUMMARY_MS_REDUCED = 2200;
@@ -128,6 +130,9 @@ export default function PachinkoPage() {
   const [rush, setRush] = useState<Rush | null>(null);
   const rushRef = useRef<Rush | null>(null);
   rushRef.current = rush;
+  // 画面に出す「○連」。初当たり=1連、以降は“撃破(継続確定)の瞬間”に+1（勝利と同期）。
+  // ラウンド番号(rush.ren)と分離して、表示タイミングを勝敗演出に合わせるためのもの。
+  const [renView, setRenView] = useState(0);
 
   // ===== バトル映像（演出レイヤー。mode/rush が本物の状態、battle は見せ方のみ） =====
   // RUSH中はリールドラムをフェードで「勇者vsボス」のバトル映像に差し替える。
@@ -240,6 +245,8 @@ export default function PachinkoPage() {
     const r: Rush = { coins: b.coins, gamesLeft: b.games, payRemaining: b.coins, loop: b.loop, ren };
     rushRef.current = r;
     setRush(r);
+    // 初当たり(ren=1)は即「1連」。継続(ren≥2)は撃破インパクトで既に+1済みなので追従のみ。
+    setRenView(ren);
     if (modeRef.current !== "complete") {
       setMode("complete");
       modeRef.current = "complete";
@@ -333,6 +340,8 @@ export default function PachinkoPage() {
         battleLockRef.current = true;
         pendingResolveRef.current = { cont, ren: r.ren };
         setBattle({ kind: "decide", boss: pickBattleBoss(r.ren), ren: r.ren, win: cont });
+        // 継続(勝利)のときだけ、撃破が当たる瞬間に「○連」を+1（勝敗演出と同期・敗北は数えない）。
+        if (cont) battleAt(WIN_IMPACT_MS, () => setRenView(r.ren + 1));
         battleAt(cont ? DECIDE_WIN_MS : DECIDE_LOSE_MS, () => onDecideDone());
       } else if (cont) {
         // 旧仕様（演出OFF/軽量）：従来どおり即・次ラウンドへ。
@@ -456,7 +465,7 @@ export default function PachinkoPage() {
   const nearCeiling = spins >= ceiling - 50;
   const statusLabel = complete
     ? rush
-      ? `RUSH ${rush.ren}連`
+      ? `RUSH ${renView}連`
       : "大当たり！"
     : `${spins}回転`;
 
@@ -603,7 +612,7 @@ export default function PachinkoPage() {
             style={{ top: `${((BOARD.monitorY + BOARD.monitorH + 2) / BOARD.height) * 100}%` }}
           >
             <span className="rounded-full bg-amber-300 px-3 py-0.5 text-xs font-black text-black">
-              🔥RUSH {rush.ren}連　{rush.coins}枚保証　残り{rush.gamesLeft}G
+              🔥RUSH {renView}連　{rush.coins}枚保証　残り{rush.gamesLeft}G
             </span>
           </div>
         )}
