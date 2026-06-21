@@ -1,336 +1,29 @@
 // Tiny chiptune (16-bit-ish) audio engine built on the Web Audio API.
 // No asset files: all BGM and SFX are synthesized procedurally.
+//
+// This barrel hosts the long-form BGM (theme sequencer + jukebox catalog) and
+// re-exports the synthesis engine (./engine) and sound effects (./sfx) so the
+// public API stays at "@/lib/audio".
 
-const MUTE_KEY = "dice-hackslash-muted";
+import {
+  getCtx,
+  getMuted,
+  noise,
+  noisePan,
+  setMutedFlag,
+  slideTone,
+  slideVoice,
+  tone,
+  voice,
+  writeMute,
+} from "./engine";
 
-let ctx: AudioContext | null = null;
-let master: GainNode | null = null;
-let muted = false;
+export { initAudio, isMuted } from "./engine";
+export { sfx, slotSfx, type Sfx, type SlotSfx } from "./sfx";
+
+// BGM scheduler state (the timer is paused while the tab is hidden).
 let bgmTimer: ReturnType<typeof setInterval> | null = null;
 let bgmStep = 0;
-let initialized = false;
-
-function getCtx(): AudioContext | null {
-  if (typeof window === "undefined") return null;
-  if (!ctx) {
-    const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return null;
-    ctx = new Ctor();
-    master = ctx.createGain();
-    master.gain.value = 0.25;
-    master.connect(ctx.destination);
-  }
-  return ctx;
-}
-
-export function isMuted(): boolean {
-  if (typeof window === "undefined") return false;
-  if (!initialized) {
-    muted = window.localStorage.getItem(MUTE_KEY) === "1";
-    initialized = true;
-  }
-  return muted;
-}
-
-/** Resume the audio context (must be called from a user gesture). */
-export function initAudio(): void {
-  const c = getCtx();
-  if (c && c.state === "suspended") void c.resume();
-  isMuted();
-}
-
-function tone(
-  freq: number,
-  dur: number,
-  type: OscillatorType = "square",
-  vol = 0.3,
-  when = 0,
-): void {
-  const c = getCtx();
-  if (!c || !master || muted) return;
-  const t = c.currentTime + when;
-  const osc = c.createOscillator();
-  const g = c.createGain();
-  osc.type = type;
-  osc.frequency.value = freq;
-  g.gain.setValueAtTime(vol, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  osc.connect(g);
-  g.connect(master);
-  osc.start(t);
-  osc.stop(t + dur);
-}
-
-function noise(dur: number, vol = 0.3): void {
-  const c = getCtx();
-  if (!c || !master || muted) return;
-  const t = c.currentTime;
-  const len = Math.floor(c.sampleRate * dur);
-  const buffer = c.createBuffer(1, len, c.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
-  const src = c.createBufferSource();
-  src.buffer = buffer;
-  const g = c.createGain();
-  g.gain.value = vol;
-  src.connect(g);
-  g.connect(master);
-  src.start(t);
-  src.stop(t + dur); // deterministic release so the node is freed promptly
-}
-
-/**
- * Pitch-sliding tone: glides the frequency f0→f1 (linear) while the amplitude
- * decays. Powers the idol theme's kick pitch-fall (100→40Hz) and the vocal
- * lead's portamento "scoop" (歌声のうねり). `glide` lets the pitch settle faster
- * than the note's full length.
- */
-function slideTone(
-  f0: number,
-  f1: number,
-  dur: number,
-  type: OscillatorType = "square",
-  vol = 0.3,
-  when = 0,
-  glide = dur,
-): void {
-  const c = getCtx();
-  if (!c || !master || muted) return;
-  const t = c.currentTime + when;
-  const osc = c.createOscillator();
-  const g = c.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(f0, t);
-  osc.frequency.linearRampToValueAtTime(Math.max(1, f1), t + Math.min(glide, dur));
-  g.gain.setValueAtTime(vol, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  osc.connect(g);
-  g.connect(master);
-  osc.start(t);
-  osc.stop(t + dur);
-}
-
-// ===== Spatial helpers (stereo pan + shared reverb send) =====
-// Used by the idol (casino) theme to give it width and air. A single convolver
-// with a synthesized impulse is shared by all reverb-sent voices.
-
-function clampPan(p: number): number {
-  return Math.max(-1, Math.min(1, p));
-}
-
-let reverbBus: GainNode | null = null;
-function makeImpulse(c: AudioContext, seconds: number, decay: number): AudioBuffer {
-  const rate = c.sampleRate;
-  const len = Math.max(1, Math.floor(rate * seconds));
-  const buf = c.createBuffer(2, len, rate);
-  for (let ch = 0; ch < 2; ch++) {
-    const d = buf.getChannelData(ch);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
-  }
-  return buf;
-}
-function getReverbBus(): GainNode | null {
-  const c = getCtx();
-  if (!c || !master) return null;
-  if (reverbBus) return reverbBus;
-  const input = c.createGain();
-  const conv = c.createConvolver();
-  conv.buffer = makeImpulse(c, 1.5, 2.4);
-  const wet = c.createGain();
-  wet.gain.value = 0.85;
-  input.connect(conv);
-  conv.connect(wet);
-  wet.connect(master);
-  reverbBus = input;
-  return reverbBus;
-}
-
-/** Route a gain node to master, optionally stereo-panned and with a reverb send. */
-function connectOut(c: AudioContext, g: GainNode, pan: number, reverb: number): void {
-  let out: AudioNode = g;
-  if (pan !== 0 && typeof c.createStereoPanner === "function") {
-    const p = c.createStereoPanner();
-    p.pan.value = clampPan(pan);
-    g.connect(p);
-    out = p;
-  }
-  out.connect(master!);
-  if (reverb > 0) {
-    const bus = getReverbBus();
-    if (bus) {
-      const send = c.createGain();
-      send.gain.value = reverb;
-      out.connect(send);
-      send.connect(bus);
-    }
-  }
-}
-
-/** Like tone(), but with stereo pan + optional reverb send. */
-function voice(
-  freq: number,
-  dur: number,
-  type: OscillatorType,
-  vol: number,
-  when = 0,
-  pan = 0,
-  reverb = 0,
-): void {
-  const c = getCtx();
-  if (!c || !master || muted) return;
-  const t = c.currentTime + when;
-  const osc = c.createOscillator();
-  const g = c.createGain();
-  osc.type = type;
-  osc.frequency.value = freq;
-  g.gain.setValueAtTime(vol, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  osc.connect(g);
-  connectOut(c, g, pan, reverb);
-  osc.start(t);
-  osc.stop(t + dur);
-}
-
-/** Portamento voice with pan + reverb (for the spacious vocal lead). */
-function slideVoice(
-  f0: number,
-  f1: number,
-  dur: number,
-  type: OscillatorType,
-  vol: number,
-  when = 0,
-  glide = dur,
-  pan = 0,
-  reverb = 0,
-): void {
-  const c = getCtx();
-  if (!c || !master || muted) return;
-  const t = c.currentTime + when;
-  const osc = c.createOscillator();
-  const g = c.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(f0, t);
-  osc.frequency.linearRampToValueAtTime(Math.max(1, f1), t + Math.min(glide, dur));
-  g.gain.setValueAtTime(vol, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  osc.connect(g);
-  connectOut(c, g, pan, reverb);
-  osc.start(t);
-  osc.stop(t + dur);
-}
-
-/** Panned noise burst with optional reverb (stereo claps / spacious risers). */
-function noisePan(dur: number, vol: number, pan = 0, reverb = 0): void {
-  const c = getCtx();
-  if (!c || !master || muted) return;
-  const t = c.currentTime;
-  const len = Math.max(1, Math.floor(c.sampleRate * dur));
-  const buffer = c.createBuffer(1, len, c.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
-  const src = c.createBufferSource();
-  src.buffer = buffer;
-  const g = c.createGain();
-  g.gain.value = vol;
-  src.connect(g);
-  connectOut(c, g, pan, reverb);
-  src.start(t);
-  src.stop(t + dur);
-}
-
-export type Sfx =
-  | "hit"
-  | "hurt"
-  | "crit"
-  | "heal"
-  | "select"
-  | "roll"
-  | "win"
-  | "lose"
-  | "coin";
-
-export function sfx(kind: Sfx): void {
-  switch (kind) {
-    case "hit":
-      tone(330, 0.07, "square", 0.28);
-      tone(220, 0.06, "square", 0.2, 0.02);
-      break;
-    case "hurt":
-      tone(140, 0.14, "sawtooth", 0.28);
-      break;
-    case "crit":
-      noise(0.16, 0.22);
-      tone(440, 0.1, "square", 0.3);
-      tone(660, 0.1, "square", 0.25, 0.06);
-      break;
-    case "heal":
-      tone(523, 0.1, "sine", 0.25);
-      tone(784, 0.12, "sine", 0.25, 0.08);
-      break;
-    case "select":
-      tone(520, 0.05, "square", 0.2);
-      break;
-    case "roll":
-      tone(740, 0.04, "square", 0.15);
-      tone(880, 0.04, "square", 0.15, 0.04);
-      break;
-    case "coin":
-      tone(988, 0.05, "square", 0.2);
-      tone(1319, 0.08, "square", 0.2, 0.05);
-      break;
-    case "win":
-      [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, "square", 0.25, i * 0.12));
-      break;
-    case "lose":
-      [392, 330, 262].forEach((f, i) => tone(f, 0.22, "triangle", 0.25, i * 0.16));
-      break;
-  }
-}
-
-// ===== Slot (パチスロ) SFX =====
-// レバーON / リール停止 / 小役 / リーチ / ボーナス揃い。tone/noise/slideTone で合成。
-export type SlotSfx = "lever" | "stop" | "small" | "reach" | "bonus" | "bonusBig" | "pan";
-
-export function slotSfx(kind: SlotSfx): void {
-  switch (kind) {
-    case "pan": // 台パン: 筐体を殴る鈍い衝撃音
-      noise(0.12, 0.4);
-      slideTone(160, 50, 0.18, "square", 0.3);
-      tone(60, 0.14, "sine", 0.3, 0.01);
-      break;
-    case "lever": // レバーを下げた「ガコッ」
-      noise(0.05, 0.2);
-      slideTone(240, 90, 0.13, "square", 0.26);
-      tone(70, 0.08, "sine", 0.18, 0.01);
-      break;
-    case "stop": // リール停止の「ガコン」
-      noise(0.03, 0.16);
-      tone(180, 0.05, "square", 0.22);
-      tone(110, 0.06, "square", 0.16, 0.01);
-      break;
-    case "small": // 小役の「ピロン↑」
-      tone(880, 0.06, "square", 0.2);
-      tone(1318, 0.1, "square", 0.2, 0.06);
-      break;
-    case "reach": // リーチの煽り(上昇サイレン)
-      slideTone(400, 1200, 0.6, "sawtooth", 0.12);
-      slideTone(404, 1212, 0.6, "sawtooth", 0.1, 0.0);
-      noise(0.5, 0.05);
-      break;
-    case "bonus": // REGULAR 揃い ファンファーレ
-      [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, "square", 0.26, i * 0.1));
-      break;
-    case "bonusBig": // BIG(7/BAR) 揃い 大ファンファーレ
-      noise(0.12, 0.18);
-      [523, 659, 784, 1047, 1319].forEach((f, i) => {
-        tone(f, 0.2, "square", 0.28, i * 0.09);
-        tone(f * 1.005, 0.2, "square", 0.18, i * 0.09); // 厚み
-      });
-      tone(1047, 0.3, "square", 0.22, 0.5);
-      tone(1319, 0.36, "square", 0.22, 0.56);
-      break;
-  }
-}
 
 // ===== BGM: "The Sunless Vault" — a long-form A-minor dungeon loop =====
 // 1 bar = 16 steps @ 150ms. Loop = 32 bars (~77s) that build A → A2 → B → A'.
@@ -705,7 +398,7 @@ function themeStepMs(theme: BgmTheme): number {
 
 // Dispatcher: each theme has its own full-band renderer; all share one step clock.
 function bgmTick(): void {
-  if (muted) return;
+  if (getMuted()) return;
   const world = WORLD_MUSIC[bgmTheme as WorldKey];
   if (bgmTheme === "final") {
     finalTick();
@@ -905,7 +598,7 @@ function finalClimax(chord: Chord, step: number, inBar: number, bar: number, lb:
 }
 
 function finalTick(): void {
-  if (muted) return;
+  if (getMuted()) return;
   const step = bgmStep;
   const bar = Math.floor(step / BAR);
   const inBar = step % BAR;
@@ -1125,7 +818,7 @@ function dungeonTick(): void {
 // 始まり(イントロ)、トライアングル・ベースとドラムでAメロ、密度を上げてプリサビ、
 // ワイドに開いたサビへ。装備や場所のテーマと同じ step クロックに乗る。
 function creditsTick(): void {
-  if (muted) return;
+  if (getMuted()) return;
   const T = bgmTranspose;
   const step = bgmStep;
   const bar = Math.floor(step / BAR); // 0..31
@@ -1255,7 +948,7 @@ function forgeTick(): void {
 // →B(サビ)→A'(間奏) の起伏を表現。ステレオパン+共有リバーブで空間の広がりを、
 // クラップ/キラキラ上昇/ワイドstab/高域シマーで特殊アクセントを加えている。
 function idolTick(sea = false): void {
-  if (muted) return;
+  if (getMuted()) return;
   const def = THEMES.idol;
   const T = bgmTranspose;
   const step = bgmStep;
@@ -1437,12 +1130,12 @@ function ensureVisibilityHook(): void {
   visHooked = true;
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) clearTimer();
-    else if (bgmPlaying && !muted) startTimer();
+    else if (bgmPlaying && !getMuted()) startTimer();
   });
 }
 
 export function startBgm(): void {
-  if (muted) return;
+  if (getMuted()) return;
   const c = getCtx();
   if (!c) return;
   ensureVisibilityHook();
@@ -1460,7 +1153,7 @@ export function setBgmTheme(theme: BgmTheme, transpose = 1): void {
   bgmStep = 0;
   // Only (re)start the timer if music is wanted and the tab is visible.
   clearTimer();
-  if (bgmPlaying && !muted && (typeof document === "undefined" || !document.hidden)) {
+  if (bgmPlaying && !getMuted() && (typeof document === "undefined" || !document.hidden)) {
     startTimer();
   }
 }
@@ -1471,11 +1164,7 @@ export function stopBgm(): void {
 }
 
 export function setMuted(m: boolean): void {
-  muted = m;
-  initialized = true;
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(MUTE_KEY, m ? "1" : "0");
-  }
+  writeMute(m);
   if (m) {
     stopBgm();
   } else {
@@ -1488,7 +1177,7 @@ export function __tickThemeForTest(theme: BgmTheme, steps: number): void {
   const prev = bgmTheme;
   bgmTheme = theme;
   bgmStep = 0;
-  muted = false;
+  setMutedFlag(false);
   for (let i = 0; i < steps; i++) bgmTick();
   bgmTheme = prev;
 }
