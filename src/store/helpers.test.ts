@@ -1,0 +1,153 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_CLASS_ID } from "@/data/classes";
+import { FINAL_FLOOR } from "@/data/worlds";
+import { itemKey } from "@/lib/ui";
+import type { Equipment, EquippedItems, Progress } from "@/types/game";
+import {
+  addUnique,
+  canChangeClassNow,
+  capInventory,
+  createPlayer,
+  discover,
+  emptyEquipped,
+  equippedResist,
+  isCleared1000,
+  isSavePointFloor,
+  MAX_INVENTORY,
+  weakestSlot,
+} from "./helpers";
+
+function mkItem(over: Partial<Equipment> = {}): Equipment {
+  return {
+    id: "test",
+    name: "テスト装備",
+    rarity: "common",
+    slot: "weapon",
+    attack: 0,
+    defense: 0,
+    maxHp: 0,
+    rerollModifier: 0,
+    description: "",
+    diceModifiers: [],
+    ...over,
+  };
+}
+
+describe("isSavePointFloor", () => {
+  it("is true at 1, 51, 101 and false otherwise", () => {
+    expect(isSavePointFloor(1)).toBe(true);
+    expect(isSavePointFloor(51)).toBe(true);
+    expect(isSavePointFloor(101)).toBe(true);
+    expect(isSavePointFloor(2)).toBe(false);
+    expect(isSavePointFloor(50)).toBe(false);
+    expect(isSavePointFloor(0)).toBe(false);
+  });
+});
+
+describe("isCleared1000", () => {
+  const base = { highestFloorReached: 0, endingSeen: false } as Progress;
+  it("is true once the final floor is reached or the ending was seen", () => {
+    expect(isCleared1000({ ...base })).toBe(false);
+    expect(isCleared1000({ ...base, highestFloorReached: FINAL_FLOOR })).toBe(true);
+    expect(isCleared1000({ ...base, endingSeen: true })).toBe(true);
+  });
+});
+
+describe("canChangeClassNow", () => {
+  it("allows on default class, after defeat, or at a save-point floor", () => {
+    expect(canChangeClassNow({ classId: DEFAULT_CLASS_ID, battleState: "player", currentFloor: 7 })).toBe(true);
+    expect(canChangeClassNow({ classId: "warrior", battleState: "lost", currentFloor: 7 })).toBe(true);
+    expect(canChangeClassNow({ classId: "warrior", battleState: "player", currentFloor: 51 })).toBe(true);
+    expect(canChangeClassNow({ classId: "warrior", battleState: "player", currentFloor: 7 })).toBe(false);
+  });
+});
+
+describe("createPlayer / emptyEquipped", () => {
+  it("creates a level-1 player", () => {
+    const p = createPlayer();
+    expect(p.level).toBe(1);
+    expect(p.hp).toBe(50);
+    expect(p.maxHp).toBe(50);
+    expect(p.baseAttack).toBe(8);
+    expect(p.baseDefense).toBe(2);
+    expect(p.gold).toBe(0);
+  });
+  it("creates an all-empty equipment map", () => {
+    expect(emptyEquipped()).toEqual({
+      weapon: null, helm: null, armor: null, gloves: null, boots: null, accessory: null,
+    });
+  });
+});
+
+describe("addUnique / discover", () => {
+  it("addUnique dedups", () => {
+    expect(addUnique(["a"], "b")).toEqual(["a", "b"]);
+    expect(addUnique(["a"], "a")).toEqual(["a"]);
+  });
+  it("discover skips procedural ids but records curated ones", () => {
+    expect(discover([], "gen_weapon_3")).toEqual([]);
+    expect(discover([], "setp_x")).toEqual([]);
+    expect(discover([], "sword_iron")).toEqual(["sword_iron"]);
+    expect(discover(["sword_iron"], "sword_iron")).toEqual(["sword_iron"]);
+  });
+});
+
+describe("capInventory", () => {
+  it("leaves an under-cap inventory untouched", () => {
+    const inv = [mkItem({ id: "a" }), mkItem({ id: "b" })];
+    const res = capInventory(inv, []);
+    expect(res.kept).toBe(inv);
+    expect(res.material).toBe(0);
+  });
+  it("dismantles the weakest items when over cap, keeping locked/favorited/noSell", () => {
+    // Strong items (kept) + weak items (some scrapped to fit the cap).
+    const strong = Array.from({ length: MAX_INVENTORY }, (_, i) =>
+      mkItem({ id: `s${i}`, attack: 100 }),
+    );
+    const weak = Array.from({ length: 5 }, (_, i) => mkItem({ id: `w${i}`, attack: 0, rarity: "common" }));
+    const favWeak = mkItem({ id: "favWeak", attack: 0, rarity: "common" });
+    const noSellWeak = mkItem({ id: "keepWeak", attack: 0, noSell: true });
+    const inv = [...strong, ...weak, favWeak, noSellWeak];
+
+    const res = capInventory(inv, [itemKey(favWeak)]);
+    expect(res.kept.length).toBe(MAX_INVENTORY);
+    // Locked items survive regardless of being weak.
+    expect(res.kept.some((it) => it.id === "favWeak")).toBe(true);
+    expect(res.kept.some((it) => it.id === "keepWeak")).toBe(true);
+    // Some weak commons were scrapped into material.
+    expect(res.material).toBeGreaterThan(0);
+  });
+});
+
+describe("weakestSlot", () => {
+  it("prefers an empty slot", () => {
+    const eq = emptyEquipped();
+    eq.weapon = mkItem({ slot: "weapon", attack: 10, defense: 10, maxHp: 10 });
+    expect(weakestSlot(eq)).not.toBe("weapon");
+  });
+  it("picks the lowest stat-sum slot when all are filled", () => {
+    const eq: EquippedItems = {
+      weapon: mkItem({ slot: "weapon", attack: 5, defense: 5, maxHp: 5 }),
+      helm: mkItem({ slot: "helm", attack: 1, defense: 0, maxHp: 0 }),
+      armor: mkItem({ slot: "armor", attack: 9, defense: 9, maxHp: 9 }),
+      gloves: mkItem({ slot: "gloves", attack: 9, defense: 9, maxHp: 9 }),
+      boots: mkItem({ slot: "boots", attack: 9, defense: 9, maxHp: 9 }),
+      accessory: mkItem({ slot: "accessory", attack: 9, defense: 9, maxHp: 9 }),
+    };
+    expect(weakestSlot(eq)).toBe("helm");
+  });
+});
+
+describe("equippedResist", () => {
+  it("sums resistances and clamps to 0.9", () => {
+    const eq = emptyEquipped();
+    eq.weapon = mkItem({ slot: "weapon", poisonResist: 0.3, stunResist: 0.2 });
+    eq.armor = mkItem({ slot: "armor", poisonResist: 0.2 });
+    expect(equippedResist(eq)).toEqual({ poison: 0.5, stun: 0.2 });
+
+    const heavy = emptyEquipped();
+    heavy.weapon = mkItem({ slot: "weapon", poisonResist: 0.8 });
+    heavy.armor = mkItem({ slot: "armor", poisonResist: 0.8 });
+    expect(equippedResist(heavy).poison).toBe(0.9);
+  });
+});
