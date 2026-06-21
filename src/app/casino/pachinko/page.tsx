@@ -34,9 +34,9 @@ const GAME_MS = 420;
 // rollContinue で先に確定し、勝ち/負け映像は“結果に合わせて”再生するだけ（演出は結果を決めない）。
 const DECIDE_WIN_MS = 1500; // 踏み込み→撃破→継続（寄せる尺を確保しつつ高速連チャンは保つ）
 const DECIDE_LOSE_MS = 1800; // ボス突進→被弾→ダウン（ためを作る）
-// 終了画面（連チャン回数・通算払い出し）の表示時間。
-const SUMMARY_MS = 2000;
-const SUMMARY_MS_REDUCED = 1000;
+// 終了画面（連チャン回数・通算払い出し）の表示時間。短すぎたので余韻を持たせて延長。
+const SUMMARY_MS = 4000;
+const SUMMARY_MS_REDUCED = 2200;
 const PACHI_MACHINE_KEY = "pachiMachine";
 
 // ボーナス(RUSH)の進行状態。出玉は大入賞口に入った玉で payRemaining を削って加算。
