@@ -85,6 +85,9 @@ export default function InventoryList() {
   const [filter, setFilter] = useState<Filter>("all");
   const [setKeyFilter, setSetKeyFilter] = useState<string>("all");
   const [sort, setSort] = useState<Sort>("rarity");
+  // 一括分解の確認はアプリ内ダイアログで行う（PWA/モバイルで window.confirm が
+  // ネイティブダイアログを出せずフリーズ/表示崩れする不具合の回避）。
+  const [bulkConfirm, setBulkConfirm] = useState<{ msg: string; run: () => void } | null>(null);
 
   const selectedItem = selected !== null ? inventory[selected] : null;
 
@@ -200,13 +203,17 @@ export default function InventoryList() {
             key={b.rarity}
             onClick={() => {
               const targets = inventory.filter(
-                (it) => !favorites.includes(itemKey(it)) && rarityRank[it.rarity] <= rarityRank[b.rarity],
+                (it) =>
+                  !it.noSell &&
+                  !favorites.includes(itemKey(it)) &&
+                  rarityRank[it.rarity] <= rarityRank[b.rarity],
               );
               if (targets.length === 0) return;
               const gain = targets.reduce((sum, it) => sum + SCRAP_VALUE[it.rarity], 0);
-              if (confirm(`${b.label} の ${targets.length}個 を分解して素材+${gain}（★は保護）`)) {
-                scrapBulk(b.rarity);
-              }
+              setBulkConfirm({
+                msg: `${b.label} の ${targets.length}個 を分解して 素材+${gain}（★・ロックは保護）`,
+                run: () => scrapBulk(b.rarity),
+              });
             }}
             className="h-7 flex-1 rounded-lg bg-amber-700/70 text-[11px] font-bold text-white active:scale-95"
           >
@@ -218,17 +225,13 @@ export default function InventoryList() {
         onClick={() => {
           const PER = 24;
           const targets = inventory.filter(
-            (it) =>
-              it.rarity === "legendary" && !favorites.includes(itemKey(it)),
+            (it) => it.rarity === "legendary" && !it.noSell && !favorites.includes(itemKey(it)),
           );
           if (targets.length === 0) return;
-          if (
-            confirm(
-              `未装備・未ロックのレジェンド ${targets.length}個 を一括分解して 素材+${targets.length * PER}`,
-            )
-          ) {
-            sellLegendaries();
-          }
+          setBulkConfirm({
+            msg: `未装備・未ロックのレジェンド ${targets.length}個 を一括分解して 素材+${targets.length * PER}`,
+            run: () => sellLegendaries(),
+          });
         }}
         className="flex h-8 w-full items-center justify-center gap-1 rounded-lg bg-amber-600/80 text-[11px] font-bold text-white active:scale-95"
       >
@@ -317,6 +320,42 @@ export default function InventoryList() {
           }}
           onClose={() => setSelected(null)}
         />
+      )}
+
+      {/* 一括分解の確認（アプリ内ダイアログ＝モバイル/PWAで確実に動く） */}
+      {bulkConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setBulkConfirm(null)}
+        >
+          <div
+            className="w-full max-w-xs rounded-2xl border border-white/15 bg-gray-900 p-4 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm leading-relaxed text-gray-100">{bulkConfirm.msg}</p>
+            <p className="mt-1 flex items-center justify-center gap-1 text-[10px] text-gray-500">
+              <PixelGlyph kind="lock" size={11} /> ロック・装備中は対象外
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setBulkConfirm(null)}
+                className="h-10 rounded-xl bg-white/10 text-sm font-bold text-gray-200 active:scale-95"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={() => {
+                  bulkConfirm.run();
+                  setBulkConfirm(null);
+                  setSelected(null);
+                }}
+                className="h-10 rounded-xl bg-amber-600 text-sm font-extrabold text-white active:scale-95"
+              >
+                分解する
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
