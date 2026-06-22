@@ -3,23 +3,79 @@
 // reasoned about in isolation. Nothing here touches Zustand `set`/`get` or any
 // mutable closure state — they are pure functions of their arguments.
 
-import { DEFAULT_CLASS_ID, getClass } from "@/data/classes";
+import { artifactBonus } from "@/data/artifacts";
+import { DEFAULT_CLASS_ID, classStatBonus, getClass } from "@/data/classes";
+import { jobAttackMult } from "@/data/jobBalance";
 import { computeSetEffects } from "@/data/sets";
 import { FINAL_FLOOR } from "@/data/worlds";
-import { EQUIP_SLOTS, expForLevel } from "@/lib/battle";
+import type { DailyBonus } from "@/lib/daily";
+import { EQUIP_SLOTS, computeStats, expForLevel } from "@/lib/battle";
 import { applyEquipmentModifiers } from "@/lib/dice";
 import { SCRAP_VALUE } from "@/lib/loot";
 import { itemKey } from "@/lib/ui";
 import type {
+  ActiveBuff,
+  ArtifactLevels,
   BattleState,
   ClassId,
+  ComputedStats,
   DiceFace,
   Equipment,
   EquipmentSlot,
   EquippedItems,
   Player,
   Progress,
+  StatBonus,
 } from "@/types/game";
+
+/**
+ * Sum of artifacts, the current class's mods, set bonuses, and the daily bonus.
+ * Pure: callers pass the live values (the store wrapper supplies them from state).
+ */
+export function passiveBonus(
+  artifacts: ArtifactLevels,
+  classId: ClassId,
+  equipped: EquippedItems,
+  daily: DailyBonus,
+): StatBonus {
+  const a = artifactBonus(artifacts);
+  const c = classStatBonus(classId);
+  const set = computeSetEffects(equipped, classId).statBonus;
+  const d: StatBonus = {
+    attack: daily.stat === "attack" ? daily.value : 0,
+    defense: daily.stat === "defense" ? daily.value : 0,
+    maxHp: 0,
+    reroll: daily.stat === "reroll" ? daily.value : 0,
+  };
+  return {
+    attack: a.attack + c.attack + d.attack + set.attack,
+    defense: a.defense + c.defense + d.defense + set.defense,
+    maxHp: a.maxHp + c.maxHp + d.maxHp + set.maxHp,
+    reroll: a.reroll + c.reroll + d.reroll + set.reroll,
+  };
+}
+
+/**
+ * Compute stats including artifact/class/set passive bonuses and the per-class
+ * job attack multiplier. Pure: the `passive` bonus and `classId` are supplied
+ * by the caller (the store wrapper reads them from live state).
+ */
+export function computePlayerStats(
+  player: Player,
+  equipped: EquippedItems,
+  buffs: ActiveBuff[],
+  classId: ClassId,
+  passive: StatBonus,
+): ComputedStats {
+  const base = computeStats(player, equipped, buffs, passive);
+  // 固有共鳴/セット集中の最終倍率(★スケール後に乗算)。装備IDからLIVE計算され
+  // セーブ非互換にならない。
+  const setEff = computeSetEffects(equipped, classId);
+  // Job balance: per-class attack multiplier (centralized in jobBalance.ts).
+  const attack = Math.round(base.attack * jobAttackMult(classId) * (1 + setEff.attackPct));
+  const maxHp = Math.round(base.maxHp * (1 + setEff.maxHpPct));
+  return { ...base, attack, maxHp };
+}
 
 /**
  * Resolve the player's final dice faces: class mods first, then each equipped

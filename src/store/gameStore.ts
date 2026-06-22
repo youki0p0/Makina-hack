@@ -12,7 +12,6 @@ import {
 } from "@/data/artifacts";
 import {
   canEquip,
-  classStatBonus,
   DEFAULT_CLASS_ID,
   getClass,
   isClassUnlocked,
@@ -35,7 +34,6 @@ import { applyModifier, modTierForFloor, rollDropModTier } from "@/data/modifier
 import { computeSetEffects, getSetDef } from "@/data/sets";
 import { getTitle, titleSouls } from "@/data/titles";
 import { grantTitles } from "@/lib/titleAward";
-import { jobAttackMult } from "@/data/jobBalance";
 import {
   crossedMilestones,
   milestoneSouls,
@@ -132,6 +130,7 @@ import {
   buildFaces,
   canChangeClassNow,
   capInventory,
+  computePlayerStats,
   createPlayer,
   discover,
   emptyEquipped,
@@ -139,6 +138,7 @@ import {
   isCleared1000,
   isSavePointFloor,
   MAX_INVENTORY,
+  passiveBonus as computePassiveBonus,
   weakestSlot,
 } from "./helpers";
 
@@ -523,24 +523,9 @@ export const useGameStore = create<GameState>((set, get) => {
     return { value: first, pair: null };
   }
 
-  /** Sum of artifacts, the current class's mods, set bonuses, and the daily bonus. */
+  /** Live passive bonus from current artifacts/class/equipment + today's daily. */
   function passiveBonus(): StatBonus {
-    const a = artifactBonus(get().artifacts);
-    const c = classStatBonus(get().classId);
-    const set = computeSetEffects(get().equipped, get().classId).statBonus;
-    const daily = getDailyBonus();
-    const d: StatBonus = {
-      attack: daily.stat === "attack" ? daily.value : 0,
-      defense: daily.stat === "defense" ? daily.value : 0,
-      maxHp: 0,
-      reroll: daily.stat === "reroll" ? daily.value : 0,
-    };
-    return {
-      attack: a.attack + c.attack + d.attack + set.attack,
-      defense: a.defense + c.defense + d.defense + set.defense,
-      maxHp: a.maxHp + c.maxHp + d.maxHp + set.maxHp,
-      reroll: a.reroll + c.reroll + d.reroll + set.reroll,
-    };
+    return computePassiveBonus(get().artifacts, get().classId, get().equipped, getDailyBonus());
   }
 
   /** Compute stats including artifact bonuses, active class, and job balance. */
@@ -549,14 +534,7 @@ export const useGameStore = create<GameState>((set, get) => {
     equipped: EquippedItems,
     buffs: ActiveBuff[] = [],
   ): ComputedStats {
-    const base = computeStats(player, equipped, buffs, passiveBonus());
-    // 固有共鳴/セット集中の最終倍率(★スケール後に乗算)。装備IDからLIVE計算され
-    // セーブ非互換にならない。
-    const setEff = computeSetEffects(equipped, get().classId);
-    // Job balance: per-class attack multiplier (centralized in jobBalance.ts).
-    const attack = Math.round(base.attack * jobAttackMult(get().classId) * (1 + setEff.attackPct));
-    const maxHp = Math.round(base.maxHp * (1 + setEff.maxHpPct));
-    return { ...base, attack, maxHp };
+    return computePlayerStats(player, equipped, buffs, get().classId, passiveBonus());
   }
 
   /** Apply a loaded save into state (used by hydrate and import). */
