@@ -70,10 +70,11 @@ export function rushBossFloor(highestFloor: number, step: number): number {
 // ---- レアドロップ（覇者の刻印）----
 export const RARE_SIGIL_RATE = 0.005; // 0.5%
 
-// ---- ★アップの素材レシピ（既存 modTier に統合。modTier が高いほど高コスト）----
+// ---- ★アップの素材レシピ（既存 modTier に統合）----
+// 🔹1 / 🔶1 固定 ＋ 💠刻印は 1 + floor(★/10)。★10未満は刻印1つ、★10ごとに+1。
 export function starMaterialCost(modTier: number): DungeonMaterials {
   const t = Math.max(0, modTier);
-  return { shard: 6 + t * 2, core: 2 + Math.floor(t / 2), sigil: 1 };
+  return { shard: 1, core: 1, sigil: 1 + Math.floor(t / 10) };
 }
 export function canAfford(have: DungeonMaterials, cost: DungeonMaterials): boolean {
   return have.shard >= cost.shard && have.core >= cost.core && have.sigil >= cost.sigil;

@@ -47,18 +47,18 @@ describe("boss rush floors", () => {
 });
 
 describe("star-up material recipe", () => {
-  it("scales with modTier and always needs 1 sigil", () => {
-    expect(starMaterialCost(0)).toEqual({ shard: 6, core: 2, sigil: 1 });
-    const hi = starMaterialCost(10);
-    expect(hi.sigil).toBe(1);
-    expect(hi.shard).toBeGreaterThan(6);
+  it("is 🔹1/🔶1 + 💠(1 + floor(★/10))", () => {
+    expect(starMaterialCost(0)).toEqual({ shard: 1, core: 1, sigil: 1 });
+    expect(starMaterialCost(9)).toEqual({ shard: 1, core: 1, sigil: 1 });
+    expect(starMaterialCost(10)).toEqual({ shard: 1, core: 1, sigil: 2 });
+    expect(starMaterialCost(25)).toEqual({ shard: 1, core: 1, sigil: 3 });
   });
   it("canAfford / spend behave", () => {
-    const have = { shard: 10, core: 3, sigil: 1 };
-    const cost = starMaterialCost(0);
+    const have = { shard: 10, core: 3, sigil: 2 };
+    const cost = starMaterialCost(0); // {1,1,1}
     expect(canAfford(have, cost)).toBe(true);
     expect(canAfford({ shard: 0, core: 0, sigil: 0 }, cost)).toBe(false);
-    expect(spend(have, cost)).toEqual({ shard: 4, core: 1, sigil: 0 });
+    expect(spend(have, cost)).toEqual({ shard: 9, core: 2, sigil: 1 });
   });
 });
 
