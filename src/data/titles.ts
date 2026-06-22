@@ -15,6 +15,12 @@ export interface Title {
   hidden?: boolean;
   /** Unlock condition (none = always available, e.g. the "(なし)" entry). */
   check?: (p: Progress) => boolean;
+  /**
+   * Excluded from the "真の称号" (completionist) gate. Used for ultra-deep
+   * endless milestones so chasing them is a bonus, not a requirement for the
+   * completionist title (which would otherwise demand reaching 5000F+).
+   */
+  noComplete?: boolean;
 }
 
 /** 転生ポイント(souls) granted the first time a title is unlocked, by tier. */
@@ -58,6 +64,12 @@ export const TITLES: readonly Title[] = [
   { id: "f_e1100", name: "深淵の常連", desc: "1100階に到達", tier: "hard", check: (p) => p.maxFloor >= 1100 },
   { id: "f_e1250", name: "奈落の支配者", desc: "1250階に到達", tier: "hard", check: (p) => p.maxFloor >= 1250 },
   { id: "f_e1500", name: "無限への挑戦者", desc: "1500階に到達", tier: "secret", hidden: true, check: (p) => p.maxFloor >= 1500 },
+  // ===== 深層エンドレスの到達称号（「登れる無限」で到達可能に）。完全制覇ゲートからは除外（追い続ける用のボーナス）。 =====
+  { id: "f_e2000", name: "二千の彼方", desc: "2000階に到達", tier: "secret", hidden: true, noComplete: true, check: (p) => p.maxFloor >= 2000 },
+  { id: "f_e2500", name: "常識の外側", desc: "2500階に到達", tier: "secret", hidden: true, noComplete: true, check: (p) => p.maxFloor >= 2500 },
+  { id: "f_e3000", name: "深淵を統べる者", desc: "3000階に到達", tier: "secret", hidden: true, noComplete: true, check: (p) => p.maxFloor >= 3000 },
+  { id: "f_e4000", name: "概念の終端", desc: "4000階に到達", tier: "secret", hidden: true, noComplete: true, check: (p) => p.maxFloor >= 4000 },
+  { id: "f_e5000", name: "無限の体現者", desc: "5000階に到達", tier: "secret", hidden: true, noComplete: true, check: (p) => p.maxFloor >= 5000 },
 
   // ===== 撃破 / Kills =====
   { id: "k10", name: "見習い剣士", desc: "敵を10体撃破", tier: "easy", check: (p) => p.kills >= 10 },
@@ -247,7 +259,7 @@ export const TITLES: readonly Title[] = [
 ];
 
 // Awarding titles excluding the meta "completionist" itself.
-TITLE_GATE = TITLES.filter((t) => t.tier && t.id !== "completionist").length;
+TITLE_GATE = TITLES.filter((t) => t.tier && t.id !== "completionist" && !t.noComplete).length;
 
 const TITLE_MAP: Map<string, Title> = new Map(TITLES.map((t) => [t.id, t]));
 

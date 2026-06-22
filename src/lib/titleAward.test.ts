@@ -8,7 +8,7 @@ import type { Progress } from "@/types/game";
 function maxedProgress(): Progress {
   return {
     ...defaultProgress(),
-    maxFloor: 2000,
+    maxFloor: 5000,
     kills: 99999,
     bossKills: 999,
     rebirths: 99,
@@ -16,7 +16,7 @@ function maxedProgress(): Progress {
     maxStreak: 999,
     discoveredItems: Array.from({ length: 60 }, (_, i) => `item${i}`),
     defeatedEnemies: Array.from({ length: 80 }, (_, i) => `enemy${i}`),
-    highestFloorReached: 2000,
+    highestFloorReached: 5000,
     claimedMilestones: [50, 100, 150, 200, 250],
     endingSeen: true,
     ngPlus: 99,
@@ -73,6 +73,16 @@ describe("grantTitles", () => {
     expect(extra.unlocked).toEqual([]);
     // Every awarding title is now claimed.
     expect(cur.progress.claimedTitles.length).toBe(TITLES.filter((t) => t.tier).length);
+  });
+
+  it("completionist (真の称号) is earnable without the ultra-deep noComplete titles", () => {
+    // Everything maxed except the climb stops at 1500F → f_e2000+ stay locked.
+    const p: Progress = { ...maxedProgress(), maxFloor: 1500, highestFloorReached: 1500 };
+    let cur = grantTitles(p, 0);
+    for (let i = 0; i < 4; i++) cur = grantTitles(cur.progress, cur.souls);
+    expect(cur.progress.claimedTitles).toContain("completionist");
+    // The deep endless titles are NOT required for completion (and not yet reached).
+    expect(cur.progress.claimedTitles).not.toContain("f_e2000");
   });
 
   it("accumulates fractional souls and only emits whole ones", () => {
