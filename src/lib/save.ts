@@ -3,6 +3,7 @@ import { defaultArtifactLevels, normalizeArtifacts } from "@/data/artifacts";
 import { normalizeClassId } from "@/data/classes";
 import { DAILY_BASE_USES, emptyMaterials, normalizeMaterials, RUSH_BASE_USES } from "@/data/dungeon";
 import { getItemInstance } from "@/data/items";
+import { emptySnapshot, normalizeSnapshot } from "@/data/quests";
 import { EQUIP_SLOTS, expForLevel } from "@/lib/battle";
 import { todayKey } from "@/lib/maintenance";
 import type {
@@ -14,6 +15,7 @@ import type {
   EquippedItems,
   Player,
   Progress,
+  QuestSnapshot,
   SavedItem,
   SaveData,
   SlotSave,
@@ -60,6 +62,14 @@ export interface LoadedState {
   dailyCleared: number[];
   seenDailyStory: boolean;
   seenDailyHelp: boolean;
+  loginDay: number;
+  loginClaimKey: string;
+  dailyQuestKey: string;
+  dailyQuestBase: QuestSnapshot;
+  dailyClaimed: string[];
+  weeklyQuestKey: string;
+  weeklyQuestBase: QuestSnapshot;
+  weeklyClaimed: string[];
   coins: number;
   hiCoins: number;
   kingPity: number;
@@ -107,6 +117,14 @@ function freshLoaded(equipped: EquippedItems, inventory: Equipment[]): LoadedSta
     dailyCleared: [],
     seenDailyStory: false,
     seenDailyHelp: false,
+    loginDay: 0,
+    loginClaimKey: "",
+    dailyQuestKey: "",
+    dailyQuestBase: emptySnapshot(),
+    dailyClaimed: [],
+    weeklyQuestKey: "",
+    weeklyQuestBase: emptySnapshot(),
+    weeklyClaimed: [],
     coins: 0,
     hiCoins: 0,
     kingPity: 0,
@@ -184,6 +202,14 @@ export function saveGame(state: LoadedState): void {
     dailyCleared: state.dailyCleared,
     seenDailyStory: state.seenDailyStory,
     seenDailyHelp: state.seenDailyHelp,
+    loginDay: state.loginDay,
+    loginClaimKey: state.loginClaimKey,
+    dailyQuestKey: state.dailyQuestKey,
+    dailyQuestBase: state.dailyQuestBase,
+    dailyClaimed: state.dailyClaimed,
+    weeklyQuestKey: state.weeklyQuestKey,
+    weeklyQuestBase: state.weeklyQuestBase,
+    weeklyClaimed: state.weeklyClaimed,
     coins: state.coins,
     hiCoins: state.hiCoins,
     kingPity: state.kingPity,
@@ -248,6 +274,14 @@ export function loadGame(): LoadedState | null {
       dailyCleared: Array.isArray(data.dailyCleared) ? data.dailyCleared : [],
       seenDailyStory: data.seenDailyStory ?? false,
       seenDailyHelp: data.seenDailyHelp ?? false,
+      loginDay: typeof data.loginDay === "number" ? data.loginDay : 0,
+      loginClaimKey: data.loginClaimKey ?? "",
+      dailyQuestKey: data.dailyQuestKey ?? "",
+      dailyQuestBase: normalizeSnapshot(data.dailyQuestBase),
+      dailyClaimed: Array.isArray(data.dailyClaimed) ? data.dailyClaimed : [],
+      weeklyQuestKey: data.weeklyQuestKey ?? "",
+      weeklyQuestBase: normalizeSnapshot(data.weeklyQuestBase),
+      weeklyClaimed: Array.isArray(data.weeklyClaimed) ? data.weeklyClaimed : [],
       coins: data.coins ?? 0,
       hiCoins: data.hiCoins ?? 0,
       kingPity: data.kingPity ?? 0,

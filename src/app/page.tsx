@@ -124,6 +124,14 @@ export default function TitlePage() {
             🗓️ 日替わりダンジョン
           </Link>
 
+          {/* デイリー/ウィークリー（ログインボーナス & クエスト） */}
+          <Link
+            href="/missions"
+            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-amber-700/80 font-bold text-amber-50 active:scale-95"
+          >
+            🎁 ログインボーナス & ミッション
+          </Link>
+
           {/* 装備 / 鍛冶屋 */}
           <div className="flex gap-2">
             <Link

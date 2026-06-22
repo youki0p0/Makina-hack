@@ -23,6 +23,13 @@ export function todayKey(d: Date = new Date()): string {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
+/** 週キー（その週の月曜日基準, "WYYYY-M-D"）。月曜0時でウィークリーが切り替わる。 */
+export function weekKey(d: Date = new Date()): string {
+  const offset = (d.getDay() + 6) % 7; // 0=Mon … 6=Sun
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - offset);
+  return `W${monday.getFullYear()}-${monday.getMonth() + 1}-${monday.getDate()}`;
+}
+
 /**
  * 純粋関数: いまリロードして解放すべきか。
  * - 日付が変わっている（= その日初回） → true
