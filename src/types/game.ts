@@ -489,6 +489,13 @@ export interface SaveData {
   seenDailyStory?: boolean;
   /** ダンジョン遊び方を見たか (optional for old saves). */
   seenDailyHelp?: boolean;
+  // モードセッション（リロードで再開し、消費した回数を無駄にしないため永続化）
+  runMode?: "normal" | "daily" | "rush";
+  modeFloor?: number;
+  modeLevel?: number;
+  modeStep?: number;
+  modeTotal?: number;
+  modeCleared?: "daily" | "rush" | null;
   /** ログインボーナス: 次に受け取るカレンダー位置(0-6) (optional). */
   loginDay?: number;
   /** ログインボーナス: 最後に受け取った日付キー (optional). */

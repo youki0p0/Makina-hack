@@ -533,6 +533,12 @@ export const useGameStore = create<GameState>((set, get) => {
       dailyCleared: s.dailyCleared,
       seenDailyStory: s.seenDailyStory,
       seenDailyHelp: s.seenDailyHelp,
+      runMode: s.runMode,
+      modeFloor: s.modeFloor,
+      modeLevel: s.modeLevel,
+      modeStep: s.modeStep,
+      modeTotal: s.modeTotal,
+      modeCleared: s.modeCleared,
       loginDay: s.loginDay,
       loginClaimKey: s.loginClaimKey,
       dailyQuestKey: s.dailyQuestKey,
@@ -677,6 +683,12 @@ export const useGameStore = create<GameState>((set, get) => {
       dailyCleared: loaded.dailyCleared,
       seenDailyStory: loaded.seenDailyStory,
       seenDailyHelp: loaded.seenDailyHelp,
+      runMode: loaded.runMode,
+      modeFloor: loaded.modeFloor,
+      modeLevel: loaded.modeLevel,
+      modeStep: loaded.modeStep,
+      modeTotal: loaded.modeTotal,
+      modeCleared: loaded.modeCleared,
       loginDay: loaded.loginDay,
       loginClaimKey: loaded.loginClaimKey,
       dailyQuestKey: loaded.dailyQuestKey,
@@ -1280,8 +1292,17 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     enterCurrentFloor: () => {
-      // モード戦の継続/終了は専用ルート（結果画面→/daily）で扱うため、通常進行は起動しない。
-      if (get().runMode !== "normal") return;
+      // モード戦（日替わり/ボスラッシュ）中は通常フロア進行を起動しない。
+      // リロード等で戦闘状態(battleState)が失われた場合はここで再開し、消費した回数を
+      // 無駄にしない。終了済みセッションの残骸(modeCleared)は掃除して通常へ戻す。
+      if (get().runMode !== "normal") {
+        if (get().modeCleared) {
+          get().exitMode();
+        } else if (get().battleState === "idle") {
+          get().startBattle();
+        }
+        return;
+      }
       const floor = get().currentFloor;
       // Leaving the result/world-clear screen always dismisses the overlay flag.
       if (get().worldCleared !== null) set({ worldCleared: null });
@@ -1582,7 +1603,7 @@ export const useGameStore = create<GameState>((set, get) => {
         winStreak: 0,
       });
       get().startBattle();
-      persist();
+      flushSave(); // 入場(回数消費)とモード状態を即時・原子的に保存（リロードで回数だけ失わない）
     },
 
     enterBossRush: () => {
@@ -1602,7 +1623,7 @@ export const useGameStore = create<GameState>((set, get) => {
         winStreak: 0,
       });
       get().startBattle();
-      persist();
+      flushSave(); // 同上
     },
 
     exitMode: () => {
@@ -1753,6 +1774,9 @@ export const useGameStore = create<GameState>((set, get) => {
         battleState: "idle",
         currentEnemy: null,
         lastResult: null,
+        // 通常プレイ開始時はモード状態を必ずクリア（リロードで残ったモードに乗っ取られない）。
+        runMode: "normal",
+        modeCleared: null,
       });
       persist();
     },
@@ -2338,6 +2362,9 @@ export const useGameStore = create<GameState>((set, get) => {
         activeBuffs: [],
         gachaPoints: 0,
         lastPull: null,
+        // モード状態もクリア。
+        runMode: "normal",
+        modeCleared: null,
         // Souls are no longer earned by rebirthing — only by reaching NEW depth
         // milestones (#17). Rebirth is purely a run reset now.
         souls: state.souls,

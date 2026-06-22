@@ -100,6 +100,32 @@ describe("save import/export", () => {
     expect(loaded.weeklyClaimed).toEqual(["w_boss"]);
   });
 
+  it("defaults mode-session to normal on old saves, and resumes an in-progress rush", () => {
+    // Old save (no runMode) → normal (no phantom mode hijack).
+    const code = btoa(unescape(encodeURIComponent(JSON.stringify(validSave))));
+    expect(importSave(code)).toBe(true);
+    expect(loadGame()!.runMode).toBe("normal");
+
+    // A save written mid-boss-rush round-trips so the session can resume on reload
+    // (so the consumed use is never wasted).
+    const midRush = {
+      ...validSave,
+      rushUses: 4,
+      runMode: "rush",
+      modeFloor: 600,
+      modeStep: 2,
+      modeTotal: 5,
+      modeCleared: null,
+    };
+    const c2 = btoa(unescape(encodeURIComponent(JSON.stringify(midRush))));
+    expect(importSave(c2)).toBe(true);
+    const loaded = loadGame()!;
+    expect(loaded.runMode).toBe("rush");
+    expect(loaded.modeFloor).toBe(600);
+    expect(loaded.modeStep).toBe(2);
+    expect(loaded.modeTotal).toBe(5);
+  });
+
   it("rejects garbage codes and old-version saves", () => {
     expect(importSave("not-valid-base64!!")).toBe(false);
     expect(importSave(btoa("{}"))).toBe(false); // no player
