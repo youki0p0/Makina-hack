@@ -1,4 +1,5 @@
 import { applyEnemyModifier, enemyModTierForFloor } from "@/data/modifiers";
+import { applyAbyss } from "@/data/abyss";
 import { FINAL_FLOOR } from "@/data/worlds";
 import type { EnemyScale } from "@/data/difficulty";
 import type { Enemy, EnemyAbility, EnemyTemplate } from "@/types/game";
@@ -275,7 +276,9 @@ export function generateEnemy(floor: number, scale: EnemyScale = DEFAULT_SCALE):
   assignMatchupTraits(enemy, floor, rank, isBossFloor, isFinalBoss);
 
   // Apply the floor's ★ modifier (no-op below floor 50); harder modes grow it faster.
-  return applyEnemyModifier(enemy, enemyModTierForFloor(floor), scale.enemyStarBonus);
+  const withStar = applyEnemyModifier(enemy, enemyModTierForFloor(floor), scale.enemyStarBonus);
+  // Endless: overlay the band's 深淵モディファイア (no-op at/below floor 1000).
+  return applyAbyss(withStar, floor);
 }
 
 /** Roster of rollable traits for normal/boss extra traits. */

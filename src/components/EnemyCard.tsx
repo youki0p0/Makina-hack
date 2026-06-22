@@ -1,6 +1,7 @@
 "use client";
 
 import { ENEMY_ABILITY_LABEL, ENEMY_TRAIT_LABEL } from "@/data/enemies";
+import { abyssModifierFor } from "@/data/abyss";
 import EnemyIcon from "@/components/EnemyIcon";
 import PixelGlyph from "@/components/PixelGlyph";
 import { useDamageFx } from "@/hooks/useDamageFx";
@@ -40,6 +41,7 @@ export default function EnemyCard() {
 
   const eatk = Math.max(0, enemy.attack - ((enemy.weakenTurns ?? 0) > 0 ? enemy.weakenAmount : 0));
   const edef = enemy.defense + (enemy.bonusDefense ?? 0);
+  const abyss = abyssModifierFor(floor);
 
   return (
     <div
@@ -96,6 +98,16 @@ export default function EnemyCard() {
               <span key={key} className="text-cyan-300">{ENEMY_TRAIT_LABEL[key]}</span>
             ))}
         </p>
+
+        {abyss && (
+          <p
+            className="mt-1 inline-flex items-center gap-1 rounded-full bg-fuchsia-600/25 px-2 py-0.5 text-[10px] font-bold text-fuchsia-200"
+            title={abyss.desc}
+          >
+            ♾️ 深淵の理: {abyss.label}
+            <span className="font-normal text-fuchsia-300/80">— {abyss.desc}</span>
+          </p>
+        )}
 
       {(statuses.length > 0 ||
         (enemy.stunTurns ?? 0) > 0 ||
