@@ -2,8 +2,12 @@
 // No realtime PvP — only records ("残響/記録"). Works with or without Supabase:
 // if it's unconfigured OR a request fails, we transparently fall back to a local
 // repository (the player's own localStorage records — no fabricated players) so
-// /ranking and /echo always function. One row per player: a returning name
-// updates its record (Supabase upsert / local replace) rather than duplicating.
+// /ranking and /echo always function.
+//
+// Player names are UNIQUE online. Each device holds a private "owner token"
+// (localStorage). Online writes go through the `submit_ranking` RPC, which
+// inserts a new name, updates the row when the caller owns it (same token), or
+// returns "duplicate" when the name is already taken by another device.
 // No personal info is stored — playerName is optional (default Guest).
 
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
@@ -32,6 +36,12 @@ export type RankingFilter =
 
 const TABLE = "ranking_entries";
 const LOCAL_KEY = "dice-ranking-local-v1";
+const OWNER_KEY = "dice-ranking-owner-v1";
+
+// Columns we read back. owner_token is intentionally never selected — it is the
+// per-device ownership secret and must stay server-side.
+const READ_COLUMNS =
+  "player_name,highest_floor,cleared_1000,endless_abyss_floor,job,difficulty,title,has_shinki_makina,equipped_weapon_name,equipment_score,total_play_time,updated_at";
 
 const MAX_FLOOR = 999999;
 const MAX_SCORE = 1_000_000;
@@ -93,6 +103,23 @@ function writeLocal(entries: RankingEntry[]) {
   }
 }
 
+/** Stable per-device secret that proves ownership of a player name online. */
+function getOwnerToken(): string {
+  if (typeof window === "undefined") return "server";
+  try {
+    let t = window.localStorage.getItem(OWNER_KEY);
+    if (!t) {
+      t =
+        (typeof crypto !== "undefined" && crypto.randomUUID?.()) ||
+        `own_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+      window.localStorage.setItem(OWNER_KEY, t);
+    }
+    return t;
+  } catch {
+    return "anon";
+  }
+}
+
 export const localRankingRepository: RankingRepository = {
   source: "local",
   async list(filter) {
@@ -107,23 +134,6 @@ export const localRankingRepository: RankingRepository = {
     return true;
   },
 };
-
-function toRow(e: RankingEntry) {
-  return {
-    player_name: e.playerName,
-    highest_floor: e.highestFloorReached,
-    cleared_1000: e.cleared1000,
-    endless_abyss_floor: e.endlessAbyssFloor,
-    job: e.job,
-    difficulty: e.difficulty,
-    title: e.title,
-    has_shinki_makina: e.hasShinkiMakina,
-    equipped_weapon_name: e.equippedWeaponName,
-    equipment_score: e.equipmentScore,
-    total_play_time: e.totalPlayTime,
-    updated_at: e.updatedAt,
-  };
-}
 
 interface Row {
   player_name: string;
@@ -156,27 +166,46 @@ function fromRow(r: Row): RankingEntry {
   };
 }
 
-const supabaseRankingRepository: RankingRepository = {
+const supabaseRankingRepository: Pick<RankingRepository, "source" | "list"> = {
   source: "supabase",
   async list(filter) {
     const sb = getSupabaseClient();
     if (!sb) throw new Error("no client");
-    const { data, error } = await sb.from(TABLE).select("*").limit(500);
+    const { data, error } = await sb.from(TABLE).select(READ_COLUMNS).limit(500);
     if (error) throw error;
     return rankEntries((data as Row[]).map(fromRow), filter);
   },
-  async submit(entry) {
-    const clean = sanitizeEntry(entry);
-    if (!clean) return false;
-    const sb = getSupabaseClient();
-    if (!sb) throw new Error("no client");
-    // Upsert on player_name so a returning player updates their row instead of
-    // piling up duplicates (requires a unique constraint on player_name).
-    const { error } = await sb.from(TABLE).upsert(toRow(clean), { onConflict: "player_name" });
-    if (error) throw error;
-    return true;
-  },
 };
+
+type SubmitStatus = "inserted" | "updated" | "duplicate";
+
+/**
+ * Write a record online via the `submit_ranking` RPC, which enforces unique
+ * player names: it inserts a new name, updates the row when the caller owns it
+ * (matching owner token), or returns "duplicate" when the name already belongs
+ * to another device.
+ */
+async function supabaseSubmit(clean: RankingEntry): Promise<SubmitStatus> {
+  const sb = getSupabaseClient();
+  if (!sb) throw new Error("no client");
+  const { data, error } = await sb.rpc("submit_ranking", {
+    p_owner: getOwnerToken(),
+    p_player_name: clean.playerName,
+    p_highest_floor: clean.highestFloorReached,
+    p_cleared_1000: clean.cleared1000,
+    p_endless_abyss_floor: clean.endlessAbyssFloor,
+    p_job: clean.job,
+    p_difficulty: clean.difficulty,
+    p_title: clean.title,
+    p_has_shinki_makina: clean.hasShinkiMakina,
+    p_equipped_weapon_name: clean.equippedWeaponName,
+    p_equipment_score: clean.equipmentScore,
+    p_total_play_time: clean.totalPlayTime,
+    p_updated_at: clean.updatedAt,
+  });
+  if (error) throw error;
+  return (data as SubmitStatus) ?? "duplicate";
+}
 
 // ----- facade with automatic fallback -----
 
@@ -221,23 +250,31 @@ export async function loadRanking(filter: RankingFilter): Promise<RankingEntry[]
 }
 
 /**
- * Submit an entry. Returns the backend that accepted it (or null if rejected by
- * validation). Always also keeps a local copy so the player sees their record.
+ * Submit an entry. Returns the backend that accepted it, "rejected" when the
+ * values are invalid, or "duplicate" when the name is already owned by another
+ * device. Keeps a local copy (except on duplicate) so the player still sees
+ * their own record offline.
  */
 export async function submitRanking(
   entry: RankingEntry,
-): Promise<{ ok: boolean; source: "supabase" | "local" | "rejected" }> {
+): Promise<{ ok: boolean; source: "supabase" | "local" | "rejected" | "duplicate" }> {
   const clean = sanitizeEntry(entry);
   if (!clean) return { ok: false, source: "rejected" };
-  // Always mirror locally so the record is visible even offline.
-  await localRankingRepository.submit(clean);
   if (isSupabaseConfigured()) {
     try {
-      await supabaseRankingRepository.submit(clean);
+      const status = await supabaseSubmit(clean);
+      // Name taken by someone else → don't store it (player must pick another).
+      if (status === "duplicate") return { ok: false, source: "duplicate" };
+      // Mirror locally so the record stays visible even offline.
+      await localRankingRepository.submit(clean);
       return { ok: true, source: "supabase" };
     } catch {
+      // Online error (network/outage) → keep a local copy so it isn't lost.
+      await localRankingRepository.submit(clean);
       return { ok: true, source: "local" };
     }
   }
+  // No Supabase configured: local only (single device, no cross-device clash).
+  await localRankingRepository.submit(clean);
   return { ok: true, source: "local" };
 }

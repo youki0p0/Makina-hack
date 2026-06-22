@@ -59,9 +59,14 @@ export default function RankingPage() {
     const entry = currentRankingEntry(name);
     const res = await submitRanking(entry);
     if (res.source === "rejected") setStatus("記録を送信できません（数値が範囲外）");
+    else if (res.source === "duplicate")
+      setStatus("⚠️ この名前は既に使われています（重複しています）。別の名前にしてください");
     else setStatus(res.source === "supabase" ? "記録を送信しました（オンライン）" : "記録を保存しました（ローカル）");
-    const rows = await loadRanking(filter);
-    setEntries(rows);
+    // On a duplicate the record wasn't saved, so the board is unchanged.
+    if (res.source !== "duplicate") {
+      const rows = await loadRanking(filter);
+      setEntries(rows);
+    }
   };
 
   return (
