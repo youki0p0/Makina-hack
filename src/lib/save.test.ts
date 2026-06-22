@@ -44,6 +44,35 @@ describe("save import/export", () => {
     expect(fang?.modTier).toBe(2);
   });
 
+  it("defaults dungeon fields on old saves (backward compatible)", () => {
+    // validSave has no materials/dailyUses → must default, not break loading.
+    const code = btoa(unescape(encodeURIComponent(JSON.stringify(validSave))));
+    expect(importSave(code)).toBe(true);
+    const loaded = loadGame()!;
+    expect(loaded.materials).toEqual({ shard: 0, core: 0, sigil: 0 });
+    expect(loaded.dailyUses).toBe(3);
+    expect(loaded.rushUses).toBe(5);
+    expect(loaded.dailyCleared).toEqual([]);
+  });
+
+  it("round-trips dungeon materials / uses / cleared levels", () => {
+    const withDungeon = {
+      ...validSave,
+      materials: { shard: 12, core: 4, sigil: 1 },
+      dailyUses: 2,
+      rushUses: 5,
+      dailyCleared: [1, 3, 7],
+      seenDailyStory: true,
+    };
+    const code = btoa(unescape(encodeURIComponent(JSON.stringify(withDungeon))));
+    expect(importSave(code)).toBe(true);
+    const loaded = loadGame()!;
+    expect(loaded.materials).toEqual({ shard: 12, core: 4, sigil: 1 });
+    expect(loaded.dailyUses).toBe(2);
+    expect(loaded.dailyCleared).toEqual([1, 3, 7]);
+    expect(loaded.seenDailyStory).toBe(true);
+  });
+
   it("rejects garbage codes and old-version saves", () => {
     expect(importSave("not-valid-base64!!")).toBe(false);
     expect(importSave(btoa("{}"))).toBe(false); // no player

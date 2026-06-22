@@ -466,12 +466,27 @@ export interface SaveData {
   equippedItems?: { [K in EquipmentSlot]: SavedItem | null };
   inventoryItems?: SavedItem[];
   currentFloor: number;
+  // (DungeonMaterials は下部で定義)
   /** Gacha currency from scrapping equipment (optional for old saves). */
   gachaPoints?: number;
   /** Rebirth currency (optional for old saves). */
   souls?: number;
   /** 魂の祭壇のレベル（ゴールド/EXP取得アップ。optional for old saves）。 */
   soulAltar?: number;
+  /** 日替わりダンジョン/ボスラッシュの素材スタック (optional for old saves). */
+  materials?: DungeonMaterials;
+  /** 日替わりダンジョンの残り回数 (optional for old saves). */
+  dailyUses?: number;
+  /** ボスラッシュの残り回数 (optional for old saves). */
+  rushUses?: number;
+  /** 回数リセット基準日キー (YYYY-M-D, optional for old saves). */
+  modeResetKey?: string;
+  /** クリア済みの日替わりダンジョンLv (optional for old saves). */
+  dailyCleared?: number[];
+  /** ダンジョン導入ストーリーを見たか (optional for old saves). */
+  seenDailyStory?: boolean;
+  /** ダンジョン遊び方を見たか (optional for old saves). */
+  seenDailyHelp?: boolean;
   /** Casino coins (medals) (optional for old saves). */
   coins?: number;
   /** ハイコイン: カジノ王の一撃台専用の上位通貨 (optional for old saves). */
@@ -508,4 +523,15 @@ export interface SaveData {
   tapToBuy?: boolean;
   /** Last start-floor chosen in the title pulldown (restored on next visit). */
   startFloorPref?: number;
+}
+
+/** 日替わりダンジョン/ボスラッシュの素材（装備とは別枠でスタック保持）。 */
+export type MaterialId = "shard" | "core" | "sigil";
+export interface DungeonMaterials {
+  /** ダンジョンの欠片（日替わりの主素材）。 */
+  shard: number;
+  /** ダンジョンの核（日替わりのレア素材）。 */
+  core: number;
+  /** 覇者の刻印（大ボスからの0.5%レア。ボスラッシュでも落ちる）。 */
+  sigil: number;
 }

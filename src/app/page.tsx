@@ -116,6 +116,14 @@ export default function TitlePage() {
             </div>
           )}
 
+          {/* 日替わりダンジョン / ボスラッシュ */}
+          <Link
+            href="/daily"
+            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-fuchsia-700/80 font-bold text-fuchsia-50 active:scale-95"
+          >
+            🗓️ 日替わりダンジョン
+          </Link>
+
           {/* 装備 / 鍛冶屋 */}
           <div className="flex gap-2">
             <Link

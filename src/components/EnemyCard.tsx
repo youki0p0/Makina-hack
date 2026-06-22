@@ -31,7 +31,20 @@ function summarize(statuses: ActiveStatus[]): { kind: StatusKind; dps: number; t
 
 export default function EnemyCard() {
   const enemy = useGameStore((s) => s.currentEnemy);
-  const floor = useGameStore((s) => s.currentFloor);
+  const currentFloor = useGameStore((s) => s.currentFloor);
+  const runMode = useGameStore((s) => s.runMode);
+  const modeFloor = useGameStore((s) => s.modeFloor);
+  const modeLevel = useGameStore((s) => s.modeLevel);
+  const modeStep = useGameStore((s) => s.modeStep);
+  const modeTotal = useGameStore((s) => s.modeTotal);
+  // モード戦では難度フロア(modeFloor)で表示・★判定する。
+  const floor = runMode === "normal" ? currentFloor : modeFloor;
+  const floorLabel =
+    runMode === "daily"
+      ? `日替Lv${modeLevel}`
+      : runMode === "rush"
+        ? `ラッシュ ${modeStep + 1}/${modeTotal}`
+        : `${currentFloor}階`;
   const { floaters, shake } = useDamageFx(enemy?.hp ?? 0, enemy?.id ?? "", "hit");
 
   if (!enemy) return null;
@@ -75,7 +88,7 @@ export default function EnemyCard() {
             {enemy.isBoss && <span className="mr-1 text-red-400">BOSS</span>}
             {enemy.name}
           </p>
-          <span className="shrink-0 text-[10px] text-gray-400">{floor}階</span>
+          <span className="shrink-0 text-[10px] text-gray-400">{floorLabel}</span>
         </div>
         <p className="text-xs text-gray-300">
           HP {fmt(Math.max(0, enemy.hp))}/{fmt(enemy.maxHp)}

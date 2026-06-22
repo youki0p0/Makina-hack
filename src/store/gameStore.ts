@@ -18,6 +18,23 @@ import {
 } from "@/data/classes";
 import { generateEnemy } from "@/data/enemies";
 import {
+  canAfford as canAffordMats,
+  DAILY_BASE_USES,
+  dailyDrop,
+  dailyLevelFloor,
+  emptyMaterials,
+  maxDailyLevel,
+  maxDailyUses,
+  maxRushUses,
+  RARE_SIGIL_RATE,
+  RUSH_BASE_USES,
+  RUSH_BOSS_COUNT,
+  RUSH_REWARD_MULT,
+  rushBossFloor,
+  spend as spendMats,
+  starMaterialCost,
+} from "@/data/dungeon";
+import {
   estimateTier,
   genItem,
   genSetItem,
@@ -99,7 +116,7 @@ import {
 } from "@/lib/casino";
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState } from "@/lib/save";
-import { runDailyMaintenance } from "@/lib/maintenance";
+import { runDailyMaintenance, todayKey } from "@/lib/maintenance";
 import { kingSpinWithPity, KING_BET, LEGEND_PIECE_HI, type KingResult } from "@/lib/casinoKing";
 import { itemKey, rarityRank } from "@/lib/ui";
 import type {
@@ -116,6 +133,7 @@ import type {
   Consumable,
   DiceFace,
   DiceValue,
+  DungeonMaterials,
   Enemy,
   Equipment,
   EquippedItems,
@@ -204,6 +222,32 @@ interface GameState {
   souls: number;
   /** 魂の祭壇レベル（ゴールド/EXP取得アップ）。 */
   soulAltar: number;
+  // ===== 日替わりダンジョン / ボスラッシュ =====
+  /** 素材スタック（★アップ用）。 */
+  materials: DungeonMaterials;
+  /** 日替わりダンジョン残り回数。 */
+  dailyUses: number;
+  /** ボスラッシュ残り回数。 */
+  rushUses: number;
+  /** 回数リセット基準日キー。 */
+  modeResetKey: string;
+  /** クリア済み日替わりLv。 */
+  dailyCleared: number[];
+  seenDailyStory: boolean;
+  seenDailyHelp: boolean;
+  // --- 以下は非永続（リロードで破棄＝モード中断）---
+  /** 現在のモード。 */
+  runMode: "normal" | "daily" | "rush";
+  /** モード戦の難度フロア。 */
+  modeFloor: number;
+  /** 日替わりの挑戦Lv（rush では0）。 */
+  modeLevel: number;
+  /** 現在のボス番号(0-based)。 */
+  modeStep: number;
+  /** モードのボス総数。 */
+  modeTotal: number;
+  /** モードクリア種別（結果画面の戻り先用）。 */
+  modeCleared: "daily" | "rush" | null;
   /** Casino coins (medals) for the slot machine. */
   coins: number;
   /** ハイコイン: カジノ王の一撃台でのみ稼ぐ上位通貨（伝説賭博セット交換用）。 */
@@ -313,6 +357,14 @@ interface GameState {
   forgeInjectStar: (loc: "inv" | EquipmentSlot, index: number) => void;
   /** Clear the last forge result popup. */
   clearLastForge: () => void;
+  // 日替わりダンジョン / ボスラッシュ
+  refreshDailyLimits: () => void;
+  enterDailyDungeon: (level: number) => void;
+  enterBossRush: () => void;
+  exitMode: () => void;
+  forgeStarWithMaterials: (loc: "inv" | EquipmentSlot, index: number) => void;
+  markDailyStorySeen: () => void;
+  markDailyHelpSeen: () => void;
 
   // misc
   toggleFavorite: (key: string) => void;
@@ -450,6 +502,13 @@ export const useGameStore = create<GameState>((set, get) => {
       gachaPoints: s.gachaPoints,
       souls: s.souls,
       soulAltar: s.soulAltar,
+      materials: s.materials,
+      dailyUses: s.dailyUses,
+      rushUses: s.rushUses,
+      modeResetKey: s.modeResetKey,
+      dailyCleared: s.dailyCleared,
+      seenDailyStory: s.seenDailyStory,
+      seenDailyHelp: s.seenDailyHelp,
       coins: s.coins,
       hiCoins: s.hiCoins,
       kingPity: s.kingPity,
@@ -559,6 +618,13 @@ export const useGameStore = create<GameState>((set, get) => {
       gachaPoints: loaded.gachaPoints,
       souls: loaded.souls,
       soulAltar: loaded.soulAltar,
+      materials: loaded.materials,
+      dailyUses: loaded.dailyUses,
+      rushUses: loaded.rushUses,
+      modeResetKey: loaded.modeResetKey,
+      dailyCleared: loaded.dailyCleared,
+      seenDailyStory: loaded.seenDailyStory,
+      seenDailyHelp: loaded.seenDailyHelp,
       coins: loaded.coins,
       hiCoins: loaded.hiCoins,
       kingPity: loaded.kingPity,
@@ -650,6 +716,19 @@ export const useGameStore = create<GameState>((set, get) => {
     lastForge: null,
     souls: 0,
     soulAltar: 0,
+    materials: emptyMaterials(),
+    dailyUses: DAILY_BASE_USES,
+    rushUses: RUSH_BASE_USES,
+    modeResetKey: "",
+    dailyCleared: [],
+    seenDailyStory: false,
+    seenDailyHelp: false,
+    runMode: "normal",
+    modeFloor: 0,
+    modeLevel: 0,
+    modeStep: 0,
+    modeTotal: 0,
+    modeCleared: null,
     coins: 0,
     hiCoins: 0,
     kingPity: 0,
@@ -706,6 +785,8 @@ export const useGameStore = create<GameState>((set, get) => {
         const before = get().progress.claimedTitles.length;
         applyTitleGrants();
         if (get().progress.claimedTitles.length !== before) flushSave();
+        // 日付が変わっていれば回数制限を全回復（毎日0時リセット）。
+        get().refreshDailyLimits();
       } else {
         // Fresh save: start with a humble weapon already equipped.
         const starter = getItemById("rusty_sword");
@@ -739,6 +820,13 @@ export const useGameStore = create<GameState>((set, get) => {
         lastPull: null,
         souls: 0,
         soulAltar: 0,
+        materials: emptyMaterials(),
+        dailyUses: DAILY_BASE_USES,
+        rushUses: RUSH_BASE_USES,
+        modeResetKey: todayKey(),
+        dailyCleared: [],
+        runMode: "normal",
+        modeCleared: null,
         artifacts: defaultArtifactLevels(),
         classId: DEFAULT_CLASS_ID,
         winStreak: 0,
@@ -759,12 +847,22 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     startBattle: () => {
-      const { currentFloor, player } = get();
+      const { currentFloor, player, runMode, modeFloor, modeLevel, modeStep, modeTotal } = get();
       const stats = currentStats(player, get().equipped, get().activeBuffs);
-      const enemy = generateEnemy(currentFloor, difficultyScale(get().difficulty));
+      // モード戦は modeFloor で敵を生成（通常フロアには触れない）。
+      const genFloor = runMode === "normal" ? currentFloor : modeFloor;
+      const enemy = generateEnemy(genFloor, difficultyScale(get().difficulty));
       // Heal a little between fights so runs are survivable but not free.
-      const healed = Math.min(stats.maxHp, player.hp + Math.round(stats.maxHp * 0.15));
+      // ボスラッシュは回復なしで歯応えを担保。
+      const regen = runMode === "rush" ? 0 : Math.round(stats.maxHp * 0.15);
+      const healed = Math.min(stats.maxHp, player.hp + regen);
       const opening = rollWithLuckInfo();
+      const where =
+        runMode === "daily"
+          ? `日替Lv${modeLevel}`
+          : runMode === "rush"
+            ? `ボスラッシュ ${modeStep + 1}/${modeTotal}`
+            : `${currentFloor}階`;
       set({
         currentEnemy: enemy,
         battleState: "player",
@@ -781,7 +879,7 @@ export const useGameStore = create<GameState>((set, get) => {
         battleTookDamage: false,
         battleMaxHit: 0,
         battleLog: pushLogs([], [
-          { text: `${currentFloor}階 — ${enemy.name} が現れた！`, tone: "neutral" },
+          { text: `${where} — ${enemy.name} が現れた！`, tone: "neutral" },
         ]),
       });
     },
@@ -1104,6 +1202,8 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     enterCurrentFloor: () => {
+      // モード戦の継続/終了は専用ルート（結果画面→/daily）で扱うため、通常進行は起動しない。
+      if (get().runMode !== "normal") return;
       const floor = get().currentFloor;
       // Leaving the result/world-clear screen always dismisses the overlay flag.
       if (get().worldCleared !== null) set({ worldCleared: null });
@@ -1372,6 +1472,99 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     clearLastForge: () => set({ lastForge: null }),
+
+    // ===== 日替わりダンジョン / ボスラッシュ =====
+    refreshDailyLimits: () => {
+      const s = get();
+      const key = todayKey();
+      if (s.modeResetKey === key) return;
+      set({
+        dailyUses: maxDailyUses(s.progress.highestFloorReached),
+        rushUses: maxRushUses(s.progress.highestFloorReached),
+        modeResetKey: key,
+      });
+      persist();
+    },
+
+    enterDailyDungeon: (level: number) => {
+      const s = get();
+      if (s.dailyUses <= 0) return;
+      const lvl = Math.max(1, Math.min(Math.floor(level), maxDailyLevel(s.progress.highestFloorReached)));
+      const stats = currentStats(s.player, s.equipped);
+      set({
+        dailyUses: s.dailyUses - 1,
+        runMode: "daily",
+        modeLevel: lvl,
+        modeFloor: dailyLevelFloor(lvl),
+        modeStep: 0,
+        modeTotal: 1,
+        modeCleared: null,
+        player: { ...s.player, hp: stats.maxHp }, // 入場で全回復
+        activeBuffs: [],
+        winStreak: 0,
+      });
+      get().startBattle();
+      persist();
+    },
+
+    enterBossRush: () => {
+      const s = get();
+      if (s.rushUses <= 0) return;
+      const stats = currentStats(s.player, s.equipped);
+      set({
+        rushUses: s.rushUses - 1,
+        runMode: "rush",
+        modeLevel: 0,
+        modeFloor: rushBossFloor(s.progress.highestFloorReached, 0),
+        modeStep: 0,
+        modeTotal: RUSH_BOSS_COUNT,
+        modeCleared: null,
+        player: { ...s.player, hp: stats.maxHp },
+        activeBuffs: [],
+        winStreak: 0,
+      });
+      get().startBattle();
+      persist();
+    },
+
+    exitMode: () => {
+      set({
+        runMode: "normal",
+        modeCleared: null,
+        modeStep: 0,
+        modeTotal: 0,
+        modeFloor: 0,
+        modeLevel: 0,
+        battleState: "idle",
+        lastResult: null,
+      });
+      persist();
+    },
+
+    forgeStarWithMaterials: (loc, index) => {
+      const s = get();
+      const item = loc === "inv" ? s.inventory[index] : s.equipped[loc];
+      if (!item || item.noModifier) return;
+      const cur = item.modTier ?? 0;
+      const cost = starMaterialCost(cur);
+      if (!canAffordMats(s.materials, cost)) return;
+      const forged = getItemInstance(item.id, item.affixId, cur + 1, item.quality, item.forgeLevel, item.forgeStreak);
+      if (!forged) return;
+      const partial = placeForged(s, loc, index, forged);
+      set({ ...partial, materials: spendMats(s.materials, cost) });
+      persist();
+    },
+
+    markDailyStorySeen: () => {
+      if (get().seenDailyStory) return;
+      set({ seenDailyStory: true });
+      persist();
+    },
+    markDailyHelpSeen: () => {
+      if (get().seenDailyHelp) return;
+      set({ seenDailyHelp: true });
+      persist();
+    },
 
     toggleFavorite: (key: string) => {
       const state = get();
@@ -2088,6 +2281,8 @@ export const useGameStore = create<GameState>((set, get) => {
     enemy: Enemy,
     battle: { tookDamage: boolean; maxHit: number } = { tookDamage: true, maxHit: 0 },
   ): Snapshot {
+    // 日替わりダンジョン / ボスラッシュは別処理（通常フロア進行・チェックポイント・節目に触れない）。
+    if (state.runMode !== "normal") return finishModeVictory(state, log, playerHp, enemy);
     // Win-streak bonus: +10% gold/exp per consecutive win after the first, capped +50%.
     const winStreak = state.winStreak + 1;
     const streakBonusPct = Math.min(50, (winStreak - 1) * 10);
@@ -2198,6 +2393,13 @@ export const useGameStore = create<GameState>((set, get) => {
     }
     let discoveredItems = state.progress.discoveredItems;
     for (const d of drops) discoveredItems = discover(discoveredItems, d.id);
+
+    // 大ボス(50階区切り)からは「覇者の刻印」が0.5%で落ちる（★アップ素材。ボスラッシュでも同様）。
+    let materials = state.materials;
+    if (enemy.isBoss && state.currentFloor % 50 === 0 && Math.random() < RARE_SIGIL_RATE) {
+      materials = { ...materials, sigil: materials.sigil + 1 };
+      finalLog = pushLogs(finalLog, [{ text: "✨ 覇者の刻印 を発見！(★アップ素材)", tone: "good" }]);
+    }
 
     // ===== Rebirth-point milestones & floor achievements (#15, #17) =====
     // Souls/material are awarded ONLY for reaching a NEW highest floor — never
@@ -2325,6 +2527,7 @@ export const useGameStore = create<GameState>((set, get) => {
       startFloorPref,
       souls: soulsAfter,
       gachaPoints: state.gachaPoints + bonusGacha + capped.material,
+      materials,
       worldCleared,
       pendingEnding: endingPending,
       endlessMessage,
@@ -2337,6 +2540,7 @@ export const useGameStore = create<GameState>((set, get) => {
     enemy: Enemy,
     enemyHp: number,
   ): Snapshot {
+    if (state.runMode !== "normal") return finishModeDefeat(state, log, enemy, enemyHp);
     // Softer, predictable penalty: reached-floor × 100 gold, but never the whole
     // purse (cap at 90% of current gold) and never below zero (#5).
     const penalty = state.currentFloor * 100;
@@ -2384,6 +2588,168 @@ export const useGameStore = create<GameState>((set, get) => {
       // Temporary buffs and the win streak don't survive a run reset.
       activeBuffs: [],
       winStreak: 0,
+    };
+  }
+
+  // ===== 日替わりダンジョン / ボスラッシュの勝敗処理（通常進行に干渉しない）=====
+  function finishModeVictory(
+    state: GameState,
+    log: BattleLogEntry[],
+    playerHp: number,
+    enemy: Enemy,
+  ): Snapshot {
+    const isRush = state.runMode === "rush";
+    const diff = getDifficulty(state.difficulty);
+    const altarMult = soulAltarMult(state.soulAltar);
+    const rewardMult = (isRush ? RUSH_REWARD_MULT : 1) * diff.rewardMult * altarMult;
+    const expGained = Math.round(enemy.exp * rewardMult);
+    const goldGained = Math.round(enemy.gold * rewardMult);
+
+    let leveledPlayer: Player = { ...state.player, hp: playerHp, gold: state.player.gold + goldGained };
+    const { player: leveled, leveledUp } = applyExp(leveledPlayer, expGained);
+    leveledPlayer = leveled;
+
+    let finalLog = pushLogs(log, [
+      { text: `EXP +${expGained} / ゴールド +${goldGained}${isRush ? "（4倍）" : ""}`, tone: "good" },
+    ]);
+    if (leveledUp) {
+      finalLog = pushLogs(finalLog, [{ text: `レベルアップ！ Lv${leveledPlayer.level} (全回復)`, tone: "good" }]);
+    }
+
+    // ---- ドロップ ----
+    let materials = state.materials;
+    let inventory = state.inventory;
+    let discoveredItems = state.progress.discoveredItems;
+    if (state.runMode === "daily") {
+      const md = dailyDrop(state.modeLevel);
+      materials = { ...materials, shard: materials.shard + md.shard, core: materials.core + md.core };
+      finalLog = pushLogs(finalLog, [{ text: `🔹欠片 +${md.shard} / 🔶核 +${md.core}`, tone: "good" }]);
+    } else {
+      // ボスラッシュ: 通常装備を周回ドロップ。
+      const drops: Equipment[] = [];
+      const count = diff.dropMin + Math.floor(Math.random() * (diff.dropMax - diff.dropMin + 1));
+      for (let i = 0; i < count; i++) {
+        const d = rollLoot(enemy, state.modeFloor, diff.rareBonus);
+        if (d) drops.push(applyModifier(d, rollDropModTier(state.modeFloor, diff.upswing)));
+      }
+      if (drops.length) {
+        inventory = [...inventory, ...drops];
+        for (const d of drops) {
+          discoveredItems = discover(discoveredItems, d.id);
+          finalLog = pushLogs(finalLog, [{ text: `${d.name} を手に入れた！`, tone: "good" }]);
+        }
+      }
+    }
+    // 大ボス0.5%: 覇者の刻印。
+    if (Math.random() < RARE_SIGIL_RATE) {
+      materials = { ...materials, sigil: materials.sigil + 1 };
+      finalLog = pushLogs(finalLog, [{ text: "✨ 覇者の刻印 を発見！", tone: "good" }]);
+    }
+
+    const capped = capInventory(inventory, state.favorites);
+    const nextStep = state.modeStep + 1;
+    const done = nextStep >= state.modeTotal;
+
+    if (!done) {
+      // ボスラッシュ次戦へ（回復なし・オーバーレイなしで連戦）。
+      const nextFloor = rushBossFloor(state.progress.highestFloorReached, nextStep);
+      const stats = currentStats(leveledPlayer, state.equipped);
+      const nextEnemy = generateEnemy(nextFloor, difficultyScale(state.difficulty));
+      const opening = rollWithLuckInfo();
+      finalLog = pushLogs(finalLog, [
+        { text: `ボスラッシュ ${nextStep + 1}/${state.modeTotal} — ${nextEnemy.name} が現れた！`, tone: "neutral" },
+      ]);
+      return {
+        player: leveledPlayer,
+        inventory: capped.kept,
+        currentEnemy: nextEnemy,
+        battleState: "player",
+        diceFaces: refreshFaces(),
+        diceValue: opening.value,
+        twoDice: opening.pair,
+        rerollsLeft: stats.rerolls,
+        lastResult: null,
+        playerStatuses: [],
+        playerStunTurns: 0,
+        battleTookDamage: false,
+        battleMaxHit: 0,
+        battleLog: finalLog,
+        materials,
+        modeFloor: nextFloor,
+        modeStep: nextStep,
+        gachaPoints: state.gachaPoints + capped.material,
+        progress: { ...state.progress, discoveredItems },
+      };
+    }
+
+    // ---- モード踏破 ----
+    const dailyCleared =
+      state.runMode === "daily" && !state.dailyCleared.includes(state.modeLevel)
+        ? [...state.dailyCleared, state.modeLevel]
+        : state.dailyCleared;
+    finalLog = pushLogs(finalLog, [
+      { text: isRush ? "🏆 ボスラッシュ踏破！" : `🏆 日替Lv${state.modeLevel} 踏破！`, tone: "good" },
+    ]);
+    const result: BattleResult = {
+      victory: true,
+      expGained,
+      goldGained,
+      goldLost: 0,
+      drop: null,
+      dropCount: 0,
+      leveledUp,
+      consumable: null,
+      healed: 0,
+      winStreak: 0,
+      streakBonusPct: 0,
+    };
+    return {
+      player: leveledPlayer,
+      inventory: capped.kept,
+      currentEnemy: { ...enemy, hp: 0 },
+      battleState: "won",
+      battleLog: finalLog,
+      lastResult: result,
+      materials,
+      dailyCleared,
+      modeCleared: state.runMode === "rush" ? "rush" : "daily",
+      modeStep: nextStep,
+      gachaPoints: state.gachaPoints + capped.material,
+      progress: { ...state.progress, discoveredItems },
+    };
+  }
+
+  function finishModeDefeat(
+    state: GameState,
+    log: BattleLogEntry[],
+    enemy: Enemy,
+    enemyHp: number,
+  ): Snapshot {
+    // モードは optional コンテンツ。ゴールド没収はせず、HP全回復で通常に戻す（回数は消費済み）。
+    const restartMaxHp = currentStats(state.player, state.equipped).maxHp;
+    const player: Player = { ...state.player, hp: restartMaxHp };
+    const finalLog = pushLogs(log, [{ text: "力尽きた… (回数は消費済み)", tone: "bad" }]);
+    const result: BattleResult = {
+      victory: false,
+      expGained: 0,
+      goldGained: 0,
+      goldLost: 0,
+      drop: null,
+      dropCount: 0,
+      leveledUp: false,
+      consumable: null,
+      healed: 0,
+      winStreak: 0,
+      streakBonusPct: 0,
+    };
+    return {
+      player,
+      currentEnemy: { ...enemy, hp: Math.max(0, enemyHp) },
+      battleState: "lost",
+      battleLog: finalLog,
+      lastResult: result,
+      activeBuffs: [],
+      modeCleared: state.runMode === "rush" ? "rush" : "daily",
     };
   }
 
