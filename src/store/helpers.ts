@@ -93,6 +93,17 @@ export function buildFaces(equipped: EquippedItems, classId: ClassId): DiceFace[
   ]);
 }
 
+/**
+ * 深淵到達補正（Endless Ascension）: 1000階を超えてからのみ効く、攻撃・最大HPへの
+ * 複利的なスケール。敵は1000階超で線形成長に抑えた（modifiers.ts のランプ頭打ち）ので、
+ * プレイヤー側もここで線形の伸び軸を持たせ、「登れる無限」を成立させる。
+ * 1000階以下は常に 1.0（本編バランスは不変）。tier = floor/50。
+ */
+export function endlessAscension(floor: number): number {
+  const tier = Math.floor(floor / 50);
+  return 1 + 0.05 * Math.max(0, tier - 20);
+}
+
 /** 1000階(DEUS EX MACHINA)を踏破済みか（到達 or エンディング視聴）。 */
 export function isCleared1000(progress: Progress): boolean {
   return progress.highestFloorReached >= FINAL_FLOOR || progress.endingSeen;

@@ -134,6 +134,7 @@ import {
   createPlayer,
   discover,
   emptyEquipped,
+  endlessAscension,
   equippedResist,
   isCleared1000,
   isSavePointFloor,
@@ -534,7 +535,11 @@ export const useGameStore = create<GameState>((set, get) => {
     equipped: EquippedItems,
     buffs: ActiveBuff[] = [],
   ): ComputedStats {
-    return computePlayerStats(player, equipped, buffs, get().classId, passiveBonus());
+    const base = computePlayerStats(player, equipped, buffs, get().classId, passiveBonus());
+    // 深淵到達補正: 1000階超のみ攻撃・最大HPを複利スケール（1000階以下は asc=1 で不変）。
+    const asc = endlessAscension(get().currentFloor);
+    if (asc === 1) return base;
+    return { ...base, attack: Math.round(base.attack * asc), maxHp: Math.round(base.maxHp * asc) };
   }
 
   /** Apply a loaded save into state (used by hydrate and import). */

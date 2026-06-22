@@ -80,9 +80,12 @@ export function applyEnemyModifier(
   bonusPerStar: number = ENEMY_MOD_BONUS_PER_STAR,
 ): Enemy {
   if (tier <= 0) return { ...enemy, modTier: 0 };
-  // 深層(★9以降=floor450+)は加算率を逓増させ、プレイヤーの乗算成長に追従させる。
-  // ★8以下は据え置きで序盤〜中盤の体感は不変。
-  const ramp = tier <= 8 ? bonusPerStar : bonusPerStar + (tier - 8) * 0.02;
+  // 深層(★9以降=floor450+)は加算率を逓増させ、プレイヤーの成長に追従させる。だが
+  // 逓増を青天井にすると敵HP/攻撃が floor に対して三次関数的に発散し、1000階超では
+  // ステ成長(線形)で追いつけず詰む。そこで (tier-8) 項を tier20(=1000階) で頭打ちにし、
+  // 1000階超は線形成長に留める。プレイヤー側は深淵到達補正(endlessAscension)で追従する。
+  // ★8以下(1000階以下)は完全に不変。
+  const ramp = tier <= 8 ? bonusPerStar : bonusPerStar + (Math.min(tier, 20) - 8) * 0.02;
   const mult = 1 + ramp * Math.max(0, tier);
   const hp = Math.round(enemy.maxHp * mult);
   return {
