@@ -62,6 +62,12 @@ export interface LoadedState {
   dailyCleared: number[];
   seenDailyStory: boolean;
   seenDailyHelp: boolean;
+  runMode: "normal" | "daily" | "rush";
+  modeFloor: number;
+  modeLevel: number;
+  modeStep: number;
+  modeTotal: number;
+  modeCleared: "daily" | "rush" | null;
   loginDay: number;
   loginClaimKey: string;
   dailyQuestKey: string;
@@ -117,6 +123,12 @@ function freshLoaded(equipped: EquippedItems, inventory: Equipment[]): LoadedSta
     dailyCleared: [],
     seenDailyStory: false,
     seenDailyHelp: false,
+    runMode: "normal",
+    modeFloor: 0,
+    modeLevel: 0,
+    modeStep: 0,
+    modeTotal: 0,
+    modeCleared: null,
     loginDay: 0,
     loginClaimKey: "",
     dailyQuestKey: "",
@@ -202,6 +214,12 @@ export function saveGame(state: LoadedState): void {
     dailyCleared: state.dailyCleared,
     seenDailyStory: state.seenDailyStory,
     seenDailyHelp: state.seenDailyHelp,
+    runMode: state.runMode,
+    modeFloor: state.modeFloor,
+    modeLevel: state.modeLevel,
+    modeStep: state.modeStep,
+    modeTotal: state.modeTotal,
+    modeCleared: state.modeCleared,
     loginDay: state.loginDay,
     loginClaimKey: state.loginClaimKey,
     dailyQuestKey: state.dailyQuestKey,
@@ -274,6 +292,12 @@ export function loadGame(): LoadedState | null {
       dailyCleared: Array.isArray(data.dailyCleared) ? data.dailyCleared : [],
       seenDailyStory: data.seenDailyStory ?? false,
       seenDailyHelp: data.seenDailyHelp ?? false,
+      runMode: data.runMode === "daily" || data.runMode === "rush" ? data.runMode : "normal",
+      modeFloor: typeof data.modeFloor === "number" ? data.modeFloor : 0,
+      modeLevel: typeof data.modeLevel === "number" ? data.modeLevel : 0,
+      modeStep: typeof data.modeStep === "number" ? data.modeStep : 0,
+      modeTotal: typeof data.modeTotal === "number" ? data.modeTotal : 0,
+      modeCleared: data.modeCleared === "daily" || data.modeCleared === "rush" ? data.modeCleared : null,
       loginDay: typeof data.loginDay === "number" ? data.loginDay : 0,
       loginClaimKey: data.loginClaimKey ?? "",
       dailyQuestKey: data.dailyQuestKey ?? "",
