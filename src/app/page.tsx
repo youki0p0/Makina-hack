@@ -9,6 +9,7 @@ import { casinoEvent } from "@/lib/casino";
 import { FINAL_FLOOR } from "@/data/worlds";
 import { isFeatureUnlocked, FEATURE_UNLOCKS } from "@/data/unlocks";
 import { getDailyBonus } from "@/lib/daily";
+import NextGoals from "@/components/NextGoals";
 import { useGameStore } from "@/store/gameStore";
 
 export default function TitlePage() {
@@ -214,6 +215,9 @@ export default function TitlePage() {
               ⚙️ 設定
             </Link>
           </div>
+
+          {/* 次の目標（リテンション用） */}
+          <NextGoals />
 
           {/* 本日のボーナス */}
           <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
