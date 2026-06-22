@@ -14,6 +14,7 @@ import {
   createPlayer,
   discover,
   emptyEquipped,
+  endlessAscension,
   equippedResist,
   isCleared1000,
   isSavePointFloor,
@@ -197,5 +198,18 @@ describe("equippedResist", () => {
     heavy.weapon = mkItem({ slot: "weapon", poisonResist: 0.8 });
     heavy.armor = mkItem({ slot: "armor", poisonResist: 0.8 });
     expect(equippedResist(heavy).poison).toBe(0.9);
+  });
+});
+
+describe("endlessAscension (深淵到達補正)", () => {
+  it("is 1.0 at and below floor 1000 (本編は不変)", () => {
+    expect(endlessAscension(1)).toBe(1);
+    expect(endlessAscension(500)).toBe(1);
+    expect(endlessAscension(1000)).toBe(1);
+  });
+  it("scales up only beyond floor 1000, linearly in 50-floor tiers", () => {
+    expect(endlessAscension(1050)).toBeCloseTo(1.05, 5); // tier21
+    expect(endlessAscension(2600)).toBeCloseTo(1 + 0.05 * 32, 5); // tier52 → ×2.6
+    expect(endlessAscension(3000) - endlessAscension(2900)).toBeCloseTo(0.1, 5); // 100階で+0.10(線形)
   });
 });
