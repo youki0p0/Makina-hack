@@ -19,6 +19,8 @@ import {
   isCleared1000,
   isSavePointFloor,
   MAX_INVENTORY,
+  soulAltarCost,
+  soulAltarMult,
   passiveBonus,
   weakestSlot,
 } from "./helpers";
@@ -211,5 +213,18 @@ describe("endlessAscension (深淵到達補正)", () => {
     expect(endlessAscension(1050)).toBeCloseTo(1.05, 5); // tier21
     expect(endlessAscension(2600)).toBeCloseTo(1 + 0.05 * 32, 5); // tier52 → ×2.6
     expect(endlessAscension(3000) - endlessAscension(2900)).toBeCloseTo(0.1, 5); // 100階で+0.10(線形)
+  });
+});
+
+describe("soulAltar (魂の祭壇)", () => {
+  it("cost rises linearly per level (10,20,30,…)", () => {
+    expect(soulAltarCost(0)).toBe(10);
+    expect(soulAltarCost(1)).toBe(20);
+    expect(soulAltarCost(9)).toBe(100);
+  });
+  it("multiplier is 1.0 at level 0 and +3% per level", () => {
+    expect(soulAltarMult(0)).toBe(1);
+    expect(soulAltarMult(10)).toBeCloseTo(1.3, 5);
+    expect(soulAltarMult(50)).toBeCloseTo(2.5, 5);
   });
 });

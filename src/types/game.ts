@@ -470,6 +470,8 @@ export interface SaveData {
   gachaPoints?: number;
   /** Rebirth currency (optional for old saves). */
   souls?: number;
+  /** 魂の祭壇のレベル（ゴールド/EXP取得アップ。optional for old saves）。 */
+  soulAltar?: number;
   /** Casino coins (medals) (optional for old saves). */
   coins?: number;
   /** ハイコイン: カジノ王の一撃台専用の上位通貨 (optional for old saves). */

@@ -140,6 +140,8 @@ import {
   isSavePointFloor,
   MAX_INVENTORY,
   passiveBonus as computePassiveBonus,
+  soulAltarCost,
+  soulAltarMult,
   weakestSlot,
 } from "./helpers";
 
@@ -200,6 +202,8 @@ interface GameState {
   lastForge: { kind: ForgeKind; from: number; to: number } | null;
   /** Rebirth currency. */
   souls: number;
+  /** 魂の祭壇レベル（ゴールド/EXP取得アップ）。 */
+  soulAltar: number;
   /** Casino coins (medals) for the slot machine. */
   coins: number;
   /** ハイコイン: カジノ王の一撃台でのみ稼ぐ上位通貨（伝説賭博セット交換用）。 */
@@ -377,6 +381,8 @@ interface GameState {
 
   // artifacts / rebirth
   upgradeArtifact: (id: ArtifactId) => void;
+  /** 魂の祭壇を1段階上げる（ゴールド/EXP取得アップ。souls を消費）。 */
+  offerToAltar: () => void;
   rebirth: () => void;
 
   // class change (転職)
@@ -443,6 +449,7 @@ export const useGameStore = create<GameState>((set, get) => {
       currentFloor: s.currentFloor,
       gachaPoints: s.gachaPoints,
       souls: s.souls,
+      soulAltar: s.soulAltar,
       coins: s.coins,
       hiCoins: s.hiCoins,
       kingPity: s.kingPity,
@@ -551,6 +558,7 @@ export const useGameStore = create<GameState>((set, get) => {
       currentFloor: loaded.currentFloor,
       gachaPoints: loaded.gachaPoints,
       souls: loaded.souls,
+      soulAltar: loaded.soulAltar,
       coins: loaded.coins,
       hiCoins: loaded.hiCoins,
       kingPity: loaded.kingPity,
@@ -641,6 +649,7 @@ export const useGameStore = create<GameState>((set, get) => {
     lastPull: null,
     lastForge: null,
     souls: 0,
+    soulAltar: 0,
     coins: 0,
     hiCoins: 0,
     kingPity: 0,
@@ -729,6 +738,7 @@ export const useGameStore = create<GameState>((set, get) => {
         gachaPoints: 0,
         lastPull: null,
         souls: 0,
+        soulAltar: 0,
         artifacts: defaultArtifactLevels(),
         classId: DEFAULT_CLASS_ID,
         winStreak: 0,
@@ -1982,6 +1992,14 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
+    offerToAltar: () => {
+      const state = get();
+      const cost = soulAltarCost(state.soulAltar);
+      if (state.souls < cost) return;
+      set({ souls: state.souls - cost, soulAltar: state.soulAltar + 1 });
+      persist();
+    },
+
     rebirth: () => {
       const state = get();
       const starter = getItemById("rusty_sword");
@@ -2074,11 +2092,12 @@ export const useGameStore = create<GameState>((set, get) => {
     const winStreak = state.winStreak + 1;
     const streakBonusPct = Math.min(50, (winStreak - 1) * 10);
     const streakMult = 1 + streakBonusPct / 100;
-    // Difficulty reward multiplier + daily gold bonus.
+    // Difficulty reward multiplier + daily gold bonus + 魂の祭壇(ゴールド/EXP取得アップ)。
     const rewardMult = getDifficulty(state.difficulty).rewardMult;
     const daily = getDailyBonus();
-    const goldMult = streakMult * rewardMult * (daily.stat === "gold" ? 1 + daily.value / 100 : 1);
-    const expGained = Math.round(enemy.exp * streakMult * rewardMult);
+    const altarMult = soulAltarMult(state.soulAltar);
+    const goldMult = streakMult * rewardMult * altarMult * (daily.stat === "gold" ? 1 + daily.value / 100 : 1);
+    const expGained = Math.round(enemy.exp * streakMult * rewardMult * altarMult);
     const goldGained = Math.round(enemy.gold * goldMult);
 
     // Difficulty governs how many drops and how big the upswing (#6). Each drop
