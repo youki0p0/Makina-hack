@@ -4,11 +4,13 @@ import { getItemById } from "@/data/items";
 import { FINAL_FLOOR } from "@/data/worlds";
 import { itemKey } from "@/lib/ui";
 import type { Equipment, EquippedItems, Progress } from "@/types/game";
+import type { ArtifactLevels } from "@/types/game";
 import {
   addUnique,
   buildFaces,
   canChangeClassNow,
   capInventory,
+  computePlayerStats,
   createPlayer,
   discover,
   emptyEquipped,
@@ -16,8 +18,11 @@ import {
   isCleared1000,
   isSavePointFloor,
   MAX_INVENTORY,
+  passiveBonus,
   weakestSlot,
 } from "./helpers";
+
+const NO_ARTIFACTS: ArtifactLevels = { might: 0, guard: 0, vitality: 0, fortune: 0 };
 
 function mkItem(over: Partial<Equipment> = {}): Equipment {
   return {
@@ -155,6 +160,29 @@ describe("buildFaces (装備がダイス目を書き換える)", () => {
     expect(f1.effect.isMiss).toBe(false);
     expect(f1.effect.kind).toBe("small");
     expect(f1.modifiedBy).toContain("鉄の剣");
+  });
+});
+
+describe("passiveBonus", () => {
+  it("maps the daily bonus onto the matching stat", () => {
+    const eq = emptyEquipped();
+    const gold = passiveBonus(NO_ARTIFACTS, DEFAULT_CLASS_ID, eq, { id: "g", label: "", stat: "gold", value: 25 });
+    const atk = passiveBonus(NO_ARTIFACTS, DEFAULT_CLASS_ID, eq, { id: "a", label: "", stat: "attack", value: 3 });
+    const rer = passiveBonus(NO_ARTIFACTS, DEFAULT_CLASS_ID, eq, { id: "r", label: "", stat: "reroll", value: 1 });
+    // gold daily affects neither attack nor reroll (it is applied elsewhere).
+    expect(atk.attack - gold.attack).toBe(3);
+    expect(rer.reroll - gold.reroll).toBe(1);
+  });
+});
+
+describe("computePlayerStats", () => {
+  it("adds the passive attack bonus on top of the base", () => {
+    const player = createPlayer();
+    const eq = emptyEquipped();
+    const s0 = computePlayerStats(player, eq, [], DEFAULT_CLASS_ID, { attack: 0, defense: 0, maxHp: 0, reroll: 0 });
+    const s1 = computePlayerStats(player, eq, [], DEFAULT_CLASS_ID, { attack: 10, defense: 0, maxHp: 0, reroll: 0 });
+    expect(s1.attack).toBeGreaterThan(s0.attack);
+    expect(s1.defense).toBe(s0.defense);
   });
 });
 
