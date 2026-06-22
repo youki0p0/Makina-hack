@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import ArtifactPanel from "@/components/ArtifactPanel";
+import SoulAltarPanel from "@/components/SoulAltarPanel";
 import PlayerStatus from "@/components/PlayerStatus";
 import { milestoneSouls, nextMilestoneFloor } from "@/data/milestones";
 import PixelGlyph from "@/components/PixelGlyph";
@@ -48,6 +49,7 @@ export default function ArtifactsPage() {
       </div>
 
       <ArtifactPanel />
+      <SoulAltarPanel />
     </main>
   );
 }

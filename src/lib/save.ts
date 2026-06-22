@@ -49,6 +49,7 @@ export interface LoadedState {
   currentFloor: number;
   gachaPoints: number;
   souls: number;
+  soulAltar: number;
   coins: number;
   hiCoins: number;
   kingPity: number;
@@ -88,6 +89,7 @@ function freshLoaded(equipped: EquippedItems, inventory: Equipment[]): LoadedSta
     currentFloor: 1,
     gachaPoints: 0,
     souls: 0,
+    soulAltar: 0,
     coins: 0,
     hiCoins: 0,
     kingPity: 0,
@@ -157,6 +159,7 @@ export function saveGame(state: LoadedState): void {
     currentFloor: state.currentFloor,
     gachaPoints: state.gachaPoints,
     souls: state.souls,
+    soulAltar: state.soulAltar,
     coins: state.coins,
     hiCoins: state.hiCoins,
     kingPity: state.kingPity,
@@ -213,6 +216,7 @@ export function loadGame(): LoadedState | null {
       currentFloor: data.currentFloor,
       gachaPoints: data.gachaPoints ?? 0,
       souls: data.souls ?? 0,
+      soulAltar: data.soulAltar ?? 0,
       coins: data.coins ?? 0,
       hiCoins: data.hiCoins ?? 0,
       kingPity: data.kingPity ?? 0,

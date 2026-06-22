@@ -93,6 +93,21 @@ export function buildFaces(equipped: EquippedItems, classId: ClassId): DiceFace[
   ]);
 }
 
+// ===== 魂の祭壇（Soul Altar）=====
+// 称号・マイルストーンで貯まる転生ポイント(souls)の“無限の使い道”。アーティファクトを
+// 上限まで上げ切った後も souls が死蔵されない受け皿。戦闘バランスには触れず、ゴールド/EXP
+// 取得を伸ばす経済アップグレードに限定（「登れる無限」の難度カーブを再調整しない）。
+
+/** 祭壇を現在Lvから次Lvへ上げる魂コスト（逓増・無限）。 */
+export function soulAltarCost(level: number): number {
+  return 10 * (Math.max(0, level) + 1);
+}
+
+/** 祭壇Lvによるゴールド・EXP取得倍率（+3% / Lv）。Lv0 で 1.0。 */
+export function soulAltarMult(level: number): number {
+  return 1 + 0.03 * Math.max(0, level);
+}
+
 /**
  * 深淵到達補正（Endless Ascension）: 1000階を超えてからのみ効く、攻撃・最大HPへの
  * 複利的なスケール。敵は1000階超で線形成長に抑えた（modifiers.ts のランプ頭打ち）ので、
