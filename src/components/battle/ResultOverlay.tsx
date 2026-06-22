@@ -14,6 +14,8 @@ export default function ResultOverlay() {
   const floor = useGameStore((s) => s.currentFloor);
   const enterCurrentFloor = useGameStore((s) => s.enterCurrentFloor);
   const startBattle = useGameStore((s) => s.startBattle);
+  const modeCleared = useGameStore((s) => s.modeCleared);
+  const exitMode = useGameStore((s) => s.exitMode);
 
   const won = battleState === "won";
   useEffect(() => {
@@ -23,6 +25,47 @@ export default function ResultOverlay() {
 
   if (!result) return null;
   const victory = won;
+
+  // ===== 日替わりダンジョン / ボスラッシュの結果（通常進行に戻さず /daily へ）=====
+  if (modeCleared) {
+    const isRush = modeCleared === "rush";
+    return (
+      <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/75 p-6">
+        <div className="w-full max-w-sm animate-pop rounded-2xl border border-white/15 bg-[#15131f] p-5 text-center">
+          <h2 className={`text-2xl font-extrabold ${victory ? "text-fuchsia-300" : "text-red-400"}`}>
+            {victory ? (isRush ? "ボスラッシュ踏破！" : "ダンジョン踏破！") : "力尽きた…"}
+          </h2>
+          {victory ? (
+            <div className="mt-3 space-y-1 text-sm text-gray-200">
+              <p>EXP +{fmt(result.expGained)}{isRush && <span className="text-amber-300"> (4倍)</span>}</p>
+              <p>ゴールド +{fmt(result.goldGained)}{isRush && <span className="text-amber-300"> (4倍)</span>}</p>
+              <p className="mt-1 text-xs text-gray-400">
+                {isRush ? "覇者の刻印が手に入ったかも。" : "素材を入手しました（★アップに使えます）。"}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-gray-400">回数は消費されました。装備を整えて再挑戦を。</p>
+          )}
+          <div className="mt-5 flex flex-col gap-2">
+            <Link
+              href="/daily"
+              onClick={exitMode}
+              className="flex h-14 items-center justify-center rounded-2xl bg-fuchsia-600 text-lg font-bold text-white active:scale-95"
+            >
+              ダンジョンへ戻る →
+            </Link>
+            <Link
+              href="/"
+              onClick={exitMode}
+              className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-white/10 text-center font-bold active:scale-95"
+            >
+              <PixelGlyph kind="home" size={18} /> ホームに戻る
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 p-6">

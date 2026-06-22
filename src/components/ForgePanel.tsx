@@ -11,12 +11,13 @@ import {
   starInjectCost,
 } from "@/data/forge";
 import { FINAL_FLOOR } from "@/data/worlds";
+import { canAfford as canAffordMats, starMaterialCost } from "@/data/dungeon";
 import { getItemInstance } from "@/data/items";
 import { modTierForFloor } from "@/data/modifiers";
 import { itemKey, rarityStyle, slotLabel } from "@/lib/ui";
 import { fmt } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
-import type { Equipment, EquipmentSlot } from "@/types/game";
+import type { DungeonMaterials, Equipment, EquipmentSlot } from "@/types/game";
 
 type Target = { loc: "inv" | EquipmentSlot; index: number };
 
@@ -28,6 +29,8 @@ export default function ForgePanel() {
   const forgeItem = useGameStore((s) => s.forgeItem);
   const forgeCombine = useGameStore((s) => s.forgeCombine);
   const forgeInjectStar = useGameStore((s) => s.forgeInjectStar);
+  const forgeStarWithMaterials = useGameStore((s) => s.forgeStarWithMaterials);
+  const materials = useGameStore((s) => s.materials);
   const lastForge = useGameStore((s) => s.lastForge);
   const clearLastForge = useGameStore((s) => s.clearLastForge);
   const [sel, setSel] = useState<Target | null>(null);
@@ -63,6 +66,8 @@ export default function ForgePanel() {
             if ((sel as Target).loc === "inv") setSel(null);
           }}
           onStar={() => forgeInjectStar((sel as Target).loc, (sel as Target).index)}
+          onStarMat={() => forgeStarWithMaterials((sel as Target).loc, (sel as Target).index)}
+          materials={materials}
           onBack={() => setSel(null)}
         />
       ) : (
@@ -165,18 +170,22 @@ function ForgeDetail({
   item,
   points,
   highest,
+  materials,
   onForge,
   onCombine,
   onStar,
+  onStarMat,
   onBack,
 }: {
   item: Equipment;
   sel: Target;
   points: number;
   highest: number;
+  materials: DungeonMaterials;
   onForge: (protect: boolean) => void;
   onCombine: () => void;
   onStar: () => void;
+  onStarMat: () => void;
   onBack: () => void;
 }) {
   const level = item.forgeLevel ?? 0;
@@ -191,6 +200,7 @@ function ForgeDetail({
   const modTier = item.modTier ?? 0;
   const starCap = modTierForFloor(highest) + 2;
   const starCost = starInjectCost(modTier);
+  const matCost = starMaterialCost(modTier);
 
   const stat = (label: string, cur: number, nx: number) =>
     cur === 0 && nx === 0 ? null : (
@@ -263,9 +273,18 @@ function ForgeDetail({
             >
               <PixelGlyph kind="star" size={13} /> ★注入 {fmt(starCost)}
             </button>
+            <button
+              onClick={onStarMat}
+              disabled={item.noModifier || !canAffordMats(materials, matCost)}
+              title={`🔹${matCost.shard} 🔶${matCost.core} 💠${matCost.sigil}`}
+              className="col-span-2 flex h-12 items-center justify-center gap-1 rounded-xl bg-fuchsia-600 text-sm font-bold text-white active:scale-95 disabled:opacity-40"
+            >
+              <PixelGlyph kind="star" size={13} /> 素材で★アップ（🔹{matCost.shard} 🔶{matCost.core} 💠{matCost.sigil}）
+            </button>
           </div>
           <p className="text-[10px] text-gray-500">
-            合成: 同じ部位の最も弱い未ロック装備を1つ消費して強化（同名は+2）。★注入の上限は最高到達階+2段。
+            合成: 同じ部位の最も弱い未ロック装備を1つ消費して強化（同名は+2）。★注入(素材消費なし)の上限は最高到達階+2段。
+            <b className="text-fuchsia-300">素材で★アップ</b>はその上限の先まで伸ばせる（日替わりダンジョン/ボスラッシュ産）。
           </p>
         </>
       )}

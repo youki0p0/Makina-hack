@@ -1,11 +1,14 @@
 import { defaultProgress, normalizeProgress } from "@/data/achievements";
 import { defaultArtifactLevels, normalizeArtifacts } from "@/data/artifacts";
 import { normalizeClassId } from "@/data/classes";
+import { DAILY_BASE_USES, emptyMaterials, normalizeMaterials, RUSH_BASE_USES } from "@/data/dungeon";
 import { getItemInstance } from "@/data/items";
 import { EQUIP_SLOTS, expForLevel } from "@/lib/battle";
+import { todayKey } from "@/lib/maintenance";
 import type {
   ArtifactLevels,
   ClassId,
+  DungeonMaterials,
   Equipment,
   EquipmentSlot,
   EquippedItems,
@@ -50,6 +53,13 @@ export interface LoadedState {
   gachaPoints: number;
   souls: number;
   soulAltar: number;
+  materials: DungeonMaterials;
+  dailyUses: number;
+  rushUses: number;
+  modeResetKey: string;
+  dailyCleared: number[];
+  seenDailyStory: boolean;
+  seenDailyHelp: boolean;
   coins: number;
   hiCoins: number;
   kingPity: number;
@@ -90,6 +100,13 @@ function freshLoaded(equipped: EquippedItems, inventory: Equipment[]): LoadedSta
     gachaPoints: 0,
     souls: 0,
     soulAltar: 0,
+    materials: emptyMaterials(),
+    dailyUses: DAILY_BASE_USES,
+    rushUses: RUSH_BASE_USES,
+    modeResetKey: todayKey(),
+    dailyCleared: [],
+    seenDailyStory: false,
+    seenDailyHelp: false,
     coins: 0,
     hiCoins: 0,
     kingPity: 0,
@@ -160,6 +177,13 @@ export function saveGame(state: LoadedState): void {
     gachaPoints: state.gachaPoints,
     souls: state.souls,
     soulAltar: state.soulAltar,
+    materials: state.materials,
+    dailyUses: state.dailyUses,
+    rushUses: state.rushUses,
+    modeResetKey: state.modeResetKey,
+    dailyCleared: state.dailyCleared,
+    seenDailyStory: state.seenDailyStory,
+    seenDailyHelp: state.seenDailyHelp,
     coins: state.coins,
     hiCoins: state.hiCoins,
     kingPity: state.kingPity,
@@ -217,6 +241,13 @@ export function loadGame(): LoadedState | null {
       gachaPoints: data.gachaPoints ?? 0,
       souls: data.souls ?? 0,
       soulAltar: data.soulAltar ?? 0,
+      materials: normalizeMaterials(data.materials),
+      dailyUses: data.dailyUses ?? DAILY_BASE_USES,
+      rushUses: data.rushUses ?? RUSH_BASE_USES,
+      modeResetKey: data.modeResetKey ?? "",
+      dailyCleared: Array.isArray(data.dailyCleared) ? data.dailyCleared : [],
+      seenDailyStory: data.seenDailyStory ?? false,
+      seenDailyHelp: data.seenDailyHelp ?? false,
       coins: data.coins ?? 0,
       hiCoins: data.hiCoins ?? 0,
       kingPity: data.kingPity ?? 0,
