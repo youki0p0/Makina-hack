@@ -43,6 +43,7 @@ export function defaultProgress(): Progress {
     noDamageBossKills: 0,
     perfectClears: 0,
     maxSingleHit: 0,
+    dungeonClears: 0,
   };
 }
 
@@ -98,6 +99,7 @@ export function normalizeProgress(p?: Partial<Progress>): Progress {
     noDamageBossKills: typeof p.noDamageBossKills === "number" ? p.noDamageBossKills : 0,
     perfectClears: typeof p.perfectClears === "number" ? p.perfectClears : 0,
     maxSingleHit: typeof p.maxSingleHit === "number" ? p.maxSingleHit : 0,
+    dungeonClears: typeof p.dungeonClears === "number" ? p.dungeonClears : 0,
   };
   // notifiedAchievements: keep saved value if present. For OLD saves (field
   // missing) backfill with everything ALREADY satisfied, so existing players

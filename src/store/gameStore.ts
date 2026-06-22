@@ -116,7 +116,16 @@ import {
 } from "@/lib/casino";
 import { generateShopStock, isShopFloor, type ShopEntry } from "@/lib/shop";
 import { clearSave, exportSave, importSave, loadGame, saveGame, type LoadedState } from "@/lib/save";
-import { runDailyMaintenance, todayKey } from "@/lib/maintenance";
+import { runDailyMaintenance, todayKey, weekKey } from "@/lib/maintenance";
+import {
+  DAILY_QUESTS,
+  emptySnapshot,
+  LOGIN_CALENDAR,
+  LOGIN_CYCLE,
+  questCounters,
+  questDone,
+  WEEKLY_QUESTS,
+} from "@/data/quests";
 import { kingSpinWithPity, KING_BET, LEGEND_PIECE_HI, type KingResult } from "@/lib/casinoKing";
 import { itemKey, rarityRank } from "@/lib/ui";
 import type {
@@ -135,6 +144,8 @@ import type {
   DiceValue,
   DungeonMaterials,
   Enemy,
+  QuestSnapshot,
+  Reward,
   Equipment,
   EquippedItems,
   EquipmentSlot,
@@ -235,6 +246,15 @@ interface GameState {
   dailyCleared: number[];
   seenDailyStory: boolean;
   seenDailyHelp: boolean;
+  // ===== ログイン / クエスト =====
+  loginDay: number;
+  loginClaimKey: string;
+  dailyQuestKey: string;
+  dailyQuestBase: QuestSnapshot;
+  dailyClaimed: string[];
+  weeklyQuestKey: string;
+  weeklyQuestBase: QuestSnapshot;
+  weeklyClaimed: string[];
   // --- 以下は非永続（リロードで破棄＝モード中断）---
   /** 現在のモード。 */
   runMode: "normal" | "daily" | "rush";
@@ -365,6 +385,10 @@ interface GameState {
   forgeStarWithMaterials: (loc: "inv" | EquipmentSlot, index: number) => void;
   markDailyStorySeen: () => void;
   markDailyHelpSeen: () => void;
+  // ログイン / クエスト
+  refreshQuests: () => void;
+  claimLogin: () => void;
+  claimQuest: (scope: "daily" | "weekly", id: string) => void;
 
   // misc
   toggleFavorite: (key: string) => void;
@@ -509,6 +533,14 @@ export const useGameStore = create<GameState>((set, get) => {
       dailyCleared: s.dailyCleared,
       seenDailyStory: s.seenDailyStory,
       seenDailyHelp: s.seenDailyHelp,
+      loginDay: s.loginDay,
+      loginClaimKey: s.loginClaimKey,
+      dailyQuestKey: s.dailyQuestKey,
+      dailyQuestBase: s.dailyQuestBase,
+      dailyClaimed: s.dailyClaimed,
+      weeklyQuestKey: s.weeklyQuestKey,
+      weeklyQuestBase: s.weeklyQuestBase,
+      weeklyClaimed: s.weeklyClaimed,
       coins: s.coins,
       hiCoins: s.hiCoins,
       kingPity: s.kingPity,
@@ -542,6 +574,26 @@ export const useGameStore = create<GameState>((set, get) => {
   }
 
   /** Put a forged item back into its slot/inventory, re-clamping HP & dice if worn. */
+  /** 報酬を該当通貨/素材に加算する差分パッチを作る（ログイン/クエスト共通）。 */
+  function rewardPatch(s: GameState, r: Reward): Partial<GameState> {
+    switch (r.kind) {
+      case "gold":
+        return { player: { ...s.player, gold: s.player.gold + r.amount } };
+      case "gacha":
+        return { gachaPoints: s.gachaPoints + r.amount };
+      case "coins":
+        return { coins: s.coins + r.amount };
+      case "souls":
+        return { souls: s.souls + r.amount };
+      case "shard":
+        return { materials: { ...s.materials, shard: s.materials.shard + r.amount } };
+      case "core":
+        return { materials: { ...s.materials, core: s.materials.core + r.amount } };
+      case "sigil":
+        return { materials: { ...s.materials, sigil: s.materials.sigil + r.amount } };
+    }
+  }
+
   function placeForged(
     state: GameState,
     loc: "inv" | EquipmentSlot,
@@ -625,6 +677,14 @@ export const useGameStore = create<GameState>((set, get) => {
       dailyCleared: loaded.dailyCleared,
       seenDailyStory: loaded.seenDailyStory,
       seenDailyHelp: loaded.seenDailyHelp,
+      loginDay: loaded.loginDay,
+      loginClaimKey: loaded.loginClaimKey,
+      dailyQuestKey: loaded.dailyQuestKey,
+      dailyQuestBase: loaded.dailyQuestBase,
+      dailyClaimed: loaded.dailyClaimed,
+      weeklyQuestKey: loaded.weeklyQuestKey,
+      weeklyQuestBase: loaded.weeklyQuestBase,
+      weeklyClaimed: loaded.weeklyClaimed,
       coins: loaded.coins,
       hiCoins: loaded.hiCoins,
       kingPity: loaded.kingPity,
@@ -723,6 +783,14 @@ export const useGameStore = create<GameState>((set, get) => {
     dailyCleared: [],
     seenDailyStory: false,
     seenDailyHelp: false,
+    loginDay: 0,
+    loginClaimKey: "",
+    dailyQuestKey: "",
+    dailyQuestBase: emptySnapshot(),
+    dailyClaimed: [],
+    weeklyQuestKey: "",
+    weeklyQuestBase: emptySnapshot(),
+    weeklyClaimed: [],
     runMode: "normal",
     modeFloor: 0,
     modeLevel: 0,
@@ -787,6 +855,8 @@ export const useGameStore = create<GameState>((set, get) => {
         if (get().progress.claimedTitles.length !== before) flushSave();
         // 日付が変わっていれば回数制限を全回復（毎日0時リセット）。
         get().refreshDailyLimits();
+        // デイリー/ウィークリークエストの基準を必要に応じてリセット。
+        get().refreshQuests();
       } else {
         // Fresh save: start with a humble weapon already equipped.
         const starter = getItemById("rusty_sword");
@@ -827,6 +897,14 @@ export const useGameStore = create<GameState>((set, get) => {
         dailyCleared: [],
         runMode: "normal",
         modeCleared: null,
+        loginDay: 0,
+        loginClaimKey: "",
+        dailyQuestKey: "",
+        dailyQuestBase: emptySnapshot(),
+        dailyClaimed: [],
+        weeklyQuestKey: "",
+        weeklyQuestBase: emptySnapshot(),
+        weeklyClaimed: [],
         artifacts: defaultArtifactLevels(),
         classId: DEFAULT_CLASS_ID,
         winStreak: 0,
@@ -1563,6 +1641,56 @@ export const useGameStore = create<GameState>((set, get) => {
     markDailyHelpSeen: () => {
       if (get().seenDailyHelp) return;
       set({ seenDailyHelp: true });
+      persist();
+    },
+
+    // ===== ログインボーナス / デイリー・ウィークリークエスト =====
+    refreshQuests: () => {
+      const s = get();
+      const patch: Partial<GameState> = {};
+      const dk = todayKey();
+      if (s.dailyQuestKey !== dk) {
+        patch.dailyQuestKey = dk;
+        patch.dailyQuestBase = questCounters(s.progress);
+        patch.dailyClaimed = [];
+      }
+      const wk = weekKey();
+      if (s.weeklyQuestKey !== wk) {
+        patch.weeklyQuestKey = wk;
+        patch.weeklyQuestBase = questCounters(s.progress);
+        patch.weeklyClaimed = [];
+      }
+      if (Object.keys(patch).length > 0) {
+        set(patch);
+        persist();
+      }
+    },
+
+    claimLogin: () => {
+      const s = get();
+      if (s.loginClaimKey === todayKey()) return; // 本日受領済み
+      const reward = LOGIN_CALENDAR[s.loginDay % LOGIN_CYCLE];
+      set({
+        ...rewardPatch(s, reward),
+        loginDay: (s.loginDay + 1) % LOGIN_CYCLE,
+        loginClaimKey: todayKey(),
+      });
+      persist();
+    },
+
+    claimQuest: (scope, id) => {
+      const s = get();
+      const defs = scope === "daily" ? DAILY_QUESTS : WEEKLY_QUESTS;
+      const q = defs.find((d) => d.id === id);
+      if (!q) return;
+      const base = scope === "daily" ? s.dailyQuestBase : s.weeklyQuestBase;
+      const claimed = scope === "daily" ? s.dailyClaimed : s.weeklyClaimed;
+      if (claimed.includes(id)) return;
+      if (!questDone(questCounters(s.progress), base, q)) return;
+      const patch = rewardPatch(s, q.reward);
+      if (scope === "daily") patch.dailyClaimed = [...claimed, id];
+      else patch.weeklyClaimed = [...claimed, id];
+      set(patch);
       persist();
     },
 
@@ -2715,7 +2843,7 @@ export const useGameStore = create<GameState>((set, get) => {
       modeCleared: state.runMode === "rush" ? "rush" : "daily",
       modeStep: nextStep,
       gachaPoints: state.gachaPoints + capped.material,
-      progress: { ...state.progress, discoveredItems },
+      progress: { ...state.progress, discoveredItems, dungeonClears: state.progress.dungeonClears + 1 },
     };
   }
 

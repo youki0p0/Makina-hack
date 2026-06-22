@@ -73,6 +73,33 @@ describe("save import/export", () => {
     expect(loaded.seenDailyStory).toBe(true);
   });
 
+  it("defaults login/quest fields on old saves, and round-trips them", () => {
+    // Old save (no login/quest fields) → safe defaults.
+    const code = btoa(unescape(encodeURIComponent(JSON.stringify(validSave))));
+    expect(importSave(code)).toBe(true);
+    let loaded = loadGame()!;
+    expect(loaded.loginDay).toBe(0);
+    expect(loaded.dailyClaimed).toEqual([]);
+    expect(loaded.dailyQuestBase).toEqual({ kills: 0, bossKills: 0, forgeCount: 0, dungeonClears: 0 });
+
+    const withQuests = {
+      ...validSave,
+      loginDay: 3,
+      loginClaimKey: "2026-6-22",
+      dailyQuestKey: "2026-6-22",
+      dailyQuestBase: { kills: 100, bossKills: 5, forgeCount: 2, dungeonClears: 1 },
+      dailyClaimed: ["d_kills"],
+      weeklyClaimed: ["w_boss"],
+    };
+    const c2 = btoa(unescape(encodeURIComponent(JSON.stringify(withQuests))));
+    expect(importSave(c2)).toBe(true);
+    loaded = loadGame()!;
+    expect(loaded.loginDay).toBe(3);
+    expect(loaded.dailyQuestBase.kills).toBe(100);
+    expect(loaded.dailyClaimed).toEqual(["d_kills"]);
+    expect(loaded.weeklyClaimed).toEqual(["w_boss"]);
+  });
+
   it("rejects garbage codes and old-version saves", () => {
     expect(importSave("not-valid-base64!!")).toBe(false);
     expect(importSave(btoa("{}"))).toBe(false); // no player

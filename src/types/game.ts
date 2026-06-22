@@ -422,6 +422,8 @@ export interface Progress {
   perfectClears: number;
   /** Biggest single-confirm damage ever dealt. */
   maxSingleHit: number;
+  /** 日替わりダンジョン/ボスラッシュの累計踏破数（クエスト用）。 */
+  dungeonClears: number;
 }
 
 // ===== Persistence =====
@@ -487,6 +489,22 @@ export interface SaveData {
   seenDailyStory?: boolean;
   /** ダンジョン遊び方を見たか (optional for old saves). */
   seenDailyHelp?: boolean;
+  /** ログインボーナス: 次に受け取るカレンダー位置(0-6) (optional). */
+  loginDay?: number;
+  /** ログインボーナス: 最後に受け取った日付キー (optional). */
+  loginClaimKey?: string;
+  /** デイリークエスト: リセット基準日キー (optional). */
+  dailyQuestKey?: string;
+  /** デイリークエスト: 進捗基準スナップショット (optional). */
+  dailyQuestBase?: QuestSnapshot;
+  /** デイリークエスト: 受領済みクエストid (optional). */
+  dailyClaimed?: string[];
+  /** ウィークリークエスト: リセット基準週キー (optional). */
+  weeklyQuestKey?: string;
+  /** ウィークリークエスト: 進捗基準スナップショット (optional). */
+  weeklyQuestBase?: QuestSnapshot;
+  /** ウィークリークエスト: 受領済みクエストid (optional). */
+  weeklyClaimed?: string[];
   /** Casino coins (medals) (optional for old saves). */
   coins?: number;
   /** ハイコイン: カジノ王の一撃台専用の上位通貨 (optional for old saves). */
@@ -534,4 +552,19 @@ export interface DungeonMaterials {
   core: number;
   /** 覇者の刻印（大ボスからの0.5%レア。ボスラッシュでも落ちる）。 */
   sigil: number;
+}
+
+// ===== デイリー/ウィークリー（ログインボーナス & クエスト）=====
+/** 報酬の種類。 */
+export type RewardKind = "gold" | "gacha" | "coins" | "souls" | "shard" | "core" | "sigil";
+export interface Reward {
+  kind: RewardKind;
+  amount: number;
+}
+/** クエスト進捗の基準スナップショット（累計カウンタの差分でクエスト進捗を測る）。 */
+export interface QuestSnapshot {
+  kills: number;
+  bossKills: number;
+  forgeCount: number;
+  dungeonClears: number;
 }
