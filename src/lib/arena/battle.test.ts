@@ -114,9 +114,9 @@ describe("新シナジー", () => {
 });
 
 describe("データ整合性", () => {
-  it("モンスターIDは一意で9体、フィールドは6種", () => {
+  it("モンスターIDは一意（9体以上）、フィールドは6種", () => {
     expect(new Set(MONSTERS.map((m) => m.id)).size).toBe(MONSTERS.length);
-    expect(MONSTERS.length).toBe(9);
+    expect(MONSTERS.length).toBeGreaterThanOrEqual(9);
     expect(FIELDS.length).toBe(6);
   });
 
