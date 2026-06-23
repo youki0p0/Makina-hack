@@ -10,6 +10,7 @@ import { FINAL_FLOOR } from "@/data/worlds";
 import { isFeatureUnlocked, FEATURE_UNLOCKS } from "@/data/unlocks";
 import { getDailyBonus } from "@/lib/daily";
 import NextGoals from "@/components/NextGoals";
+import DailyDiceCard from "@/components/DailyDiceCard";
 import { useGameStore } from "@/store/gameStore";
 
 export default function TitlePage() {
@@ -231,6 +232,9 @@ export default function TitlePage() {
               ⚙️ 設定
             </Link>
           </div>
+
+          {/* 今日のダイス（1日1回の運試し） */}
+          <DailyDiceCard />
 
           {/* 次の目標（リテンション用） */}
           <NextGoals />

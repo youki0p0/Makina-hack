@@ -70,6 +70,9 @@ export interface LoadedState {
   modeCleared: "daily" | "rush" | null;
   loginDay: number;
   loginClaimKey: string;
+  dailyDiceKey: string;
+  dailyDiceFace: string;
+  dailyDiceValue: number;
   dailyQuestKey: string;
   dailyQuestBase: QuestSnapshot;
   dailyClaimed: string[];
@@ -131,6 +134,9 @@ function freshLoaded(equipped: EquippedItems, inventory: Equipment[]): LoadedSta
     modeCleared: null,
     loginDay: 0,
     loginClaimKey: "",
+    dailyDiceKey: "",
+    dailyDiceFace: "",
+    dailyDiceValue: 0,
     dailyQuestKey: "",
     dailyQuestBase: emptySnapshot(),
     dailyClaimed: [],
@@ -222,6 +228,9 @@ export function saveGame(state: LoadedState): void {
     modeCleared: state.modeCleared,
     loginDay: state.loginDay,
     loginClaimKey: state.loginClaimKey,
+    dailyDiceKey: state.dailyDiceKey,
+    dailyDiceFace: state.dailyDiceFace,
+    dailyDiceValue: state.dailyDiceValue,
     dailyQuestKey: state.dailyQuestKey,
     dailyQuestBase: state.dailyQuestBase,
     dailyClaimed: state.dailyClaimed,
@@ -300,6 +309,9 @@ export function loadGame(): LoadedState | null {
       modeCleared: data.modeCleared === "daily" || data.modeCleared === "rush" ? data.modeCleared : null,
       loginDay: typeof data.loginDay === "number" ? data.loginDay : 0,
       loginClaimKey: data.loginClaimKey ?? "",
+      dailyDiceKey: data.dailyDiceKey ?? "",
+      dailyDiceFace: data.dailyDiceFace ?? "",
+      dailyDiceValue: typeof data.dailyDiceValue === "number" ? data.dailyDiceValue : 0,
       dailyQuestKey: data.dailyQuestKey ?? "",
       dailyQuestBase: normalizeSnapshot(data.dailyQuestBase),
       dailyClaimed: Array.isArray(data.dailyClaimed) ? data.dailyClaimed : [],
