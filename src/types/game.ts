@@ -11,7 +11,8 @@ export type EquipmentSlot =
   | "armor"
   | "gloves"
   | "boots"
-  | "accessory";
+  | "accessory"
+  | "emblem";
 
 /** Set identifiers for set-bonus gear. */
 export type SetId = "gambler" | "vampire" | "executioner" | "oracle";
@@ -145,6 +146,11 @@ export interface Equipment {
   modTier?: number;
   /** Set membership key (named or procedural `gset<n>`); drives set bonuses. */
   setId?: string;
+  /**
+   * 紋章(emblem)スロット専用: 装備中、セット効果の数値系を深層ほど増幅する。
+   * 倍率は現在階層から算出（emblemSetMult, 3000階+で発動）。
+   */
+  setAmplifier?: boolean;
   /** Quality tier (ancient/mythic/unique) layered on rarity. */
   quality?: Quality;
   /** Never drops/gacha/shop — granted only by special events (e.g. 神機マキナ). */

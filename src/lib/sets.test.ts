@@ -167,8 +167,9 @@ describe("set bonuses", () => {
   });
 
   it("every named set has six equippable pieces, reconstructable by id", () => {
+    // 紋章(emblem)はセット部位ではない（増幅専用スロット）ので除外。
     for (const set of SETS) {
-      for (const slot of EQUIP_SLOTS) {
+      for (const slot of EQUIP_SLOTS.filter((s) => s !== "emblem")) {
         const id = setPieceId(set.key, slot, 30);
         expect(getItemById(id)?.setId).toBe(set.key);
       }

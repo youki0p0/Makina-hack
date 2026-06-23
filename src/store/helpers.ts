@@ -37,10 +37,11 @@ export function passiveBonus(
   classId: ClassId,
   equipped: EquippedItems,
   daily: DailyBonus,
+  floor = 0,
 ): StatBonus {
   const a = artifactBonus(artifacts);
   const c = classStatBonus(classId);
-  const set = computeSetEffects(equipped, classId).statBonus;
+  const set = computeSetEffects(equipped, classId, floor).statBonus;
   const d: StatBonus = {
     attack: daily.stat === "attack" ? daily.value : 0,
     defense: daily.stat === "defense" ? daily.value : 0,
@@ -66,11 +67,12 @@ export function computePlayerStats(
   buffs: ActiveBuff[],
   classId: ClassId,
   passive: StatBonus,
+  floor = 0,
 ): ComputedStats {
   const base = computeStats(player, equipped, buffs, passive);
   // 固有共鳴/セット集中の最終倍率(★スケール後に乗算)。装備IDからLIVE計算され
-  // セーブ非互換にならない。
-  const setEff = computeSetEffects(equipped, classId);
+  // セーブ非互換にならない。紋章のセット増幅も floor から反映。
+  const setEff = computeSetEffects(equipped, classId, floor);
   // Job balance: per-class attack multiplier (centralized in jobBalance.ts).
   const attack = Math.round(base.attack * jobAttackMult(classId) * (1 + setEff.attackPct));
   const maxHp = Math.round(base.maxHp * (1 + setEff.maxHpPct));
@@ -163,6 +165,7 @@ export function emptyEquipped(): EquippedItems {
     gloves: null,
     boots: null,
     accessory: null,
+    emblem: null,
   };
 }
 
@@ -218,11 +221,15 @@ export function capInventory(
   return { kept, material };
 }
 
-/** The emptiest/weakest equipped slot (for biasing "smart drops"). */
+/**
+ * The emptiest/weakest equipped slot (for biasing "smart drops").
+ * 紋章(emblem)は通常ドロップ対象外（3000階+の専用ドロップのみ）なので除外する。
+ */
 export function weakestSlot(eq: EquippedItems): EquipmentSlot {
   let worst: EquipmentSlot = EQUIP_SLOTS[0];
   let worstScore = Infinity;
   for (const slot of EQUIP_SLOTS) {
+    if (slot === "emblem") continue;
     const it = eq[slot];
     const score = it ? it.attack + it.defense + it.maxHp : -1;
     if (score < worstScore) {

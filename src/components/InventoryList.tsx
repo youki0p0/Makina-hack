@@ -33,6 +33,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "gloves", label: "篭手" },
   { id: "boots", label: "靴" },
   { id: "accessory", label: "装飾" },
+  { id: "emblem", label: "紋章" },
 ];
 
 const SORTS: { id: Sort; label: string }[] = [

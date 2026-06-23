@@ -656,7 +656,7 @@ export const useGameStore = create<GameState>((set, get) => {
   function rollWithLuckInfo(): { value: DiceValue; pair: [DiceValue, DiceValue] | null } {
     const min = luckFloor(get().activeBuffs);
     const first = Math.max(rollDice(), min) as DiceValue;
-    if (computeSetEffects(get().equipped, get().classId).rollTwoDice) {
+    if (computeSetEffects(get().equipped, get().classId, get().currentFloor).rollTwoDice) {
       const second = Math.max(rollDice(), min) as DiceValue;
       return { value: Math.max(first, second) as DiceValue, pair: [first, second] };
     }
@@ -665,7 +665,13 @@ export const useGameStore = create<GameState>((set, get) => {
 
   /** Live passive bonus from current artifacts/class/equipment + today's daily. */
   function passiveBonus(): StatBonus {
-    return computePassiveBonus(get().artifacts, get().classId, get().equipped, getDailyBonus());
+    return computePassiveBonus(
+      get().artifacts,
+      get().classId,
+      get().equipped,
+      getDailyBonus(),
+      get().currentFloor,
+    );
   }
 
   /** Compute stats including artifact bonuses, active class, and job balance. */
@@ -674,7 +680,14 @@ export const useGameStore = create<GameState>((set, get) => {
     equipped: EquippedItems,
     buffs: ActiveBuff[] = [],
   ): ComputedStats {
-    const base = computePlayerStats(player, equipped, buffs, get().classId, passiveBonus());
+    const base = computePlayerStats(
+      player,
+      equipped,
+      buffs,
+      get().classId,
+      passiveBonus(),
+      get().currentFloor,
+    );
     // 深淵到達補正: 1000階超のみ攻撃・最大HPを複利スケール（1000階以下は asc=1 で不変）。
     const asc = endlessAscension(get().currentFloor);
     if (asc === 1) return base;
@@ -1003,7 +1016,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const { rerollsLeft, battleState } = state;
       if (battleState !== "player" || rerollsLeft <= 0) return;
       // Oracle 2pc: reroll heals a little.
-      const setEff = computeSetEffects(state.equipped, state.classId);
+      const setEff = computeSetEffects(state.equipped, state.classId, state.currentFloor);
       let player = state.player;
       if (setEff.healOnReroll > 0) {
         const maxHp = currentStats(player, state.equipped, state.activeBuffs).maxHp;
@@ -1033,7 +1046,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const action = resolvePlayerAction(face, stats, enemy);
 
       // ===== Set-bonus combat effects =====
-      const setEff = computeSetEffects(state.equipped, state.classId);
+      const setEff = computeSetEffects(state.equipped, state.classId, state.currentFloor);
       const v = state.diceValue;
       const setLogs: string[] = [];
       let bonusDamage = 0;
@@ -2499,7 +2512,7 @@ export const useGameStore = create<GameState>((set, get) => {
     // slot so gearing up doesn't take 2× as long as it did with 3 slots.
     const weakSlot = weakestSlot(state.equipped);
     // 伝説賭博セット6pc: ドロップ率2倍＋レアドロップ比率増加。
-    const setEff = computeSetEffects(state.equipped, state.classId);
+    const setEff = computeSetEffects(state.equipped, state.classId, state.currentFloor);
     const lootEnemy =
       setEff.dropRateMult !== 1
         ? { ...enemy, dropRate: Math.min(1, enemy.dropRate * setEff.dropRateMult) }
