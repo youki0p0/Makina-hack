@@ -232,6 +232,7 @@ function buildAllies(
   operatorId: string,
   field: FieldId,
   mods: TeamMods,
+  side: "ally" | "enemy" = "ally",
 ): Combatant[] {
   const op = getOperator(operatorId);
   const boost =
@@ -287,10 +288,10 @@ function buildAllies(
     );
 
     const c: Combatant = {
-      uid: `ally-${slot}-${m.id}`,
+      uid: `${side}-${slot}-${m.id}`,
       name: m.name,
       emoji: m.emoji,
-      side: "ally",
+      side,
       color: m.color,
       slot,
       maxHp: Math.round((hp * mods.hpMult)),
@@ -592,7 +593,7 @@ function tickStatuses(all: Combatant[], mods: TeamMods, isSecond: boolean, event
         c.hp -= p;
         events.push(`☠️ ${c.name} は毒で ${p} 受けた`);
       }
-      const regen = sumStatus(c, "regen") + (c.side === "ally" ? c.regenFlat : 0);
+      const regen = sumStatus(c, "regen") + c.regenFlat;
       if (regen > 0 && c.hp > 0) {
         c.hp = Math.min(c.maxHp, c.hp + regen);
       }
@@ -630,13 +631,25 @@ export function simulateBattle(
 
   const allies = buildAllies(builds, operatorId, field, mods);
   const enemies = buildEnemies(round, field, rng);
-  const all = [...allies, ...enemies];
-
-  const frames: BattleFrame[] = [];
-  const log: string[] = [];
-
   const boss = isBossRound(round);
   const startMsg = boss ? `👑 ボス戦！（${round}回戦）` : `⚔️ 戦闘開始（${round}回戦）`;
+  return runBattle(allies, enemies, mods, rng, startMsg, field, round, boss);
+}
+
+/** 構築済みの両チームでバトルを回し、結果を組み立てる共有ランナー。 */
+function runBattle(
+  allies: Combatant[],
+  enemies: Combatant[],
+  mods: TeamMods,
+  rng: () => number,
+  startMsg: string,
+  field: FieldId,
+  round: number,
+  boss: boolean,
+): BattleResult {
+  const all = [...allies, ...enemies];
+  const frames: BattleFrame[] = [];
+  const log: string[] = [];
   frames.push({ tick: 0, units: snapshot(all), events: [startMsg] });
   log.push(startMsg);
 
@@ -648,13 +661,11 @@ export function simulateBattle(
 
     tickStatuses(all, mods, isSecond, events);
 
-    // 行動（味方→敵のスロット順。タイマーは速度を反映）
     for (const c of all) {
       if (!c.alive) continue;
       c.attackTimer -= 1;
       for (let i = 0; i < c.skillTimer.length; i++) c.skillTimer[i] -= 1;
 
-      // 発動可能な技のうち最も威力の高いものを優先
       let bestIdx = -1;
       let bestPower = -1;
       for (let i = 0; i < c.skills.length; i++) {
@@ -676,7 +687,6 @@ export function simulateBattle(
         c.attackTimer = attackInterval(c);
       }
 
-      // 即時決着チェック
       if (livingFoes(all, "enemy").length === 0 || livingFoes(all, "ally").length === 0) break;
     }
 
@@ -685,9 +695,7 @@ export function simulateBattle(
       for (const e of events) log.push(e);
     }
 
-    const alliesLeft = livingAllies(all, "ally").length;
-    const enemiesLeft = livingAllies(all, "enemy").length;
-    if (alliesLeft === 0 || enemiesLeft === 0) {
+    if (livingAllies(all, "ally").length === 0 || livingAllies(all, "enemy").length === 0) {
       reason = "wipe";
       break;
     }
@@ -695,14 +703,7 @@ export function simulateBattle(
 
   const allyHpLeft = allies.reduce((a, c) => a + Math.max(0, c.hp), 0);
   const enemyHpLeft = enemies.reduce((a, c) => a + Math.max(0, c.hp), 0);
-  const enemiesAlive = enemies.some((c) => c.alive);
-
-  let win: boolean;
-  if (reason === "wipe") {
-    win = !enemiesAlive;
-  } else {
-    win = allyHpLeft >= enemyHpLeft;
-  }
+  const win = reason === "wipe" ? !enemies.some((c) => c.alive) : allyHpLeft >= enemyHpLeft;
 
   const endMsg = win ? "🏆 勝利！" : "❌ 敗北…";
   frames.push({ tick: MAX_TICKS, units: snapshot(all), events: [endMsg] });
@@ -713,21 +714,33 @@ export function simulateBattle(
     null,
   );
   const mvp =
-    topAlly && topAlly.dealt > 0
-      ? { name: topAlly.name, dealt: Math.round(topAlly.dealt) }
-      : null;
+    topAlly && topAlly.dealt > 0 ? { name: topAlly.name, dealt: Math.round(topAlly.dealt) } : null;
 
-  return {
-    win,
-    reason,
-    frames,
-    log,
-    allyHpLeft,
-    enemyHpLeft,
-    field,
-    round,
-    boss,
-    mvp,
-    firstDown,
-  };
+  return { win, reason, frames, log, allyHpLeft, enemyHpLeft, field, round, boss, mvp, firstDown };
+}
+
+/**
+ * 残響戦：プレイヤーの記録した編成（残響）vs 名のある残響（ゴースト編成）の観戦デュエル。
+ * ラウンド進行なしの単発バトル。両チームともビルドからシナジー/祝福を反映して構築する。
+ */
+export function simulateEcho(
+  playerBuilds: MonsterBuild[],
+  playerOp: string,
+  playerBless: string[],
+  ghostBuilds: MonsterBuild[],
+  ghostOp: string,
+  ghostBless: string[],
+  field: FieldId,
+): BattleResult {
+  const pMods = computeSynergies(playerBuilds, playerOp).mods;
+  applyBlessings(pMods, playerBless);
+  const gMods = computeSynergies(ghostBuilds, ghostOp).mods;
+  applyBlessings(gMods, ghostBless);
+  firstDown = null;
+  battleMatchupScale = 1; // 残響戦は相性フル
+  const rng = mulberry32(playerBuilds.length * 131 + ghostBuilds.length * 911 + 17);
+
+  const allies = buildAllies(playerBuilds, playerOp, field, pMods, "ally");
+  const enemies = buildAllies(ghostBuilds, ghostOp, field, gMods, "enemy");
+  return runBattle(allies, enemies, pMods, rng, "👻 残響戦 開始！", field, 0, false);
 }
