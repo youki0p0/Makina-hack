@@ -18,16 +18,33 @@ const STATUS_EMOJI: Record<StatusType, string> = {
   atkUp: "💢",
 };
 
-function UnitCard({ u }: { u: UnitSnapshot }) {
+function UnitCard({ u, delta, frameKey }: { u: UnitSnapshot; delta: number; frameKey: number }) {
   const ratio = u.maxHp > 0 ? Math.max(0, u.hp / u.maxHp) : 0;
   const barColor = u.side === "ally" ? "bg-emerald-500" : "bg-rose-500";
+  const damaged = delta > 0;
+  const healed = delta < 0;
   return (
     <div
-      className={`flex w-[30%] flex-col items-center gap-0.5 rounded-lg p-1 ${
+      className={`relative flex w-[30%] flex-col items-center gap-0.5 rounded-lg p-1 ${
         u.alive ? "bg-black/30" : "bg-black/50 opacity-40"
       }`}
     >
-      <div className="text-2xl leading-none">{u.alive ? u.emoji : "💀"}</div>
+      {delta !== 0 && u.alive && (
+        <span
+          key={frameKey}
+          className="dmg-float text-[13px]"
+          style={{ color: damaged ? "#fca5a5" : "#86efac", top: "10%" }}
+        >
+          {damaged ? `-${delta}` : `+${-delta}`}
+        </span>
+      )}
+      <div
+        key={`s${frameKey}`}
+        className="text-2xl leading-none"
+        style={damaged ? { animation: "fxShake 0.3s" } : healed ? { animation: "fatePop 0.3s" } : undefined}
+      >
+        {u.alive ? u.emoji : "💀"}
+      </div>
       <div className="w-full truncate text-center text-[8px] text-white/80">{u.name}</div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/15">
         <div className={`h-full ${barColor}`} style={{ width: `${ratio * 100}%` }} />
@@ -93,6 +110,12 @@ export default function BattleView({
   const enemies = frame.units.filter((u) => u.side === "enemy").sort((a, b) => a.slot - b.slot);
   const allies = frame.units.filter((u) => u.side === "ally").sort((a, b) => a.slot - b.slot);
 
+  // 前フレームとのHP差分（ダメージ=正 / 回復=負）でフローティング数値を出す
+  const prevHp = new Map<string, number>();
+  const prev = result.frames[idx - 1];
+  if (prev) for (const u of prev.units) prevHp.set(u.uid, u.hp);
+  const deltaOf = (u: UnitSnapshot) => (prevHp.has(u.uid) ? (prevHp.get(u.uid) as number) - u.hp : 0);
+
   return (
     <div className="flex flex-col gap-2">
       <div
@@ -112,7 +135,7 @@ export default function BattleView({
         {/* 敵 3体 */}
         <div className="flex justify-between gap-1">
           {enemies.map((u) => (
-            <UnitCard key={u.uid} u={u} />
+            <UnitCard key={u.uid} u={u} delta={deltaOf(u)} frameKey={idx} />
           ))}
         </div>
 
@@ -121,7 +144,7 @@ export default function BattleView({
         {/* 味方 3体 */}
         <div className="flex justify-between gap-1">
           {allies.map((u) => (
-            <UnitCard key={u.uid} u={u} />
+            <UnitCard key={u.uid} u={u} delta={deltaOf(u)} frameKey={idx} />
           ))}
         </div>
       </div>
