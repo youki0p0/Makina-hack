@@ -430,6 +430,8 @@ export interface Progress {
   maxSingleHit: number;
   /** 日替わりダンジョン/ボスラッシュの累計踏破数（クエスト用）。 */
   dungeonClears: number;
+  /** 🎆 夏の花火大会の自己ベストスコア（7月限定イベント／称号判定にも使用）。 */
+  summerBest: number;
 }
 
 // ===== Persistence =====
@@ -512,6 +514,8 @@ export interface SaveData {
   dailyDiceFace?: string;
   /** 今日のダイス: 最後の出目1..6 (optional). */
   dailyDiceValue?: number;
+  /** 🎆 夏の花火大会: 受領済みマイルストーンid (optional). 自己ベストは progress.summerBest. */
+  summerClaimed?: string[];
   /** デイリークエスト: リセット基準日キー (optional). */
   dailyQuestKey?: string;
   /** デイリークエスト: 進捗基準スナップショット (optional). */

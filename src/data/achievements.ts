@@ -44,6 +44,7 @@ export function defaultProgress(): Progress {
     perfectClears: 0,
     maxSingleHit: 0,
     dungeonClears: 0,
+    summerBest: 0,
   };
 }
 
@@ -100,6 +101,7 @@ export function normalizeProgress(p?: Partial<Progress>): Progress {
     perfectClears: typeof p.perfectClears === "number" ? p.perfectClears : 0,
     maxSingleHit: typeof p.maxSingleHit === "number" ? p.maxSingleHit : 0,
     dungeonClears: typeof p.dungeonClears === "number" ? p.dungeonClears : 0,
+    summerBest: typeof p.summerBest === "number" ? p.summerBest : 0,
   };
   // notifiedAchievements: keep saved value if present. For OLD saves (field
   // missing) backfill with everything ALREADY satisfied, so existing players

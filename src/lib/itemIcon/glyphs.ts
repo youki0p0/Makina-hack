@@ -33,7 +33,8 @@ export type GlyphKind =
   | "bag"
   | "card"
   | "save"
-  | "rainbow";
+  | "rainbow"
+  | "firework";
 
 const GC = {
   white: "#e5e7eb",
@@ -193,6 +194,22 @@ const GLYPHS: Record<GlyphKind, (g: Grid) => void> = {
     for (let i = 0; i < 6; i++) ring(g, 8, 13, 6 - i, cols[i]);
     rect(g, 0, 11, 15, 15, null);
     for (let i = 0; i < 6; i++) { const r = 6 - i; for (let x = -r; x <= r; x++) { const y = -Math.round(Math.sqrt(Math.max(0, r * r - x * x))); set(g, 8 + x, 11 + y, cols[i]); } }
+  },
+  // 夏の花火: 中心の光から放射する色とりどりの火花（オリジナル絵文字）。
+  firework: (g) => {
+    disc(g, 8, 8, 1, GC.yellow);
+    set(g, 8, 8, GC.white);
+    const sparks: [number, number, string][] = [
+      [8, 6, GC.gold], [8, 4, GC.fuchsia],     // 上
+      [8, 10, GC.gold], [8, 12, GC.cyan],      // 下
+      [6, 8, GC.gold], [4, 8, GC.yellow],      // 左
+      [10, 8, GC.gold], [12, 8, GC.violet],    // 右
+      [6, 6, GC.gold], [4, 4, GC.fuchsia],     // 左上
+      [10, 6, GC.gold], [12, 4, GC.cyan],      // 右上
+      [6, 10, GC.gold], [4, 12, GC.violet],    // 左下
+      [10, 10, GC.gold], [12, 12, GC.yellow],  // 右下
+    ];
+    for (const [x, y, c] of sparks) set(g, x, y, c);
   },
 };
 

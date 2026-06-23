@@ -2,6 +2,7 @@
 
 import { getClass } from "@/data/classes";
 import PixelGlyph from "@/components/PixelGlyph";
+import GlyphText from "@/components/GlyphText";
 import { fmt } from "@/lib/ui";
 import { classGlyphKind, consumableGlyphKind } from "@/lib/uiGlyphs";
 import { getTitle } from "@/data/titles";
@@ -39,7 +40,9 @@ export default function PlayerStatus() {
       ))}
       <div className="flex items-center justify-between text-sm">
         <span className="font-bold">
-          {title.id && <span className="text-amber-300">《{title.name}》</span>}{" "}
+          {title.id && (
+            <span className="text-amber-300">《<GlyphText text={title.name} size={13} />》</span>
+          )}{" "}
           <PixelGlyph kind={classGlyphKind(classId)} size={14} /> {cls.name} Lv{player.level}
         </span>
         <span className="flex items-center gap-2">

@@ -73,6 +73,7 @@ export interface LoadedState {
   dailyDiceKey: string;
   dailyDiceFace: string;
   dailyDiceValue: number;
+  summerClaimed: string[];
   dailyQuestKey: string;
   dailyQuestBase: QuestSnapshot;
   dailyClaimed: string[];
@@ -137,6 +138,7 @@ function freshLoaded(equipped: EquippedItems, inventory: Equipment[]): LoadedSta
     dailyDiceKey: "",
     dailyDiceFace: "",
     dailyDiceValue: 0,
+    summerClaimed: [],
     dailyQuestKey: "",
     dailyQuestBase: emptySnapshot(),
     dailyClaimed: [],
@@ -231,6 +233,7 @@ export function saveGame(state: LoadedState): void {
     dailyDiceKey: state.dailyDiceKey,
     dailyDiceFace: state.dailyDiceFace,
     dailyDiceValue: state.dailyDiceValue,
+    summerClaimed: state.summerClaimed,
     dailyQuestKey: state.dailyQuestKey,
     dailyQuestBase: state.dailyQuestBase,
     dailyClaimed: state.dailyClaimed,
@@ -312,6 +315,7 @@ export function loadGame(): LoadedState | null {
       dailyDiceKey: data.dailyDiceKey ?? "",
       dailyDiceFace: data.dailyDiceFace ?? "",
       dailyDiceValue: typeof data.dailyDiceValue === "number" ? data.dailyDiceValue : 0,
+      summerClaimed: Array.isArray(data.summerClaimed) ? data.summerClaimed : [],
       dailyQuestKey: data.dailyQuestKey ?? "",
       dailyQuestBase: normalizeSnapshot(data.dailyQuestBase),
       dailyClaimed: Array.isArray(data.dailyClaimed) ? data.dailyClaimed : [],

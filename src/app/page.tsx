@@ -9,6 +9,7 @@ import { casinoEvent } from "@/lib/casino";
 import { FINAL_FLOOR } from "@/data/worlds";
 import { isFeatureUnlocked, FEATURE_UNLOCKS } from "@/data/unlocks";
 import { getDailyBonus } from "@/lib/daily";
+import { isJuly } from "@/lib/fireworks";
 import NextGoals from "@/components/NextGoals";
 import DailyDiceCard from "@/components/DailyDiceCard";
 import { useGameStore } from "@/store/gameStore";
@@ -130,6 +131,16 @@ export default function TitlePage() {
                 ))}
               </select>
             </div>
+          )}
+
+          {/* 🎆 7月限定イベント：夏の花火大会（本編から独立・7月のみ表示） */}
+          {isJuly() && (
+            <Link
+              href="/summer"
+              className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-700/80 to-amber-600/80 text-base font-extrabold text-white shadow-lg active:scale-95"
+            >
+              <PixelGlyph kind="firework" size={20} /> 夏の花火大会（7月限定）
+            </Link>
           )}
 
           {/* 🔰 新規オンボーディング：まだ潜っていない人にはコア操作だけを提示 */}

@@ -5,6 +5,7 @@ import { defaultProgress, newlyEarnedAchievements } from "@/data/achievements";
 import { difficultyScale, getDifficulty, normalizeDifficulty, type Difficulty } from "@/data/difficulty";
 import { getDailyBonus } from "@/lib/daily";
 import { spinDailyDice, type DiceFaceId } from "@/lib/dailyDice";
+import { SUMMER_MILESTONES } from "@/lib/fireworks";
 import {
   artifactBonus,
   artifactUpgradeCost,
@@ -264,6 +265,9 @@ interface GameState {
   dailyDiceFace: string;
   /** 最後の出目(1..6, 0=未プレイ)。結果カードの再表示に使う。 */
   dailyDiceValue: number;
+  // ===== 🎆 夏の花火大会（7月限定スコアアタック・本編から切り離し）=====
+  /** 受領済みの夏マイルストーンid（自己ベストは progress.summerBest）。 */
+  summerClaimed: string[];
   // --- 以下は非永続（リロードで破棄＝モード中断）---
   /** 現在のモード。 */
   runMode: "normal" | "daily" | "rush";
@@ -399,6 +403,10 @@ interface GameState {
   claimLogin: () => void;
   claimQuest: (scope: "daily" | "weekly", id: string) => void;
   rollDailyDice: (faceId: DiceFaceId) => void;
+  /** 🎆 花火大会のスコアを記録（自己ベストのみ更新）。 */
+  submitFireworksScore: (score: number) => void;
+  /** 🎆 受領可能な夏マイルストーン報酬を受け取る。 */
+  claimSummerReward: (id: string) => void;
 
   // misc
   toggleFavorite: (key: string) => void;
@@ -554,6 +562,7 @@ export const useGameStore = create<GameState>((set, get) => {
       dailyDiceKey: s.dailyDiceKey,
       dailyDiceFace: s.dailyDiceFace,
       dailyDiceValue: s.dailyDiceValue,
+      summerClaimed: s.summerClaimed,
       dailyQuestKey: s.dailyQuestKey,
       dailyQuestBase: s.dailyQuestBase,
       dailyClaimed: s.dailyClaimed,
@@ -722,6 +731,7 @@ export const useGameStore = create<GameState>((set, get) => {
       dailyDiceKey: loaded.dailyDiceKey,
       dailyDiceFace: loaded.dailyDiceFace,
       dailyDiceValue: loaded.dailyDiceValue,
+      summerClaimed: loaded.summerClaimed,
       dailyQuestKey: loaded.dailyQuestKey,
       dailyQuestBase: loaded.dailyQuestBase,
       dailyClaimed: loaded.dailyClaimed,
@@ -831,6 +841,7 @@ export const useGameStore = create<GameState>((set, get) => {
     dailyDiceKey: "",
     dailyDiceFace: "",
     dailyDiceValue: 0,
+    summerClaimed: [],
     dailyQuestKey: "",
     dailyQuestBase: emptySnapshot(),
     dailyClaimed: [],
@@ -948,6 +959,7 @@ export const useGameStore = create<GameState>((set, get) => {
         dailyDiceKey: "",
         dailyDiceFace: "",
         dailyDiceValue: 0,
+        summerClaimed: [],
         dailyQuestKey: "",
         dailyQuestBase: emptySnapshot(),
         dailyClaimed: [],
@@ -1750,6 +1762,29 @@ export const useGameStore = create<GameState>((set, get) => {
         dailyDiceKey: todayKey(),
         dailyDiceFace: faceId,
         dailyDiceValue: value,
+      });
+      persist();
+    },
+
+    submitFireworksScore: (score) => {
+      const s = get();
+      const best = Math.round(score);
+      if (!Number.isFinite(score) || best <= s.progress.summerBest) return;
+      // 自己ベストは Progress に保存（称号判定 summer_hanabi が参照）。
+      set({ progress: { ...s.progress, summerBest: best } });
+      // 8000到達で限定称号「夏の花火師」を解放（souls 付与込み）。
+      applyTitleGrants();
+      persist();
+    },
+
+    claimSummerReward: (id) => {
+      const s = get();
+      const m = SUMMER_MILESTONES.find((x) => x.id === id);
+      if (!m) return;
+      if (s.progress.summerBest < m.minScore || s.summerClaimed.includes(id)) return;
+      set({
+        ...rewardPatch(s, m.reward),
+        summerClaimed: [...s.summerClaimed, id],
       });
       persist();
     },
