@@ -500,6 +500,12 @@ export interface SaveData {
   loginDay?: number;
   /** ログインボーナス: 最後に受け取った日付キー (optional). */
   loginClaimKey?: string;
+  /** 今日のダイス: 最後に振った日付キー (optional). */
+  dailyDiceKey?: string;
+  /** 今日のダイス: 最後に選んだ面 (optional). */
+  dailyDiceFace?: string;
+  /** 今日のダイス: 最後の出目1..6 (optional). */
+  dailyDiceValue?: number;
   /** デイリークエスト: リセット基準日キー (optional). */
   dailyQuestKey?: string;
   /** デイリークエスト: 進捗基準スナップショット (optional). */

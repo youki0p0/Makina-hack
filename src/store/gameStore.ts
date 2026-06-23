@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { defaultProgress, newlyEarnedAchievements } from "@/data/achievements";
 import { difficultyScale, getDifficulty, normalizeDifficulty, type Difficulty } from "@/data/difficulty";
 import { getDailyBonus } from "@/lib/daily";
+import { spinDailyDice, type DiceFaceId } from "@/lib/dailyDice";
 import {
   artifactBonus,
   artifactUpgradeCost,
@@ -255,6 +256,13 @@ interface GameState {
   weeklyQuestKey: string;
   weeklyQuestBase: QuestSnapshot;
   weeklyClaimed: string[];
+  // ===== 今日のダイス（1日1回の運試し）=====
+  /** 最後にダイスを振った日付キー（""=未プレイ）。 */
+  dailyDiceKey: string;
+  /** 最後に選んだ面（""=未プレイ）。 */
+  dailyDiceFace: string;
+  /** 最後の出目(1..6, 0=未プレイ)。結果カードの再表示に使う。 */
+  dailyDiceValue: number;
   // --- 以下は非永続（リロードで破棄＝モード中断）---
   /** 現在のモード。 */
   runMode: "normal" | "daily" | "rush";
@@ -389,6 +397,7 @@ interface GameState {
   refreshQuests: () => void;
   claimLogin: () => void;
   claimQuest: (scope: "daily" | "weekly", id: string) => void;
+  rollDailyDice: (faceId: DiceFaceId) => void;
 
   // misc
   toggleFavorite: (key: string) => void;
@@ -541,6 +550,9 @@ export const useGameStore = create<GameState>((set, get) => {
       modeCleared: s.modeCleared,
       loginDay: s.loginDay,
       loginClaimKey: s.loginClaimKey,
+      dailyDiceKey: s.dailyDiceKey,
+      dailyDiceFace: s.dailyDiceFace,
+      dailyDiceValue: s.dailyDiceValue,
       dailyQuestKey: s.dailyQuestKey,
       dailyQuestBase: s.dailyQuestBase,
       dailyClaimed: s.dailyClaimed,
@@ -691,6 +703,9 @@ export const useGameStore = create<GameState>((set, get) => {
       modeCleared: loaded.modeCleared,
       loginDay: loaded.loginDay,
       loginClaimKey: loaded.loginClaimKey,
+      dailyDiceKey: loaded.dailyDiceKey,
+      dailyDiceFace: loaded.dailyDiceFace,
+      dailyDiceValue: loaded.dailyDiceValue,
       dailyQuestKey: loaded.dailyQuestKey,
       dailyQuestBase: loaded.dailyQuestBase,
       dailyClaimed: loaded.dailyClaimed,
@@ -797,6 +812,9 @@ export const useGameStore = create<GameState>((set, get) => {
     seenDailyHelp: false,
     loginDay: 0,
     loginClaimKey: "",
+    dailyDiceKey: "",
+    dailyDiceFace: "",
+    dailyDiceValue: 0,
     dailyQuestKey: "",
     dailyQuestBase: emptySnapshot(),
     dailyClaimed: [],
@@ -911,6 +929,9 @@ export const useGameStore = create<GameState>((set, get) => {
         modeCleared: null,
         loginDay: 0,
         loginClaimKey: "",
+        dailyDiceKey: "",
+        dailyDiceFace: "",
+        dailyDiceValue: 0,
         dailyQuestKey: "",
         dailyQuestBase: emptySnapshot(),
         dailyClaimed: [],
@@ -1695,6 +1716,19 @@ export const useGameStore = create<GameState>((set, get) => {
         ...rewardPatch(s, reward),
         loginDay: (s.loginDay + 1) % LOGIN_CYCLE,
         loginClaimKey: todayKey(),
+      });
+      persist();
+    },
+
+    rollDailyDice: (faceId) => {
+      const s = get();
+      if (s.dailyDiceKey === todayKey()) return; // 本日は振り済み
+      const { value, reward } = spinDailyDice(faceId, todayKey());
+      set({
+        ...rewardPatch(s, reward),
+        dailyDiceKey: todayKey(),
+        dailyDiceFace: faceId,
+        dailyDiceValue: value,
       });
       persist();
     },
