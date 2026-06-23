@@ -71,44 +71,67 @@ export function computeSynergies(
   const views: SynergyView[] = [];
   const { colors, tagCount, monstersWithSkill, maxSkillsOnOne } = tally(builds);
 
-  // ---- 色シナジー（単色は“役割の穴”を埋める生存力も付与して罠化を防ぐ） ----
+  // ---- 色シナジー（排他：単色＝単色陣 / 2色＝該当ペア1つ / 3色＝三原のみ） ----
+  // 虹編成が全ペアを同時取りして突出するのを防ぐため、構成の色数で1つだけ付与する。
+  const distinct = new Set(colors).size;
+  const pair = (a: MonsterColor, b: MonsterColor) =>
+    distinct === 2 && has(colors, a) && has(colors, b);
+  // 単色は“役割の穴”をシナジーで丸ごと補い、混色（役割コンプ）と肩を並べる強さに。
   if (countColor(colors, "green") === 3) {
-    mods.regenAdd += 8;
-    mods.defMult *= 1.1;
-    mods.hpMult *= 1.1;
-    views.push({ id: "ggg", name: "森の陣", emoji: "🌿", desc: "毎秒回復+8・防御+10%・HP+10%。" });
+    mods.regenAdd += 12;
+    mods.defMult *= 1.18;
+    mods.hpMult *= 1.18;
+    mods.atkMult *= 1.08;
+    views.push({ id: "ggg", name: "森の陣", emoji: "🌿", desc: "毎秒回復+12・防御/HP+18%・攻撃+8%。" });
   }
   if (countColor(colors, "blue") === 3) {
-    mods.cdMult *= 0.75;
-    mods.spdMult *= 1.1;
-    mods.shieldStart += 30;
-    views.push({ id: "bbb", name: "魔導陣", emoji: "🔷", desc: "CT-25%・速度+10%・開幕シールド+30。" });
+    mods.cdMult *= 0.65;
+    mods.spdMult *= 1.15;
+    mods.shieldStart += 70;
+    mods.defMult *= 1.2;
+    mods.regenAdd += 5;
+    views.push({ id: "bbb", name: "魔導陣", emoji: "🔷", desc: "CT-35%・速度+15%・開幕シールド+70・防御+20%。" });
   }
   if (countColor(colors, "red") === 3) {
-    mods.atkMult *= 1.28;
-    mods.critAdd += 12;
-    views.push({ id: "rrr", name: "猛火陣", emoji: "🔺", desc: "攻撃+28%・クリ率+12%。" });
-  }
-  if (has(colors, "green") && has(colors, "blue") && has(colors, "red")) {
-    mods.atkMult *= 1.1;
+    mods.atkMult *= 1.35;
+    mods.critAdd += 18;
+    mods.hpMult *= 1.15;
     mods.defMult *= 1.1;
-    mods.hpMult *= 1.1;
-    mods.spdMult *= 1.1;
-    views.push({ id: "gbr", name: "三原陣", emoji: "🌈", desc: "全ステータス +10%。" });
+    views.push({ id: "rrr", name: "猛火陣", emoji: "🔺", desc: "攻撃+35%・クリ+18%・HP+15%・防御+10%。" });
   }
-  if (has(colors, "green") && has(colors, "red")) {
+  if (distinct === 3) {
+    // 役割が揃う安定編成。コンプ自体が強みなので数値ボーナスは控えめ。
+    mods.atkMult *= 1.08;
+    mods.defMult *= 1.08;
+    mods.hpMult *= 1.08;
+    mods.spdMult *= 1.08;
+    views.push({ id: "gbr", name: "三原陣", emoji: "🌈", desc: "全ステータス +8%（役割コンプの安定編成）。" });
+  }
+  if (pair("green", "red")) {
+    // 緑赤＝毒炎の継戦。耐久寄り。
     mods.poisonBurn = true;
-    views.push({ id: "gr", name: "毒炎", emoji: "☠️", desc: "毒状態の敵に火傷追加ダメージ。" });
+    mods.atkMult *= 1.1;
+    mods.hpMult *= 1.06;
+    mods.regenAdd += 5;
+    views.push({ id: "gr", name: "毒炎", emoji: "☠️", desc: "毒に火傷追加・攻撃+10%・HP+6%・回復+5。" });
   }
-  if (has(colors, "blue") && has(colors, "red")) {
-    mods.spdMult *= 1.12;
-    mods.critAdd += 12;
-    views.push({ id: "br", name: "加速火力", emoji: "💨", desc: "攻撃速度とクリ率上昇。" });
+  if (pair("blue", "red")) {
+    // 青赤＝速攻グラスキャノン。火力と手数だが脆いので生存も補強。
+    mods.spdMult *= 1.18;
+    mods.critAdd += 16;
+    mods.shieldStart += 60;
+    mods.hpMult *= 1.16;
+    mods.defMult *= 1.1;
+    mods.regenAdd += 6;
+    views.push({ id: "br", name: "加速火力", emoji: "💨", desc: "速度/クリ大・開幕シールド+60・HP+16%・防御+10%・回復+6。" });
   }
-  if (has(colors, "green") && has(colors, "blue")) {
-    mods.defMult *= 1.15;
-    mods.healMult *= 1.25;
-    views.push({ id: "gb", name: "守護術式", emoji: "🛡️", desc: "防御と回復量上昇。" });
+  if (pair("green", "blue")) {
+    // 緑青＝鉄壁の支援。硬いが火力は控えめ。
+    mods.defMult *= 1.18;
+    mods.healMult *= 1.28;
+    mods.shieldStart += 28;
+    mods.cdMult *= 0.92;
+    views.push({ id: "gb", name: "守護術式", emoji: "🛡️", desc: "防御+18%・回復+28%・シールド+28・CT-8%。" });
   }
 
   // ---- 技タグシナジー ----

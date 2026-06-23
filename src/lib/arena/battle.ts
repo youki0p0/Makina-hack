@@ -46,6 +46,7 @@ interface Combatant {
   name: string;
   emoji: string;
   side: "ally" | "enemy";
+  color: MonsterColor;
   slot: number;
   maxHp: number;
   hp: number;
@@ -70,7 +71,44 @@ interface Combatant {
 // 1戦のうちで最初に倒れたユニット（勝因/敗因サマリ用）。simulateBattle 開始時にリセット。
 let firstDown: { name: string; side: "ally" | "enemy" } | null = null;
 
-const MAX_TICKS = 420;
+/**
+ * 色の三すくみ：緑→赤→青→緑（緑は赤に強い／赤は青に強い／青は緑に強い）。
+ * 攻撃側が有利なら与ダメ上昇、不利なら減少。混色は平均的に中庸、単色は
+ * 得意/不得意ラウンドが巡回して平均すると互角になる。
+ */
+const BEATS: Record<MonsterColor, MonsterColor> = {
+  green: "red",
+  red: "blue",
+  blue: "green",
+};
+export const MATCHUP_BONUS = 0.22; // 有利時 +22% / 不利時 -18%（短期戦の事故を抑えつつ相性は出す）
+export function colorMatchup(attacker: MonsterColor, defender: MonsterColor): number {
+  if (BEATS[attacker] === defender) return 1 + MATCHUP_BONUS;
+  if (BEATS[defender] === attacker) return 1 / (1 + MATCHUP_BONUS);
+  return 1;
+}
+
+/**
+ * チーム同士の色相性スコア（>1 で味方有利 / <1 で不利）。
+ * 全味方色×全敵色の相性倍率の平均。UI の有利/不利表示に使う。
+ */
+export function teamColorAdvantage(
+  allyColors: MonsterColor[],
+  enemyColors: MonsterColor[],
+): number {
+  if (allyColors.length === 0 || enemyColors.length === 0) return 1;
+  let sum = 0;
+  let n = 0;
+  for (const a of allyColors)
+    for (const e of enemyColors) {
+      // 攻めの相性（味方→敵）と受けの相性（敵→味方の逆数）を両取りで平均
+      sum += colorMatchup(a, e) * (1 / colorMatchup(e, a));
+      n++;
+    }
+  return Math.sqrt(sum / n); // 積の平均を穏やかに
+}
+
+const MAX_TICKS = 480;
 
 function sumStatus(c: Combatant, t: StatusType): number {
   return c.statuses.filter((s) => s.type === t).reduce((a, s) => a + s.mag, 0);
@@ -118,6 +156,9 @@ function dealDamage(
   events: string[],
 ): void {
   if (!target.alive) return;
+  // 色の三すくみ補正（直接ダメージに適用）
+  const mu = colorMatchup(attacker.color, target.color);
+  raw = raw * mu;
   let dmg = pierce ? raw : Math.max(1, raw - effDefense(target));
   const curse = sumStatus(target, "curse");
   if (curse > 0) dmg *= 1 + curse / 100;
@@ -248,6 +289,7 @@ function buildAllies(
       name: m.name,
       emoji: m.emoji,
       side: "ally",
+      color: m.color,
       slot,
       maxHp: Math.round((hp * mods.hpMult)),
       hp: 0,
@@ -321,6 +363,7 @@ function buildEnemies(
       name: st.bossLead ? `【ボス】${m.name}` : m.name,
       emoji: st.bossLead ? "👑" : m.emoji,
       side: "enemy",
+      color: m.color,
       slot,
       maxHp: st.maxHp,
       hp: 0,
