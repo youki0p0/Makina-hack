@@ -71,8 +71,10 @@ export default function InventoryList() {
   const [filter, setFilter] = useState<Filter>("all");
   const [setKeyFilter, setSetKeyFilter] = useState<string>("all");
   const [sort, setSort] = useState<Sort>("rarity");
+  // 「強化候補だけ」表示（装備中より強い＝▲のものに絞る）。
+  const [onlyUpgrades, setOnlyUpgrades] = useState(false);
 
-  // 表示設定（フィルタ／並び）を localStorage に記憶し、次に開いたとき復元する。
+  // 表示設定（フィルタ／並び／強化候補のみ）を localStorage に記憶し、次に開いたとき復元する。
   // セットフィルタは所持状況で消えうるのでセッション限り（ストランド防止）。
   const [viewLoaded, setViewLoaded] = useState(false);
   useEffect(() => {
@@ -81,6 +83,7 @@ export default function InventoryList() {
       if (f && FILTERS.some((x) => x.id === f)) setFilter(f as Filter);
       const s = window.localStorage.getItem("inv.sort");
       if (s && SORTS.some((x) => x.id === s)) setSort(s as Sort);
+      setOnlyUpgrades(window.localStorage.getItem("inv.onlyUpgrades") === "1");
     } catch {}
     setViewLoaded(true);
   }, []);
@@ -89,8 +92,9 @@ export default function InventoryList() {
     try {
       window.localStorage.setItem("inv.filter", filter);
       window.localStorage.setItem("inv.sort", sort);
+      window.localStorage.setItem("inv.onlyUpgrades", onlyUpgrades ? "1" : "0");
     } catch {}
-  }, [filter, sort, viewLoaded]);
+  }, [filter, sort, onlyUpgrades, viewLoaded]);
   // 一括分解の確認はアプリ内ダイアログで行う（PWA/モバイルで window.confirm が
   // ネイティブダイアログを出せずフリーズ/表示崩れする不具合の回避）。
   const [bulkConfirm, setBulkConfirm] = useState<{ msg: string; run: () => void } | null>(null);
@@ -125,6 +129,7 @@ export default function InventoryList() {
         .map((item, index) => ({ item, index }))
         .filter((r) => filter === "all" || r.item.slot === filter)
         .filter((r) => setKeyFilter === "all" || r.item.setId === setKeyFilter)
+        .filter((r) => !onlyUpgrades || isUpgrade(r.item))
         .sort((a, b) => {
           const aFav = favorites.includes(itemKey(a.item));
           const bFav = favorites.includes(itemKey(b.item));
@@ -132,7 +137,8 @@ export default function InventoryList() {
           if (sort === "name") return a.item.name.localeCompare(b.item.name, "ja");
           return sortValue(b.item, sort) - sortValue(a.item, sort);
         }),
-    [inventory, filter, setKeyFilter, sort, favorites],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [inventory, filter, setKeyFilter, sort, favorites, onlyUpgrades, equipped, classId],
   );
 
   // 深層では所持品が上限(300件)まで増え、各行がcanvas生成のアイコンを持つため、全件を一度に
@@ -141,18 +147,29 @@ export default function InventoryList() {
   const [visible, setVisible] = useState(PAGE);
   useEffect(() => {
     setVisible(PAGE);
-  }, [filter, setKeyFilter, sort]);
+  }, [filter, setKeyFilter, sort, onlyUpgrades]);
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold text-gray-300">所持品 ({inventory.length})</h2>
-        <button
-          onClick={() => equipBest()}
-          className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1 text-[11px] font-bold text-white active:scale-95"
-        >
-          <PixelGlyph kind="attack" size={13} /> 最強装備
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setOnlyUpgrades((v) => !v)}
+            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold active:scale-95 ${
+              onlyUpgrades ? "bg-emerald-600 text-white" : "bg-white/10 text-gray-300"
+            }`}
+            title="装備中より強い候補だけ表示"
+          >
+            🔼 強化候補
+          </button>
+          <button
+            onClick={() => equipBest()}
+            className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1 text-[11px] font-bold text-white active:scale-95"
+          >
+            <PixelGlyph kind="attack" size={13} /> 最強装備
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-1">
