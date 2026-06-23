@@ -8,6 +8,7 @@ import {
   maxRushUses,
   normalizeMaterials,
   rushBossFloor,
+  rushRewardMult,
   spend,
   starMaterialCost,
   weekdayTheme,
@@ -43,6 +44,20 @@ describe("boss rush floors", () => {
     expect(fs.every((f) => f % 50 === 0 && f >= 50)).toBe(true);
     expect(fs[0]).toBeLessThan(fs[4]); // 逓増
     expect(rushBossFloor(0, 0)).toBe(50); // 序盤でも最低50
+  });
+
+  it("never spawns the 1000F final boss (難度フロアは常に1000階未満)", () => {
+    for (const hf of [950, 1000, 1050, 1500, 2000, 5000, 9999]) {
+      for (let step = 0; step < 5; step++) {
+        expect(rushBossFloor(hf, step)).toBeLessThan(1000);
+      }
+    }
+  });
+
+  it("報酬倍率は深く潜るほど増える（上げ損防止）", () => {
+    expect(rushRewardMult(1000)).toBe(4);
+    expect(rushRewardMult(2000)).toBeGreaterThan(rushRewardMult(1000));
+    expect(rushRewardMult(5000)).toBeGreaterThan(rushRewardMult(2000));
   });
 });
 

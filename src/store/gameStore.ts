@@ -30,7 +30,7 @@ import {
   RARE_SIGIL_RATE,
   RUSH_BASE_USES,
   RUSH_BOSS_COUNT,
-  RUSH_REWARD_MULT,
+  rushRewardMult,
   rushBossFloor,
   spend as spendMats,
   starMaterialCost,
@@ -2811,7 +2811,9 @@ export const useGameStore = create<GameState>((set, get) => {
     const isRush = state.runMode === "rush";
     const diff = getDifficulty(state.difficulty);
     const altarMult = soulAltarMult(state.soulAltar);
-    const rewardMult = (isRush ? RUSH_REWARD_MULT : 1) * diff.rewardMult * altarMult;
+    // ボスラッシュは深く潜るほど報酬倍率が伸びる（上げ損防止）。
+    const rushMult = isRush ? rushRewardMult(state.progress.highestFloorReached) : 1;
+    const rewardMult = rushMult * diff.rewardMult * altarMult;
     const expGained = Math.round(enemy.exp * rewardMult);
     const goldGained = Math.round(enemy.gold * rewardMult);
 
@@ -2819,8 +2821,9 @@ export const useGameStore = create<GameState>((set, get) => {
     const { player: leveled, leveledUp } = applyExp(leveledPlayer, expGained);
     leveledPlayer = leveled;
 
+    const rushMultLabel = Number.isInteger(rushMult) ? `${rushMult}` : rushMult.toFixed(1);
     let finalLog = pushLogs(log, [
-      { text: `EXP +${expGained} / ゴールド +${goldGained}${isRush ? "（4倍）" : ""}`, tone: "good" },
+      { text: `EXP +${expGained} / ゴールド +${goldGained}${isRush ? `（×${rushMultLabel}）` : ""}`, tone: "good" },
     ]);
     if (leveledUp) {
       finalLog = pushLogs(finalLog, [{ text: `レベルアップ！ Lv${leveledPlayer.level} (全回復)`, tone: "good" }]);

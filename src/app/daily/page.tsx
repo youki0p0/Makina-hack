@@ -57,7 +57,7 @@ function HelpOverlay({ onDone }: { onDone: () => void }) {
         <h2 className="text-center text-lg font-extrabold text-fuchsia-200">遊び方</h2>
         <ul className="space-y-2 text-[12px] leading-relaxed text-gray-200">
           <li>🗓️ <b>日替わりダンジョン</b>：曜日で表情が変わる挑戦。レベルは「Lv×100階」相当の難度。クリアで素材（🔹欠片・🔶核）が貯まる。</li>
-          <li>⚔️ <b>ボスラッシュ</b>：ボス{RUSH_BOSS_COUNT}連戦（回復なし）。<b>コイン＆EXPが4倍</b>。道中で<b>💠覇者の刻印</b>(0.5%)も狙える。</li>
+          <li>⚔️ <b>ボスラッシュ</b>：ボス{RUSH_BOSS_COUNT}連戦（回復なし）。<b>コイン＆EXPが4倍〜（深いほどUP）</b>。道中で<b>💠覇者の刻印</b>(0.5%)も狙える。</li>
           <li>⭐ 集めた素材は<b>鍛冶屋</b>で装備の<b>★アップ</b>に使える（既存の★を上限の先へ）。</li>
           <li>⏳ 挑戦回数は<b>毎日0時にリセット</b>。深く潜るほど回数が増える（1000/1500/2000/2500階で+1）。</li>
         </ul>
@@ -148,7 +148,7 @@ export default function DailyPage() {
           <h2 className="text-sm font-extrabold text-amber-200">⚔️ ボスラッシュ</h2>
           <span className="text-xs text-amber-100">残り {rushUses}/{maxRushUses(highest)}</span>
         </div>
-        <p className="text-[11px] text-gray-300">ボス{RUSH_BOSS_COUNT}連戦・回復なし。<b className="text-amber-200">コイン&EXP 4倍</b>、💠刻印も狙える。</p>
+        <p className="text-[11px] text-gray-300">ボス{RUSH_BOSS_COUNT}連戦・回復なし。<b className="text-amber-200">コイン&EXP 4倍〜（深いほどUP）</b>、💠刻印も狙える。</p>
         <button
           onClick={startRush}
           disabled={rushUses <= 0}

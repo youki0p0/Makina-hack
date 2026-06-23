@@ -37,8 +37,8 @@ export default function ResultOverlay() {
           </h2>
           {victory ? (
             <div className="mt-3 space-y-1 text-sm text-gray-200">
-              <p>EXP +{fmt(result.expGained)}{isRush && <span className="text-amber-300"> (4倍)</span>}</p>
-              <p>ゴールド +{fmt(result.goldGained)}{isRush && <span className="text-amber-300"> (4倍)</span>}</p>
+              <p>EXP +{fmt(result.expGained)}{isRush && <span className="text-amber-300"> (ブースト)</span>}</p>
+              <p>ゴールド +{fmt(result.goldGained)}{isRush && <span className="text-amber-300"> (ブースト)</span>}</p>
               <p className="mt-1 text-xs text-gray-400">
                 {isRush ? "覇者の刻印が手に入ったかも。" : "素材を入手しました（★アップに使えます）。"}
               </p>
