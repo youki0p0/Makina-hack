@@ -39,6 +39,18 @@ describe("dailyDice", () => {
     expect(values.size).toBeGreaterThan(1);
   });
 
+  it("各面の出目6は大当たり：コイン1000 / 刻印1 / 魂1（等価設計）", () => {
+    expect(faceById("atk")!.rewards[5]).toEqual({ kind: "coins", amount: 1000 });
+    expect(faceById("def")!.rewards[5]).toEqual({ kind: "sigil", amount: 1 });
+    expect(faceById("luck")!.rewards[5]).toEqual({ kind: "souls", amount: 1 });
+  });
+
+  it("💠刻印は経済保護のため『守りの出目6』1枠のみ（ばら撒かない）", () => {
+    const sigilSlots = DICE_FACES.flatMap((f) => f.rewards).filter((r) => r.kind === "sigil");
+    expect(sigilSlots).toHaveLength(1);
+    expect(sigilSlots[0]).toEqual({ kind: "sigil", amount: 1 });
+  });
+
   it("出目6はその面の大当たり（テーブル末尾）", () => {
     // 出目6が出る日を探して、報酬が末尾と一致することを確認。
     let found = false;
