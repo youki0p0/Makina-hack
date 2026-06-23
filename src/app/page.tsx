@@ -117,21 +117,36 @@ export default function TitlePage() {
             </div>
           )}
 
-          {/* 日替わりダンジョン / ボスラッシュ */}
-          <Link
-            href="/daily"
-            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-fuchsia-700/80 font-bold text-fuchsia-50 active:scale-95"
-          >
-            🗓️ 日替わりダンジョン
-          </Link>
-
-          {/* デイリー/ウィークリー（ログインボーナス & クエスト） */}
-          <Link
-            href="/missions"
-            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-amber-700/80 font-bold text-amber-50 active:scale-95"
-          >
-            🎁 ログインボーナス & ミッション
-          </Link>
+          {/* 📅 今日のやること（デイリー系をまとめたハブ。毎日0時リセット） */}
+          <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[0.03] p-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-gray-300">📅 今日のやること</span>
+              <span className="text-[9px] text-gray-500">毎日0時にリセット</span>
+            </div>
+            {/* 日替わりダンジョン / ミッション */}
+            <div className="flex gap-2">
+              <Link
+                href="/daily"
+                className="flex h-11 flex-1 items-center justify-center gap-1 rounded-xl bg-fuchsia-700/80 text-[13px] font-bold text-fuchsia-50 active:scale-95"
+              >
+                🗓️ 日替わり
+              </Link>
+              <Link
+                href="/missions"
+                className="flex h-11 flex-1 items-center justify-center gap-1 rounded-xl bg-amber-700/80 text-[13px] font-bold text-amber-50 active:scale-95"
+              >
+                🎁 ミッション
+              </Link>
+            </div>
+            {/* 今日のダイス（1日1回の運試し） */}
+            <DailyDiceCard />
+            {/* 本日のボーナス（今日の常時パッシブ） */}
+            <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
+              <PixelGlyph kind="star" size={14} /> 本日のボーナス: <span className="font-bold">{daily.label}</span>
+            </div>
+            {/* 次の目標（リテンション用） */}
+            <NextGoals />
+          </div>
 
           {/* 装備 / 鍛冶屋 */}
           <div className="flex gap-2">
@@ -231,17 +246,6 @@ export default function TitlePage() {
             >
               ⚙️ 設定
             </Link>
-          </div>
-
-          {/* 今日のダイス（1日1回の運試し） */}
-          <DailyDiceCard />
-
-          {/* 次の目標（リテンション用） */}
-          <NextGoals />
-
-          {/* 本日のボーナス */}
-          <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
-            <PixelGlyph kind="star" size={14} /> 本日のボーナス: <span className="font-bold">{daily.label}</span>
           </div>
 
           {/* リリースノート */}
