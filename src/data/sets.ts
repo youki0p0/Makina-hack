@@ -31,6 +31,10 @@ export interface SetTierBonus {
   attack?: number;
   defense?: number;
   maxHp?: number;
+  /** 攻撃の割合上昇（最終攻撃に (1+attackPct) を乗算）。深層でもスケールする。 */
+  attackPct?: number;
+  /** 最大HPの割合上昇（最終maxHpに (1+maxHpPct) を乗算）。 */
+  maxHpPct?: number;
   /** 回避率（敵の攻撃を確率で無効化）。 */
   dodge?: number;
   /** リロール時に出目6を確定させる。 */
@@ -275,20 +279,38 @@ export const SETS = SET_DEFS;
 
 // ===== Procedural set generation (infinite) =====
 
-/** Pool of bonus primitives a procedural set can roll (label + payload). */
-const PRIMS: { make: () => Omit<SetTierBonus, "pieces"> }[] = [
-  { make: () => ({ desc: "リロール +1", reroll: 1 }) },
-  { make: () => ({ desc: "与ダメージの10%を吸血", lifestealAllPct: 0.1 }) },
-  { make: () => ({ desc: "出目4以上で追加吸血(+15%)", lifestealHighFacePct: 0.15 }) },
-  { make: () => ({ desc: "出目5・6の威力上昇(+30%)", highFaceDmgBonus: 0.3 }) },
-  { make: () => ({ desc: "出目6の威力上昇(+60%)", sixDmgBonus: 0.6 }) },
-  { make: () => ({ desc: "攻撃時に追撃(+1ヒット)", extraHit: true }) },
-  { make: () => ({ desc: "リロール時にHP回復", healOnReroll: 6 }) },
-  { make: () => ({ desc: "敵HP12%以下を即死", executePct: 0.12 }) },
-  { make: () => ({ desc: "出目6が2回発動する", sixDouble: true }) },
-  { make: () => ({ desc: "ダイスを2個振り高い方を使う", rollTwoDice: true }) },
-  { make: () => ({ desc: "攻撃 +8", attack: 8 }) },
-  { make: () => ({ desc: "防御 +8 / HP +20", defense: 8, maxHp: 20 }) },
+// 手続き生成セットの強さを「上の下」帯に統一するため、効果を3段に分類し、
+// 2部位=小 / 4部位=中 / 6部位=大(ビルド定義級) を必ず1つずつ割り当てる。
+// これで「強効果が2部位で壊れ」「弱効果が6部位でゴミ」を構造的に無くす。
+// 数値はすべて割合/効果ベース（flat攻撃などは深層でスケールしないため不採用）。
+type Prim = () => Omit<SetTierBonus, "pieces">;
+
+/** 小（2部位）: 常時効く控えめな下支え。 */
+const PRIMS_SMALL: Prim[] = [
+  () => ({ desc: "リロール +1", reroll: 1 }),
+  () => ({ desc: "与ダメージの8%を吸血", lifestealAllPct: 0.08 }),
+  () => ({ desc: "リロール時にHP回復", healOnReroll: 6 }),
+  () => ({ desc: "出目5・6の威力上昇(+20%)", highFaceDmgBonus: 0.2 }),
+  () => ({ desc: "攻撃力 +8%", attackPct: 0.08 }),
+  () => ({ desc: "最大HP +12%", maxHpPct: 0.12 }),
+];
+
+/** 中（4部位）: ビルドの主軸になる確かな強化。 */
+const PRIMS_MEDIUM: Prim[] = [
+  () => ({ desc: "出目4以上で追加吸血(+15%)", lifestealHighFacePct: 0.15 }),
+  () => ({ desc: "出目6の威力上昇(+45%)", sixDmgBonus: 0.45 }),
+  () => ({ desc: "攻撃時に追撃(+1ヒット)", extraHit: true }),
+  () => ({ desc: "出目5・6の威力上昇(+35%)", highFaceDmgBonus: 0.35 }),
+  () => ({ desc: "攻撃力 +15%", attackPct: 0.15 }),
+];
+
+/** 大（6部位）: ビルドを定義する切り札（名前付きセットの最上位よりやや控えめ）。 */
+const PRIMS_LARGE: Prim[] = [
+  () => ({ desc: "ダイスを2個振り高い方を使う", rollTwoDice: true }),
+  () => ({ desc: "出目6が2回発動する", sixDouble: true }),
+  () => ({ desc: "全ての攻撃が25%吸血", lifestealAllPct: 0.25 }),
+  () => ({ desc: "敵HP12%以下を即死", executePct: 0.12 }),
+  () => ({ desc: "出目6の威力上昇(+45%)＋20%で与ダメ2倍", sixDmgBonus: 0.45, doubleDmgChance: 0.2 }),
 ];
 
 const SET_ADJ = ["深淵", "星霜", "虚空", "業火", "氷晶", "雷鳴", "黄昏", "暁", "幽幻", "永劫"];
@@ -339,23 +361,21 @@ export function proceduralSetDef(n: number): SetDef {
       bonuses: override,
     };
   }
-  // Pick three distinct primitives deterministically from n. Walking
-  // consecutive indices from a per-n start guarantees distinct picks in exactly
-  // 3 steps and is bounded by PRIMS.length, so it can never hang regardless of
-  // PRIMS.length / parity. (A previous step-based variant could land on a step
-  // of 0 or PRIMS.length/2, cycling forever and freezing the casino exchange.)
-  const picks: number[] = [];
-  const start = (n * 7 + 3) % PRIMS.length;
-  for (let i = 0; i < PRIMS.length && picks.length < 3; i++) {
-    picks.push((start + i) % PRIMS.length);
-  }
-  const tiers: (2 | 4 | 6)[] = [2, 4, 6];
+  // 各段から n で決定論的に1つずつ選び、2/4/6部位へ割り当てる。これで全ての
+  // 手続きセットが「小→中→大」の一貫した上の下帯になり、壊れ／ゴミが出ない。
+  const small = PRIMS_SMALL[(n * 7 + 3) % PRIMS_SMALL.length];
+  const medium = PRIMS_MEDIUM[(n * 5 + 1) % PRIMS_MEDIUM.length];
+  const large = PRIMS_LARGE[(n * 3 + 2) % PRIMS_LARGE.length];
   return {
     key: `gset${n}`,
     name: `${a}の${b}`,
     icon: SET_ICONS[n % SET_ICONS.length],
     procedural: true,
-    bonuses: picks.map((p, i) => ({ pieces: tiers[i], ...PRIMS[p].make() })),
+    bonuses: [
+      { pieces: 2, ...small() },
+      { pieces: 4, ...medium() },
+      { pieces: 6, ...large() },
+    ],
   };
 }
 
@@ -685,6 +705,9 @@ export function computeSetEffects(
       if (b.attack) eff.statBonus.attack += b.attack;
       if (b.defense) eff.statBonus.defense += b.defense;
       if (b.maxHp) eff.statBonus.maxHp += b.maxHp;
+      // 割合ステ（深層でもスケールする。flat攻撃/HPの上位互換）。
+      if (b.attackPct) eff.attackPct += b.attackPct;
+      if (b.maxHpPct) eff.maxHpPct += b.maxHpPct;
       if (b.lifestealAllPct) eff.lifestealAllPct = Math.max(eff.lifestealAllPct, b.lifestealAllPct);
       if (b.lifestealHighFacePct) eff.lifestealHighFacePct = Math.max(eff.lifestealHighFacePct, b.lifestealHighFacePct);
       if (b.highFaceDmgBonus) eff.highFaceDmgBonus = Math.max(eff.highFaceDmgBonus, b.highFaceDmgBonus);
