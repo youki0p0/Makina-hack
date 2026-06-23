@@ -28,8 +28,6 @@ export const AFFIXES: readonly Affix[] = [
 ];
 
 const NORMAL_AFFIXES = AFFIXES.filter((a) => !a.volatileOnly);
-/** The "greater" affixes — the biggest variable-stat swings (the MAX rolls). */
-const GREATER_AFFIXES = AFFIXES.filter((a) => a.volatileOnly);
 
 const AFFIX_MAP: Map<string, Affix> = new Map(AFFIXES.map((a) => [a.id, a]));
 
@@ -52,11 +50,6 @@ export function applyAffix(base: Equipment, affix: Affix): Equipment {
     description: `${base.description}【${affix.label}】`,
     affixId: affix.id,
   };
-}
-
-/** Apply a MAX-roll (greater) affix to an item — the biggest variable-stat swing. */
-export function applyMaxAffix(item: Equipment): Equipment {
-  return applyAffix(item, pickAffix(GREATER_AFFIXES));
 }
 
 function pickAffix(pool: readonly Affix[]): Affix {
