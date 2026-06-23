@@ -64,7 +64,7 @@ interface Combatant {
   revive: boolean;
 }
 
-const MAX_TICKS = 320;
+const MAX_TICKS = 420;
 
 function sumStatus(c: Combatant, t: StatusType): number {
   return c.statuses.filter((s) => s.type === t).reduce((a, s) => a + s.mag, 0);
@@ -291,16 +291,16 @@ function buildEnemies(
   rng: () => number,
 ): Combatant[] {
   const boss = isBossRound(round);
-  const sf = (1 + (round - 1) * 0.13) * (boss ? 1.25 : 1);
+  const sf = (1 + (round - 1) * 0.105) * (boss ? 1.12 : 1);
   const fStat = fieldStatMods(field);
   const nSkills = boss ? 3 : round < 3 ? 1 : round < 9 ? 2 : 3;
   const enemies: Combatant[] = [];
 
   for (let slot = 0; slot < 3; slot++) {
     const m = MONSTERS[(round * 3 + slot) % MONSTERS.length];
-    // ボス戦は中央(slot 1)を強大な「ボス」に。HP・攻撃を大きく盛る。
+    // ボス戦は中央(slot 1)を強大な「ボス」に。HP・攻撃を盛る（勝てる範囲で）。
     const bossLead = boss && slot === 1;
-    const lead = bossLead ? 1.9 : 1;
+    const lead = bossLead ? 1.6 : 1;
     const skills: EffectiveSkill[] = [];
     for (let i = 0; i < nSkills; i++) {
       const id = ENEMY_SKILL_POOL[Math.floor(rng() * ENEMY_SKILL_POOL.length)];
