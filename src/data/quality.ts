@@ -20,12 +20,23 @@ export const QUALITIES: Record<Quality, QualityDef> = {
   unique: { id: "unique", label: "Unique", statMult: 1.0, prefix: "" },
 };
 
-/** Roll a quality for a freshly-dropped item (only Legendary can upgrade). */
-export function rollQuality(item: Equipment): Quality | undefined {
+/**
+ * Roll a quality for a freshly-dropped item (only Legendary can upgrade).
+ * 深層ほど上位品質が出やすい：3000階+で底上げ、5000階+でさらに。
+ * 既定(〜3000階未満)は従来どおり mythic 1% / ancient 12%。
+ */
+export function rollQuality(item: Equipment, floor = 1): Quality | undefined {
   if (item.rarity !== "legendary") return undefined;
+  // [mythic率, ancient帯] を階層帯で決める。
+  const [mythic, ancientBand] =
+    floor >= 5000
+      ? [0.12, 0.4]
+      : floor >= 3000
+        ? [0.06, 0.3]
+        : [0.01, 0.12];
   const r = Math.random();
-  if (r < 0.01) return "mythic"; // 1% of legendaries
-  if (r < 0.13) return "ancient"; // next 12%
+  if (r < mythic) return "mythic";
+  if (r < mythic + ancientBand) return "ancient";
   return undefined;
 }
 
