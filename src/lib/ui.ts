@@ -69,6 +69,7 @@ export const slotLabel: Record<string, string> = {
   gloves: "篭手",
   boots: "靴",
   accessory: "装飾",
+  emblem: "紋章",
 };
 
 /** Accent color per dice kind for the big dice readout. */

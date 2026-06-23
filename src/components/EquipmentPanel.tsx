@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { canEquip, CLASSES } from "@/data/classes";
 import { EQUIP_SLOTS } from "@/lib/battle";
-import { computeSetEffects, getSetDef } from "@/data/sets";
+import { computeSetEffects, emblemSetMult, getSetDef } from "@/data/sets";
 import { QUALITIES } from "@/data/quality";
 import ItemIcon from "@/components/ItemIcon";
 import PixelGlyph from "@/components/PixelGlyph";
@@ -16,13 +16,31 @@ export default function EquipmentPanel() {
   const equipped = useGameStore((s) => s.equipped);
   const unequip = useGameStore((s) => s.unequipItem);
   const classId = useGameStore((s) => s.classId);
-  const setEff = useMemo(() => computeSetEffects(equipped, classId), [equipped, classId]);
+  const floor = useGameStore((s) => s.currentFloor);
+  const setEff = useMemo(() => computeSetEffects(equipped, classId, floor), [equipped, classId, floor]);
   const [detail, setDetail] = useState<EquipmentSlot | null>(null);
   const detailItem = detail ? equipped[detail] : null;
+  // 紋章(emblem)による現在のセット増幅倍率（3000階+で発動）。
+  const emblemMult = equipped.emblem?.setAmplifier ? emblemSetMult(floor) : 1;
 
   return (
     <div className="space-y-2">
       <h2 className="text-sm font-bold text-gray-300">装備中</h2>
+
+      {equipped.emblem?.setAmplifier && (
+        <div className="rounded-xl border border-violet-500/40 bg-violet-500/10 p-2 text-[10px] text-violet-100">
+          🟣 <span className="font-bold">紋章</span>: セット効果の数値を
+          {emblemMult > 1 ? (
+            <span className="font-bold text-violet-200"> ×{emblemMult} </span>
+          ) : (
+            " "
+          )}
+          増幅
+          {emblemMult > 1
+            ? `（現在 ${floor}階）`
+            : "（3000階以上で発動・深層ほど上昇）"}
+        </div>
+      )}
 
       {setEff.activeTiers.length > 0 && (
         <div className="rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 p-2">

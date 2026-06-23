@@ -21,6 +21,7 @@ export const EQUIP_SLOTS: ReadonlyArray<keyof EquippedItems> = [
   "gloves",
   "boots",
   "accessory",
+  "emblem",
 ];
 
 const NO_BONUS: StatBonus = { attack: 0, defense: 0, maxHp: 0, reroll: 0 };

@@ -618,10 +618,30 @@ function gamblerFaceOneToTwo(): DiceModifier {
 // 呼び出し側で破壊しない前提(全呼び出しが読み取りのみ)。
 let _setEffEquipped: EquippedItems | null = null;
 let _setEffClassId: ClassId | undefined;
+let _setEffFloor = 0;
 let _setEffResult: SetEffects | null = null;
 
-export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): SetEffects {
-  if (_setEffResult && equipped === _setEffEquipped && classId === _setEffClassId) {
+/**
+ * 紋章(emblem)のセット増幅倍率 N。3000階+でのみ発動し、深層ほど伸びる。
+ * N = 1.5 + 0.5*floor((階-3000)/1000)：3000→×1.5 / 4000→×2 / 5000→×2.5 …
+ * 3000階未満は 1（増幅なし）。
+ */
+export function emblemSetMult(floor: number): number {
+  if (floor < 3000) return 1;
+  return 1.5 + 0.5 * Math.floor((floor - 3000) / 1000);
+}
+
+export function computeSetEffects(
+  equipped: EquippedItems,
+  classId?: ClassId,
+  floor = 0,
+): SetEffects {
+  if (
+    _setEffResult &&
+    equipped === _setEffEquipped &&
+    classId === _setEffClassId &&
+    floor === _setEffFloor
+  ) {
     return _setEffResult;
   }
   const counts: Record<string, number> = {};
@@ -732,8 +752,26 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
     }
   }
 
+  // ===== 紋章(emblem)によるセット効果の増幅 =====
+  // emblem スロットに setAmplifier 装備があり、3000階+のとき、セット効果の
+  // 「数値系」(攻/防/HP/吸血%/各ダメージ%/最終攻HP%)を N 倍する。発動トリガー系
+  // (2個振り/即死/追撃/出目書換/回避/2倍ダメ確率/ドロップ系)は乗算しない。
+  const mult = equipped.emblem?.setAmplifier ? emblemSetMult(floor) : 1;
+  if (mult > 1) {
+    eff.statBonus.attack = Math.round(eff.statBonus.attack * mult);
+    eff.statBonus.defense = Math.round(eff.statBonus.defense * mult);
+    eff.statBonus.maxHp = Math.round(eff.statBonus.maxHp * mult);
+    eff.lifestealAllPct *= mult;
+    eff.lifestealHighFacePct *= mult;
+    eff.highFaceDmgBonus *= mult;
+    eff.sixDmgBonus *= mult;
+    eff.attackPct *= mult;
+    eff.maxHpPct *= mult;
+  }
+
   _setEffEquipped = equipped;
   _setEffClassId = classId;
+  _setEffFloor = floor;
   _setEffResult = eff;
   return eff;
 }

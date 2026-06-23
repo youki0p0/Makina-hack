@@ -84,7 +84,7 @@ describe("createPlayer / emptyEquipped", () => {
   });
   it("creates an all-empty equipment map", () => {
     expect(emptyEquipped()).toEqual({
-      weapon: null, helm: null, armor: null, gloves: null, boots: null, accessory: null,
+      weapon: null, helm: null, armor: null, gloves: null, boots: null, accessory: null, emblem: null,
     });
   });
 });
@@ -143,6 +143,7 @@ describe("weakestSlot", () => {
       gloves: mkItem({ slot: "gloves", attack: 9, defense: 9, maxHp: 9 }),
       boots: mkItem({ slot: "boots", attack: 9, defense: 9, maxHp: 9 }),
       accessory: mkItem({ slot: "accessory", attack: 9, defense: 9, maxHp: 9 }),
+      emblem: null,
     };
     expect(weakestSlot(eq)).toBe("helm");
   });

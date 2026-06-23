@@ -937,6 +937,7 @@ const SLOT_NOUNS: Record<EquipmentSlot, string[]> = {
   gloves: GLOVE_NOUNS,
   boots: BOOT_NOUNS,
   accessory: ACC_NOUNS,
+  emblem: ["紋章", "紋章", "エンブレム", "紋章"],
 };
 
 export function rarityForTier(t: number): Rarity {
@@ -1026,6 +1027,26 @@ export function genItem(slot: EquipmentSlot, tier: number): Equipment {
   return item;
 }
 
+/**
+ * 紋章(emblem)を生成する。3000階+のボスからのみドロップする上位部位。
+ * セット効果の数値を深層ほど増幅する setAmplifier を持つ（倍率は装備時に階層から算出）。
+ * ベースステは accessory 相当（genItem の汎用分岐）＋レジェ確定で品質ロールにも乗る。
+ */
+export function genEmblem(floor: number): Equipment {
+  const t = genTierForFloor(floor);
+  const base = genItem("emblem", t);
+  return {
+    ...base,
+    id: `emblem_${t}`,
+    name: `共鳴の紋章`,
+    rarity: "legendary",
+    equipTag: undefined, // どのジョブでも装備可
+    setAmplifier: true,
+    minFloor: 3000,
+    description: `${base.description} ／ セット効果の数値を深層ほど増幅`,
+  };
+}
+
 const randInt = (lo: number, hi: number) =>
   lo + Math.floor(Math.random() * (hi - lo + 1));
 
@@ -1112,10 +1133,10 @@ export function genRarePlusNear(slot: EquipmentSlot, refTier: number, refMod: nu
 // Set pieces are generated procedurally and tiered, so they scale with depth
 // forever. The set itself (named or procedural) is resolved via getSetDef.
 const SET_SLOT_NOUN: Record<EquipmentSlot, string> = {
-  weapon: "刃", helm: "兜", armor: "鎧", gloves: "篭手", boots: "靴", accessory: "印",
+  weapon: "刃", helm: "兜", armor: "鎧", gloves: "篭手", boots: "靴", accessory: "印", emblem: "紋章",
 };
 const SET_SLOT_TAG: Record<EquipmentSlot, EquipTag | undefined> = {
-  weapon: "light", helm: "heavy", armor: "heavy", gloves: "light", boots: "light", accessory: undefined,
+  weapon: "light", helm: "heavy", armor: "heavy", gloves: "light", boots: "light", accessory: undefined, emblem: undefined,
 };
 
 /** Stable id for a set piece (key + slot + tier), reconstructable on load. */

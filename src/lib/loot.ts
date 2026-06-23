@@ -1,6 +1,6 @@
 import { AFFIXES, applyAffix, rollAffixedCopy } from "@/data/affixes";
 import { CONSUMABLES } from "@/data/consumables";
-import { ITEMS, genCommon, genRarePlus, genRarePlusNear, rollGenDrop, rollSetDrop } from "@/data/items";
+import { ITEMS, genCommon, genEmblem, genRarePlus, genRarePlusNear, rollGenDrop, rollSetDrop } from "@/data/items";
 import { availableSetKeys } from "@/data/sets";
 import { applyModifier } from "@/data/modifiers";
 import { applyQuality, rollQuality } from "@/data/quality";
@@ -121,6 +121,12 @@ export function rollLoot(
   slotHint?: EquipmentSlot,
 ): Equipment | null {
   if (Math.random() > enemy.dropRate) return null;
+
+  // 紋章(emblem): 3000階+のボスからのみ、低確率でドロップする上位部位。
+  // セット効果の数値を深層ほど増幅する（emblemSetMult）。
+  if (floor >= 3000 && enemy.isBoss && Math.random() < 0.04) {
+    return withQuality(genEmblem(floor), floor);
+  }
 
   // Set-piece drop (build-defining gear). Sets unlock by depth and scale forever.
   const setChance = enemy.isBoss ? 0.18 : 0.12;
