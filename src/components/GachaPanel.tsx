@@ -10,7 +10,8 @@ import { fmt } from "@/lib/ui";
 import { useGameStore } from "@/store/gameStore";
 import type { EquipmentSlot } from "@/types/game";
 
-const SLOTS = EQUIP_SLOTS as readonly EquipmentSlot[];
+// 紋章(emblem)は3000階+のボス限定ドロップ。部位指定ガチャの対象外にする。
+const SLOTS = (EQUIP_SLOTS as readonly EquipmentSlot[]).filter((s) => s !== "emblem");
 
 export default function GachaPanel() {
   const points = useGameStore((s) => s.gachaPoints);

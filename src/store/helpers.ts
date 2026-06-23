@@ -183,7 +183,7 @@ export function addUnique(list: string[], id: string): string[] {
  * slow to load. Skipping them keeps the array bounded to the curated set.
  */
 export function discover(list: string[], id: string): string[] {
-  if (id.startsWith("gen_") || id.startsWith("setp_")) return list;
+  if (id.startsWith("gen_") || id.startsWith("setp_") || id.startsWith("emblem_")) return list;
   return addUnique(list, id);
 }
 
