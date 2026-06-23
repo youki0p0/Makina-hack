@@ -56,15 +56,37 @@ export function dailyLevelFloor(level: number): number {
   return Math.max(DAILY_FLOOR_PER_LEVEL, level * DAILY_FLOOR_PER_LEVEL);
 }
 
-// ---- ボスラッシュ（5連戦・回復なし・コイン&EXP4倍）----
+// ---- ボスラッシュ（5連戦・回復なし・コイン&EXPブースト）----
 export const RUSH_BOSS_COUNT = 5;
+/** ボスラッシュ報酬の基礎倍率（1000階まで）。深層ほど rushRewardMult で増える。 */
 export const RUSH_REWARD_MULT = 4;
-/** i 体目(0-based)のボスの難度フロア。到達度に応じて 60%→100% へ逓増、50の倍数=大ボス。 */
+/** ボスラッシュ全体の難度ナーフ（約50階ぶん弱く）。 */
+export const RUSH_NERF_FLOORS = 50;
+
+/**
+ * i 体目(0-based)のボスの難度フロア。到達度に応じて 60%→100% へ逓増、50の倍数。
+ * 緊急調整: 全体を約50階ナーフし、1000階の固定ラスボス(機神デウス)は出さない
+ * ＝難度フロアは常に 1000階未満に制限する（強すぎるため）。
+ */
 export function rushBossFloor(highestFloor: number, step: number): number {
   const top = Math.max(50, Math.floor(highestFloor / 50) * 50);
   const ratio = 0.6 + 0.1 * Math.max(0, Math.min(RUSH_BOSS_COUNT - 1, step));
-  const f = Math.round((top * ratio) / 50) * 50;
-  return Math.max(50, f);
+  let f = Math.round((top * ratio) / 50) * 50;
+  // 全体的に約50階ぶん弱く。
+  f = Math.max(50, f - RUSH_NERF_FLOORS);
+  // 1000階のラスボスは出さない（常に1000階未満＝最大950階）。
+  if (f >= FINAL_FLOOR) f = FINAL_FLOOR - 50;
+  return f;
+}
+
+/**
+ * ボスラッシュの報酬倍率。基礎4倍に加え、深く潜るほど増える（1000階ごとに +RUSH_REWARD_MULT）。
+ * 難度フロアは1000階未満に制限される一方、報酬は到達階で伸び続ける＝「深く潜るほど上げ損」を防ぐ。
+ *   1000階→×4 / 2000階→×8 / 3000階→×12 / 5000階→×20。
+ */
+export function rushRewardMult(highestFloor: number): number {
+  const deep = Math.max(0, highestFloor - FINAL_FLOOR);
+  return RUSH_REWARD_MULT * (1 + deep / FINAL_FLOOR);
 }
 
 // ---- レアドロップ（覇者の刻印）----
@@ -111,6 +133,3 @@ export const WEEKDAY_THEMES: readonly WeekdayTheme[] = [
 export function weekdayTheme(date: Date = new Date()): WeekdayTheme {
   return WEEKDAY_THEMES[date.getDay() % 7];
 }
-
-// FINAL_FLOOR を参照していることを明示（将来 1000階以下制限を入れる余地）。
-void FINAL_FLOOR;
