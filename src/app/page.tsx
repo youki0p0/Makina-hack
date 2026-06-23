@@ -117,7 +117,22 @@ export default function TitlePage() {
             </div>
           )}
 
-          {/* 📅 今日のやること（デイリー系をまとめたハブ。毎日0時リセット） */}
+          {/* 🔰 新規オンボーディング：まだ潜っていない人にはコア操作だけを提示 */}
+          {!hasProgress && (
+            <div className="space-y-1 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-left">
+              <div className="text-[12px] font-bold text-emerald-100">🔰 はじめてのあなたへ</div>
+              <p className="text-[11px] leading-relaxed text-emerald-50/90">
+                まず <span className="font-bold">▶ はじめる</span> で潜ろう。敵が出たら
+                <span className="font-bold">「リロール」</span>で出目を選び
+                <span className="font-bold">「決定」</span>で発動。
+                <span className="font-bold text-amber-200">装備を変えると出目の効果が変わる</span>
+                のがこのゲームの核心！
+              </p>
+            </div>
+          )}
+
+          {/* 📅 今日のやること（デイリー系をまとめたハブ。毎日0時リセット。新規には段階解放で非表示） */}
+          {hasProgress && (
           <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[0.03] p-2.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-gray-300">📅 今日のやること</span>
@@ -147,6 +162,7 @@ export default function TitlePage() {
             {/* 次の目標（リテンション用） */}
             <NextGoals />
           </div>
+          )}
 
           {/* 装備 / 鍛冶屋 */}
           <div className="flex gap-2">
