@@ -14,6 +14,7 @@ import type { GameMode } from "@/types/arena";
 import SoundToggle from "@/components/SoundToggle";
 import BattleView from "@/components/arena/BattleView";
 import BuildListPanel from "@/components/arena/BuildListPanel";
+import CodexOverlay from "@/components/arena/CodexOverlay";
 import HelpOverlay from "@/components/arena/HelpOverlay";
 import CardDraft from "@/components/arena/CardDraft";
 import FieldBanner from "@/components/arena/FieldBanner";
@@ -52,6 +53,7 @@ function SetupScreen() {
   const [operatorId, setOperatorId] = useState(OPERATORS[0].id);
   const [team, setTeam] = useState<string[]>([]);
   const [showHelp, setShowHelp] = useState(false);
+  const [showCodex, setShowCodex] = useState(false);
 
   useEffect(() => {
     if (window.localStorage.getItem("arena-help-seen") !== "1") setShowHelp(true);
@@ -98,10 +100,14 @@ function SetupScreen() {
           <button onClick={() => setShowHelp(true)} className="text-[10px] text-sky-400 underline">
             ❓ 遊び方
           </button>
+          <button onClick={() => setShowCodex(true)} className="text-[10px] text-amber-400 underline">
+            📖 ずかん
+          </button>
         </div>
       </header>
 
       {showHelp && <HelpOverlay onClose={closeHelp} />}
+      {showCodex && <CodexOverlay onClose={() => setShowCodex(false)} />}
 
       {/* モード選択 */}
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
