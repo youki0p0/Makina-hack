@@ -140,6 +140,33 @@ function SetupScreen() {
       {/* オペレーター選択 */}
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
         <div className="mb-2 text-xs font-bold text-gray-300">② オペレーター（あなたの分身）</div>
+
+        {/* 選択中オペレーターの立ち絵プレビュー */}
+        <div
+          className="mb-2 flex items-center gap-3 rounded-xl border p-2"
+          style={{ borderColor: op.palette[1], background: `${op.palette[0]}33` }}
+        >
+          <div
+            style={{ background: `radial-gradient(circle at 40% 25%, ${op.palette[2]}55, transparent 70%)` }}
+            className="flex h-24 w-20 shrink-0 items-end justify-center rounded-lg"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/arena/operators/${op.id}.png`}
+              alt={op.name}
+              style={{ imageRendering: "pixelated", maxHeight: "100%", animation: "fxBob 3s ease-in-out infinite" }}
+            />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-black" style={{ color: op.palette[2] }}>
+              {op.name}
+            </div>
+            <div className="text-[10px] text-gray-300">{op.title}</div>
+            <div className="mt-1 text-[10px] font-bold text-amber-300">◆ {op.passiveName}</div>
+            <div className="text-[10px] text-gray-300">{op.passiveDesc}</div>
+          </div>
+        </div>
+
         <div className="flex flex-col gap-1.5">
           {OPERATORS.map((o) => (
             <button
