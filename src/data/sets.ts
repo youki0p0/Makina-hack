@@ -41,6 +41,8 @@ export interface SetTierBonus {
   dropRateMult?: number;
   /** レアドロップ比率の加算（rollLoot の rareBonus に加算）。 */
   rareDropBonus?: number;
+  /** 【隠し】ドロップが「強化ドロップ」(★最大+1・変動ステ最大級)になる確率(0..1)。UI非表示の裏効果。 */
+  dropUpgradeChance?: number;
 }
 
 export interface SetDef {
@@ -257,7 +259,9 @@ export const SET_DEFS: readonly SetDef[] = [
     bonuses: [
       { pieces: 2, desc: "リロール時に出目6が確定＋30%で与ダメージ2倍", rerollSix: true, doubleDmgChance: 0.3 },
       { pieces: 4, desc: "回避力極大（敵の攻撃を45%無効化）", dodge: 0.45 },
-      { pieces: 6, desc: "ドロップ率2倍＋レアドロップ比率増加", dropRateMult: 2, rareDropBonus: 50 },
+      // 6pcは表示効果(ドロップ率2倍＋レア比率増加)に加え、UI非表示の隠し効果として
+      // 「強化ドロップ」(★最大+1・変動ステ最大級)が一定確率で発動する。
+      { pieces: 6, desc: "ドロップ率2倍＋レアドロップ比率増加", dropRateMult: 2, rareDropBonus: 50, dropUpgradeChance: 0.5 },
     ],
   },
 ];
@@ -440,6 +444,8 @@ export interface SetEffects {
   dropRateMult: number;
   /** レアドロップ比率の加算。 */
   rareDropBonus: number;
+  /** 【隠し】「強化ドロップ」(★最大+1・変動ステ最大級)になる確率(0..1)。UI非表示。 */
+  dropUpgradeChance: number;
   /** 最終的な攻撃倍率(★スケール後の attack に (1+attackPct) を乗算)。 */
   attackPct: number;
   /** 最終的なHP倍率(maxHp に (1+maxHpPct) を乗算)。 */
@@ -641,6 +647,7 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
     doubleDmgChance: 0,
     dropRateMult: 1,
     rareDropBonus: 0,
+    dropUpgradeChance: 0,
     attackPct: 0,
     maxHpPct: 0,
     activeTiers: [],
@@ -672,6 +679,7 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
       if (b.doubleDmgChance) eff.doubleDmgChance = Math.max(eff.doubleDmgChance, b.doubleDmgChance);
       if (b.dropRateMult) eff.dropRateMult *= b.dropRateMult;
       if (b.rareDropBonus) eff.rareDropBonus += b.rareDropBonus;
+      if (b.dropUpgradeChance) eff.dropUpgradeChance = Math.max(eff.dropUpgradeChance, b.dropUpgradeChance);
       if (b.faceOneToTwo) eff.diceModifiers.push(gamblerFaceOneToTwo());
     }
   }

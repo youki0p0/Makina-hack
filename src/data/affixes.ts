@@ -28,6 +28,13 @@ export const AFFIXES: readonly Affix[] = [
 ];
 
 const NORMAL_AFFIXES = AFFIXES.filter((a) => !a.volatileOnly);
+/** The "greater" affixes — the biggest variable-stat swings (the MAX rolls). */
+const GREATER_AFFIXES = AFFIXES.filter((a) => a.volatileOnly);
+
+/** Apply a MAX-roll (greater) affix to an item — the biggest variable-stat swing. */
+export function applyMaxAffix(item: Equipment): Equipment {
+  return applyAffix(item, pickAffix(GREATER_AFFIXES));
+}
 
 const AFFIX_MAP: Map<string, Affix> = new Map(AFFIXES.map((a) => [a.id, a]));
 

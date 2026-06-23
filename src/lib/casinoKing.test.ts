@@ -86,5 +86,7 @@ describe("伝説賭博セット", () => {
     // 6pc: ドロップ率2倍＋レアドロップ比率増加。
     expect(eff.dropRateMult).toBeCloseTo(2);
     expect(eff.rareDropBonus).toBeGreaterThan(0);
+    // 6pc 隠し効果: 強化ドロップ(★最大+1・変動ステ最大級)。UI非表示だが効果は有効。
+    expect(eff.dropUpgradeChance).toBeGreaterThan(0);
   });
 });

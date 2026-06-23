@@ -49,6 +49,7 @@ import {
 } from "@/data/items";
 import { forgeCost, forgeMax, rollForge, starInjectCost, type ForgeKind } from "@/data/forge";
 import { applyModifier, modTierForFloor, rollDropModTier } from "@/data/modifiers";
+import { applyMaxAffix } from "@/data/affixes";
 import { computeSetEffects, getSetDef } from "@/data/sets";
 import { getTitle, titleSouls } from "@/data/titles";
 import { grantTitles } from "@/lib/titleAward";
@@ -2506,9 +2507,16 @@ export const useGameStore = create<GameState>((set, get) => {
     const drops: Equipment[] = [];
     for (let i = 0; i < dropCount; i++) {
       const hint = Math.random() < 0.6 ? weakSlot : undefined;
-      const d = rollLoot(lootEnemy, state.currentFloor, rareBonus, hint);
+      let d = rollLoot(lootEnemy, state.currentFloor, rareBonus, hint);
       if (!d) continue;
-      drops.push(applyModifier(d, rollDropModTier(state.currentFloor, diff.upswing)));
+      let modTier = rollDropModTier(state.currentFloor, diff.upswing);
+      // 【隠し】伝説賭博セット完成(6pc)の裏効果: 一定確率で「強化ドロップ」化
+      // (その階層の★最大+1・変動ステを最大級アフィックスに)。UIには表示しない。
+      if (setEff.dropUpgradeChance > 0 && Math.random() < setEff.dropUpgradeChance) {
+        modTier = Math.max(modTier, modTierForFloor(state.currentFloor) + 1);
+        if (!d.affixId) d = applyMaxAffix(d);
+      }
+      drops.push(applyModifier(d, modTier));
     }
     const drop = drops[0] ?? null;
 
