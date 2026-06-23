@@ -1,9 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import type { OperatorDef } from "@/types/arena";
 
 /**
- * プレーヤーキャラ（オペレーター）の常時表示バッジ。「この人が使役している」と
- * 一目で分かるよう、固有パレットの円形アバター＋称号で示す。ドット絵差分が
- * 用意できるまでは絵文字アバターで代用。
+ * プレーヤーキャラ（オペレーター）の常時表示バッジ。専用ドット絵スプライト
+ * （/arena/operators/<id>.png）を円形アバターに表示。読み込み失敗時は絵文字に
+ * フォールバックする。
  */
 export default function OperatorBadge({
   operator,
@@ -15,6 +18,7 @@ export default function OperatorBadge({
   showPassive?: boolean;
 }) {
   const [dark, mid, light] = operator.palette;
+  const [err, setErr] = useState(false);
   return (
     <div className="flex items-center gap-2">
       <div
@@ -23,14 +27,23 @@ export default function OperatorBadge({
           height: size,
           background: `radial-gradient(circle at 30% 25%, ${light} 0%, ${mid} 45%, ${dark} 100%)`,
           borderColor: light,
-          imageRendering: "pixelated",
         }}
-        className="flex items-center justify-center rounded-full border-2 shadow-md"
+        className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 shadow-md"
         aria-label={operator.name}
       >
-        <span style={{ fontSize: size * 0.5 }} className="leading-none">
-          {operator.emoji}
-        </span>
+        {!err ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/arena/operators/${operator.id}.png`}
+            alt={operator.name}
+            onError={() => setErr(true)}
+            style={{ imageRendering: "pixelated", width: "128%", height: "128%", objectFit: "cover" }}
+          />
+        ) : (
+          <span style={{ fontSize: size * 0.5 }} className="leading-none">
+            {operator.emoji}
+          </span>
+        )}
       </div>
       <div className="leading-tight">
         <div className="text-[11px] font-bold text-gray-100">

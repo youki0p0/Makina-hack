@@ -78,9 +78,14 @@ export default function MonsterColumn({
             background: `radial-gradient(circle at 30% 25%, ${op.palette[2]} 0%, ${op.palette[1]} 45%, ${op.palette[0]} 100%)`,
             borderColor: op.palette[2],
           }}
-          className="flex h-7 w-7 items-center justify-center rounded-full border-2"
+          className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border-2"
         >
-          <span className="text-sm leading-none">{op.emoji}</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/arena/operators/${op.id}.png`}
+            alt={op.name}
+            style={{ imageRendering: "pixelated", width: "130%", height: "130%", objectFit: "cover" }}
+          />
         </div>
         <div className="min-w-0 leading-tight">
           <div className="truncate text-[9px] font-bold text-gray-100">{op.name}</div>
