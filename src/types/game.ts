@@ -86,6 +86,11 @@ export interface DiceFaceEffect {
   stun?: number;
   /** Amount to reduce the enemy's attack (weaken) for a few turns. */
   weaken?: number;
+  /**
+   * 弱体を「敵攻撃の割合(0-1)」で与える。深層では固定値が誤差になるため、
+   * 付与時の敵攻撃 × weakenPct を弱体量に変換する（flat weaken と高い方を採用）。
+   */
+  weakenPct?: number;
 }
 
 /**

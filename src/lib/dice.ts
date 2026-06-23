@@ -97,5 +97,6 @@ function mergeEffect(
     statusEffect,
     stun: Math.max(base.stun ?? 0, patch.stun ?? 0),
     weaken: Math.max(base.weaken ?? 0, patch.weaken ?? 0),
+    weakenPct: Math.max(base.weakenPct ?? 0, patch.weakenPct ?? 0),
   };
 }
