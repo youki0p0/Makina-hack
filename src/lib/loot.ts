@@ -125,7 +125,7 @@ export function rollLoot(
   // Set-piece drop (build-defining gear). Sets unlock by depth and scale forever.
   const setChance = enemy.isBoss ? 0.18 : 0.12;
   if (availableSetKeys(floor).length > 0 && Math.random() < setChance) {
-    return withQuality(rollSetDrop(floor));
+    return withQuality(rollSetDrop(floor), floor);
   }
 
   // Floor-gated curated pool (recent window), with fallbacks.
@@ -147,17 +147,17 @@ export function rollLoot(
       if (enemy.isBoss && it.rarity !== "common") w += 25;
       return w;
     });
-    return withQuality(item);
+    return withQuality(item, floor);
   }
 
   // Procedural stat gear, floor-appropriate, optionally targeting a weak slot.
   const bias = rareBonus + (enemy.isBoss ? 25 : 0);
-  return withQuality(rollAffixedCopy(rollGenDrop(floor, bias, slotHint)));
+  return withQuality(rollAffixedCopy(rollGenDrop(floor, bias, slotHint)), floor);
 }
 
-/** Roll an Ancient/Mythic upgrade onto a (legendary) drop. */
-function withQuality(item: Equipment): Equipment {
-  return applyQuality(item, rollQuality(item));
+/** Roll an Ancient/Mythic upgrade onto a (legendary) drop（深層ほど上位が出やすい）。 */
+function withQuality(item: Equipment, floor = 1): Equipment {
+  return applyQuality(item, rollQuality(item, floor));
 }
 
 /**
