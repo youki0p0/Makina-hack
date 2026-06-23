@@ -225,7 +225,7 @@ export default function KingChallenge() {
       <div className="rounded-2xl border border-violet-500/40 bg-violet-500/5 p-3">
         <p className="text-sm font-bold text-violet-200">👑 伝説賭博セット（部位指定で交換）</p>
         <p className="mt-0.5 text-[10px] text-gray-400">
-          回避力極大／リロール時6確定／ドロップ超向上の“バランス壊れ”装備。ハイコインでのみ交換。
+          出目6確定＋会心の2倍／回避45%／ドロップ率2倍&レア比率増の“伝説級”装備。ハイコインでのみ交換。
         </p>
         <div className="mt-2 grid grid-cols-3 gap-1">
           {EQUIP_SLOTS.map((sl) => (
