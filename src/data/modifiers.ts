@@ -20,10 +20,10 @@ export const DEEP_RAMP_TIER = 200;
 /**
  * 開始tier以降、1tier(50階)ごとに敵ランプへ加算する量。mult=1+ramp*tier なので
  * これは敵の伸びを超線形(≒二次)にし、2万階以上を段階的にかなり難しくする。
- * 例: 20,000階(tier400) で ramp +1.80、30,000階(tier600) で +3.60。
+ * 例: 20,000階(tier400) で ramp +6.0、30,000階(tier600) で +12.0。
  * （深層はプレイヤーの総合火力が非常に高いため、効かせるには大きめの傾きが要る。）
  */
-export const DEEP_RAMP_SLOPE = 0.009;
+export const DEEP_RAMP_SLOPE = 0.03;
 
 /** How many floors between star tiers. */
 export const FLOORS_PER_STAR = 50;
