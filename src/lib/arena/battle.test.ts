@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { simulateBattle } from "@/lib/arena/battle";
+import { isBossRound, simulateBattle } from "@/lib/arena/battle";
 import { generateDraft, newRun } from "@/lib/arena/gameState";
 import { computeSynergies } from "@/lib/arena/synergy";
 import { fieldTransform } from "@/lib/arena/fieldTransform";
-import { SKILLS } from "@/data/arena/cards";
+import { ALL_CARDS, EQUIPMENT, SKILLS, isSkill } from "@/data/arena/cards";
+import { MONSTERS } from "@/data/arena/monsters";
+import { FIELDS } from "@/data/arena/fields";
 import type { FieldId, MonsterBuild } from "@/types/arena";
 
 const ALL_FIELDS: FieldId[] = ["forest", "volcano", "rain", "thunder", "ruins", "sanctuary"];
@@ -80,6 +82,57 @@ describe("fieldTransform", () => {
     expect(t.name).toBe("蒸気斬り");
     expect(t.apply?.some((a) => a.status === "burn")).toBe(false);
     expect(t.apply?.some((a) => a.status === "blind")).toBe(true);
+  });
+});
+
+describe("ボスラウンド", () => {
+  it("5の倍数だけがボス", () => {
+    expect(isBossRound(5)).toBe(true);
+    expect(isBossRound(10)).toBe(true);
+    expect(isBossRound(7)).toBe(false);
+    expect(isBossRound(1)).toBe(false);
+  });
+
+  it("ボス戦の結果は boss=true、通常戦は false", () => {
+    const b = rainbowBuilds();
+    expect(simulateBattle(b, "calibrator", "ruins", 5, "long").boss).toBe(true);
+    expect(simulateBattle(b, "calibrator", "ruins", 6, "long").boss).toBe(false);
+  });
+});
+
+describe("新シナジー", () => {
+  it("fireタグ3つで業火結界が点く", () => {
+    const fire: MonsterBuild[] = [
+      { monsterId: "ember_imp", equipmentIds: ["blaze_ring"], skillIds: ["flame_slash"] },
+      { monsterId: "magma_beast", equipmentIds: [], skillIds: ["area_blast"] },
+      { monsterId: "blade_dancer", equipmentIds: [], skillIds: [] },
+    ];
+    const { views, mods } = computeSynergies(fire, "calibrator");
+    expect(views.some((v) => v.id === "fire3")).toBe(true);
+    expect(mods.burnBonus).toBeGreaterThan(0);
+  });
+});
+
+describe("データ整合性", () => {
+  it("モンスターIDは一意で9体、フィールドは6種", () => {
+    expect(new Set(MONSTERS.map((m) => m.id)).size).toBe(MONSTERS.length);
+    expect(MONSTERS.length).toBe(9);
+    expect(FIELDS.length).toBe(6);
+  });
+
+  it("カードIDは一意、技は cooldown>0 / 装備はステ補正を持つ", () => {
+    expect(new Set(ALL_CARDS.map((c) => c.id)).size).toBe(ALL_CARDS.length);
+    for (const c of ALL_CARDS) {
+      if (isSkill(c)) {
+        expect(c.cooldown).toBeGreaterThan(0);
+      }
+    }
+    for (const e of EQUIPMENT) {
+      const total =
+        (e.hp ?? 0) + (e.attack ?? 0) + (e.defense ?? 0) + (e.speed ?? 0) +
+        (e.reflectPct ?? 0) + (e.regen ?? 0) + (e.critAdd ?? 0) + (e.grantRevive ? 1 : 0);
+      expect(total).toBeGreaterThan(0);
+    }
   });
 });
 
