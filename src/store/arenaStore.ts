@@ -140,6 +140,7 @@ export const useArenaStore = create<ArenaStore>((set, get) => ({
       run.round,
       run.mode,
       run.blessings,
+      run.losses, // 逆境ボーナス：負け数に応じて味方を底上げ
     );
     const next: RunState = { ...run, phase: "battle", lastResult: result };
     persistRun(next);
