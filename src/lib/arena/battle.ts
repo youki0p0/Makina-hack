@@ -64,7 +64,11 @@ interface Combatant {
   shield: number;
   alive: boolean;
   revive: boolean;
+  dealt: number; // 与えた総ダメージ（MVP集計用）
 }
+
+// 1戦のうちで最初に倒れたユニット（勝因/敗因サマリ用）。simulateBattle 開始時にリセット。
+let firstDown: { name: string; side: "ally" | "enemy" } | null = null;
 
 const MAX_TICKS = 420;
 
@@ -121,12 +125,14 @@ function dealDamage(
   dmg = Math.round(dmg);
 
   // シールドで吸収
+  const before = dmg;
   if (target.shield > 0) {
     const absorbed = Math.min(target.shield, dmg);
     target.shield -= absorbed;
     dmg -= absorbed;
   }
   if (dmg > 0) target.hp -= dmg;
+  attacker.dealt += before; // 与ダメ集計（シールド込みの貢献）
 
   // 反射（DoT ではない直接攻撃のみ）
   if (target.reflectPct > 0 && attacker.alive && attacker !== target) {
@@ -151,6 +157,7 @@ function checkDeath(c: Combatant, events: string[]) {
       c.alive = false;
       c.hp = 0;
       events.push(`💀 ${c.name} が倒れた`);
+      if (firstDown === null) firstDown = { name: c.name, side: c.side };
     }
   }
 }
@@ -222,8 +229,8 @@ function buildAllies(
     let focusPowerMult = 1;
     let dmgTakenMult = 1;
     if (focused) {
-      focusPowerMult = 1.25 + (op.passive.focusPowerBoost ?? 0);
-      dmgTakenMult = 1.2;
+      focusPowerMult = 1.4 + (op.passive.focusPowerBoost ?? 0);
+      dmgTakenMult = 1.1;
     }
 
     // 色 CT 短縮（オペレーター）
@@ -260,7 +267,8 @@ function buildAllies(
       statuses: [],
       shield: mods.shieldStart,
       alive: true,
-      revive: fieldGrantsRevive(field) || equipRevive,
+      revive: fieldGrantsRevive(field) || equipRevive || mods.reviveOnce,
+      dealt: 0,
     };
     c.hp = c.maxHp;
     // CT 倍率を後で再利用するため skillTimer に反映済み（リセット時も同倍率）
@@ -293,6 +301,12 @@ function buildEnemies(
   rng: () => number,
 ): Combatant[] {
   const enemies: Combatant[] = [];
+  // 敵も色シナジーを持つ（赤=攻撃 / 緑=再生 / 青=速度）。読み合いを深くする。
+  const ecolors = [0, 1, 2].map((s) => MONSTERS[(round * 3 + s) % MONSTERS.length].color);
+  const cnt = (c: MonsterColor) => ecolors.filter((x) => x === c).length;
+  const eAtkMult = 1 + cnt("red") * 0.04;
+  const eSpdMult = 1 + cnt("blue") * 0.04;
+  const eRegen = cnt("green") * 2;
   for (let slot = 0; slot < 3; slot++) {
     const st = enemyStat(round, field, slot);
     const m = st.m;
@@ -310,21 +324,22 @@ function buildEnemies(
       slot,
       maxHp: st.maxHp,
       hp: 0,
-      baseAttack: st.attack,
+      baseAttack: Math.round(st.attack * eAtkMult),
       baseDefense: st.defense,
-      baseSpeed: st.speed,
+      baseSpeed: Math.max(1, Math.round(st.speed * eSpdMult)),
       crit: 5,
       reflectPct: 0,
-      regenFlat: 0,
+      regenFlat: eRegen,
       dmgTakenMult: 1,
       focusPowerMult: 1,
       skills,
       skillTimer: skills.map((s) => Math.max(12, Math.round(s.cooldown * 0.8))),
-      attackTimer: Math.max(4, Math.round(100 / Math.max(1, m.speed))),
+      attackTimer: Math.max(4, Math.round(100 / Math.max(1, st.speed * eSpdMult))),
       statuses: [],
       shield: 0,
       alive: true,
       revive: fieldGrantsRevive(field),
+      dealt: 0,
     };
     c.hp = c.maxHp;
     (c as Combatant & { cdMult: number }).cdMult = 1;
@@ -448,7 +463,9 @@ function castSkill(
   if (isOffense) {
     const foes = livingFoes(all, caster.side);
     if (foes.length === 0) return;
-    const baseRaw = atk * skill.power * critMult * caster.focusPowerMult;
+    // レア度で威力に差（量より質：コモン乱発を抑え、強カードの価値を上げる）
+    const rf = skill.rarity === 1 ? 0.9 : skill.rarity === 3 ? 1.15 : 1;
+    const baseRaw = atk * skill.power * critMult * caster.focusPowerMult * rf;
 
     if (skill.targeting === "area") {
       for (const f of foes) dealDamage(caster, f, Math.round(baseRaw * 0.9), !!skill.pierce, events);
@@ -551,6 +568,7 @@ export function simulateBattle(
 ): BattleResult {
   const { mods } = computeSynergies(builds, operatorId);
   applyBlessings(mods, blessings);
+  firstDown = null; // 1戦ごとにリセット
   const rng = mulberry32(round * 2654435761 + builds.length * 40503 + 7);
 
   const allies = buildAllies(builds, operatorId, field, mods);
@@ -633,6 +651,15 @@ export function simulateBattle(
   frames.push({ tick: MAX_TICKS, units: snapshot(all), events: [endMsg] });
   log.push(endMsg);
 
+  const topAlly = allies.reduce<Combatant | null>(
+    (best, c) => (best === null || c.dealt > best.dealt ? c : best),
+    null,
+  );
+  const mvp =
+    topAlly && topAlly.dealt > 0
+      ? { name: topAlly.name, dealt: Math.round(topAlly.dealt) }
+      : null;
+
   return {
     win,
     reason,
@@ -643,5 +670,7 @@ export function simulateBattle(
     field,
     round,
     boss,
+    mvp,
+    firstDown,
   };
 }

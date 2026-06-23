@@ -255,6 +255,8 @@ export interface BattleResult {
   field: FieldId;
   round: number;
   boss: boolean;
+  mvp: { name: string; dealt: number } | null; // 最大ダメージを出した味方
+  firstDown: { name: string; side: "ally" | "enemy" } | null; // 最初に倒れたユニット
 }
 
 export interface RankRecord {

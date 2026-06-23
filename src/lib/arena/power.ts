@@ -12,7 +12,8 @@ import type { FieldId, MonsterBuild, TeamMods } from "@/types/arena";
  */
 
 function statPower(hp: number, attack: number, defense: number, speed: number): number {
-  return hp * 0.08 + attack * 1.3 + defense * 1.1 + speed * 0.8;
+  // 実プレイテストに合わせ、生存（HP/防御）の寄与を引き上げ攻撃偏重を是正。
+  return hp * 0.11 + attack * 1.0 + defense * 1.3 + speed * 0.7;
 }
 
 /** チーム補正(シナジー+祝福)を1つのスカラー倍率に丸める。 */
@@ -31,9 +32,11 @@ function unitRawPower(build: MonsterBuild, field: FieldId, operatorId: string): 
   for (const id of build.skillIds) {
     const c = getCard(id);
     if (!c || !isSkill(c)) continue;
-    v += 6 + c.power * 5 + (c.heal ?? 0) * 5 + (c.shield ?? 0) * 0.15 + c.rarity * 2;
+    // レア度威力差(#3)を反映。回復/シールドは生存に効くため厚めに評価。
+    const rf = c.rarity === 1 ? 0.9 : c.rarity === 3 ? 1.15 : 1;
+    v += 5 + c.power * 5 * rf + (c.heal ?? 0) * 8 + (c.shield ?? 0) * 0.25 + c.rarity * 2;
   }
-  if (p.focused) v *= 1.1; // 集中エースはやや高評価
+  if (p.focused) v *= 1.15; // 集中エースは強化済み(#1)なので相応に高評価
   return v;
 }
 

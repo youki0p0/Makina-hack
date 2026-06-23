@@ -54,6 +54,18 @@ export default function ResultView({
             {r.reason === "timeout" ? "時間切れ：残HP合計で判定" : "全滅で決着"}
             （味方残HP {r.allyHpLeft} / 敵残HP {r.enemyHpLeft}）
           </p>
+          <div className="flex flex-wrap justify-center gap-2 text-[11px]">
+            {r.mvp && (
+              <span className="rounded-lg bg-amber-500/15 px-2 py-1 text-amber-200">
+                🏅 MVP: {r.mvp.name}（{r.mvp.dealt}ダメージ）
+              </span>
+            )}
+            {r.firstDown && (
+              <span className="rounded-lg bg-white/10 px-2 py-1 text-gray-300">
+                {r.firstDown.side === "ally" ? "💀 先に落ちた味方" : "🎯 最初に倒した敵"}: {r.firstDown.name}
+              </span>
+            )}
+          </div>
         </>
       )}
 
