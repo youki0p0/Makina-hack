@@ -25,6 +25,7 @@ import MonsterColumn from "@/components/arena/MonsterColumn";
 import MonsterSprite from "@/components/arena/MonsterSprite";
 import OperatorBadge from "@/components/arena/OperatorBadge";
 import ResultView from "@/components/arena/ResultView";
+import TutorialCoach from "@/components/arena/TutorialCoach";
 
 export default function ArenaPage() {
   const hydrate = useArenaStore((s) => s.hydrate);
@@ -258,8 +259,20 @@ function GameScreen() {
   const clearFresh = useArenaStore((s) => s.clearFreshAchievements);
 
   const [selected, setSelected] = useState<string | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
   const op = getOperator(run.operatorId);
   const cfg = MODE_CONFIG[run.mode];
+
+  // 初回プレイ時、準備画面で対話式チュートリアルを自動表示
+  useEffect(() => {
+    if (window.localStorage.getItem("arena-tutorial-seen") !== "1") setShowTutorial(true);
+  }, []);
+  const closeTutorial = () => {
+    setShowTutorial(false);
+    try {
+      window.localStorage.setItem("arena-tutorial-seen", "1");
+    } catch {}
+  };
 
   if (run.phase === "battle" && run.lastResult) {
     return <BattleView result={run.lastResult} onFinished={finishBattle} />;
@@ -306,12 +319,20 @@ function GameScreen() {
 
   return (
     <>
+      {showTutorial && <TutorialCoach onClose={closeTutorial} />}
       {/* ヘッダー：成績 + オペレーター */}
       <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-2">
         <OperatorBadge operator={op} size={32} />
         <div className="flex items-center gap-1.5 text-[10px] font-bold">
           <span className="rounded bg-emerald-500/20 px-2 py-1">🏅{run.wins}/{cfg.targetWins}</span>
           <span className="rounded bg-white/10 px-2 py-1">❤️{run.life}</span>
+          <button
+            onClick={() => setShowTutorial(true)}
+            className="rounded bg-white/10 px-2 py-1 active:scale-95"
+            aria-label="チュートリアル"
+          >
+            ❔
+          </button>
           <SoundToggle />
         </div>
       </div>
