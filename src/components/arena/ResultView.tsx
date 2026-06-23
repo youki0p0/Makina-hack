@@ -1,0 +1,85 @@
+import { MODE_CONFIG } from "@/lib/arena/gameState";
+import { rankTitle } from "@/lib/arena/rank";
+import type { RunState } from "@/types/arena";
+
+/** ラウンド結果 / 優勝 / 敗退の表示。 */
+export default function ResultView({
+  run,
+  onNext,
+  onQuit,
+}: {
+  run: RunState;
+  onNext: () => void;
+  onQuit: () => void;
+}) {
+  const cfg = MODE_CONFIG[run.mode];
+  const r = run.lastResult;
+  const terminal = run.phase === "victory" || run.phase === "gameover";
+
+  return (
+    <div className="flex flex-col items-center gap-4 py-6 text-center">
+      {run.phase === "victory" && (
+        <>
+          <div className="text-5xl">🏆</div>
+          <h2 className="text-2xl font-black text-amber-300">優勝！</h2>
+          <p className="text-sm text-gray-300">
+            {cfg.label}を {run.wins} 勝で制覇！ ランク <b>{rankTitle(run.wins)}</b>
+          </p>
+        </>
+      )}
+      {run.phase === "gameover" && (
+        <>
+          <div className="text-5xl">🥀</div>
+          <h2 className="text-2xl font-black text-rose-300">敗退…</h2>
+          <p className="text-sm text-gray-300">
+            {run.wins} 勝 / {run.round} 回戦で力尽きた。次はビルドを変えて挑もう。
+          </p>
+        </>
+      )}
+      {!terminal && r && (
+        <>
+          <div className="text-5xl">{r.win ? "✨" : "💢"}</div>
+          <h2 className={`text-xl font-black ${r.win ? "text-emerald-300" : "text-rose-300"}`}>
+            {r.win ? "このラウンド 勝利！" : "このラウンド 敗北…"}
+          </h2>
+          <p className="text-xs text-gray-400">
+            {r.reason === "timeout" ? "時間切れ：残HP合計で判定" : "全滅で決着"}
+            （味方残HP {r.allyHpLeft} / 敵残HP {r.enemyHpLeft}）
+          </p>
+        </>
+      )}
+
+      <div className="flex gap-3 text-sm font-bold text-gray-200">
+        <span className="rounded-lg bg-emerald-500/20 px-3 py-1">🏅 {run.wins} 勝</span>
+        <span className="rounded-lg bg-white/10 px-3 py-1">❤️ ライフ {run.life}</span>
+        <span className="rounded-lg bg-white/10 px-3 py-1">🎯 目標 {cfg.targetWins} 勝</span>
+      </div>
+
+      <div className="mt-2 flex w-full max-w-xs flex-col gap-2">
+        {!terminal ? (
+          <button
+            onClick={onNext}
+            className="rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white active:scale-95"
+          >
+            ▶ 次のラウンドへ
+          </button>
+        ) : (
+          <button
+            onClick={onQuit}
+            className="rounded-2xl bg-emerald-600 py-3 text-base font-extrabold text-white active:scale-95"
+          >
+            🏠 メニューへ戻る
+          </button>
+        )}
+        {!terminal && (
+          <button
+            onClick={onQuit}
+            className="rounded-xl bg-white/10 py-2 text-xs font-bold text-gray-300 active:scale-95"
+          >
+            ✖ ゲームをやめてメニューへ
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
