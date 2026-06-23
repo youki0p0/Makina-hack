@@ -171,7 +171,7 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     maxHp: 0,
     rerollModifier: 0,
     minFloor: 20,
-    description: "【呪術師専用】攻撃+12。2以上で強毒(5T)、4以上で攻-8、6で大呪火。",
+    description: "【呪術師専用】攻撃+12。2以上で強毒(5T)、4以上で敵攻-35%、6で大呪火。",
     diceModifiers: [
       {
         faces: [2, 3],
@@ -183,11 +183,11 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
         faces: [4, 5],
         effect: {
           kind: "weaken",
-          weaken: 8,
+          weakenPct: 0.35,
           statusEffect: { kind: "poison", damagePerTurnMultiplier: 0.5, turns: 5 },
         },
         label: "大呪詛",
-        description: "4〜5: 敵の攻撃-8＋強毒",
+        description: "4〜5: 敵の攻撃-35%＋強毒",
       },
       {
         faces: [6],
@@ -342,13 +342,13 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
     defense: 0,
     maxHp: 0,
     rerollModifier: 0,
-    description: "【固有】攻撃力+5。2〜3で敵を弱体化(攻撃ダウン)。",
+    description: "【固有】攻撃力+5。2〜3で敵を弱体化(攻撃-10%)。",
     diceModifiers: [
       {
         faces: [2, 3],
-        effect: { kind: "weaken", weaken: 2 },
+        effect: { kind: "weaken", weakenPct: 0.1 },
         label: "弱体化",
-        description: "2〜3: 敵の攻撃-2",
+        description: "2〜3: 敵の攻撃-10%",
       },
     ],
   },

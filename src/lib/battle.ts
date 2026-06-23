@@ -197,7 +197,10 @@ export function resolvePlayerAction(
     logs.push(`スタン！ 敵は${stun}ターン動けない`);
   }
 
-  const weaken = e.weaken && e.weaken > 0 ? e.weaken : 0;
+  // 弱体は固定値(weaken)と割合(weakenPct×付与時の敵攻撃)の高い方。割合は深層でもスケールする。
+  const flatWeaken = e.weaken && e.weaken > 0 ? e.weaken : 0;
+  const pctWeaken = e.weakenPct && e.weakenPct > 0 ? Math.round(enemy.attack * e.weakenPct) : 0;
+  const weaken = Math.max(flatWeaken, pctWeaken);
   if (weaken > 0) {
     logs.push(`弱体化！ 敵の攻撃-${weaken} (${WEAKEN_TURNS}T)`);
   }

@@ -160,11 +160,11 @@ export const CLASSES: readonly CharacterClass[] = [
         faces: [3, 4, 5],
         effect: {
           kind: "weaken",
-          weaken: 5,
+          weakenPct: 0.2,
           statusEffect: { kind: "poison", damagePerTurnMultiplier: 0.3, turns: 4 },
         },
         label: "呪詛",
-        description: "3〜5: 敵の攻撃-5＋強毒",
+        description: "3〜5: 敵の攻撃-20%＋強毒",
       },
       {
         faces: [6],
