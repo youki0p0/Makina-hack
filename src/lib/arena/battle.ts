@@ -16,6 +16,7 @@ import type {
   FieldId,
   GameMode,
   MonsterBuild,
+  MonsterColor,
   SkillCard,
   StatusType,
   TeamMods,
@@ -291,34 +292,27 @@ function buildEnemies(
   field: FieldId,
   rng: () => number,
 ): Combatant[] {
-  const boss = isBossRound(round);
-  const sf = (1 + (round - 1) * 0.2) * (boss ? 1.25 : 1);
-  const fStat = fieldStatMods(field);
-  const nSkills = boss ? 3 : round < 3 ? 1 : round < 9 ? 2 : 3;
   const enemies: Combatant[] = [];
-
   for (let slot = 0; slot < 3; slot++) {
-    const m = MONSTERS[(round * 3 + slot) % MONSTERS.length];
-    // ボス戦は中央(slot 1)を強大な「ボス」に。HP・攻撃を盛る（勝てる範囲で）。
-    const bossLead = boss && slot === 1;
-    const lead = bossLead ? 1.6 : 1;
+    const st = enemyStat(round, field, slot);
+    const m = st.m;
     const skills: EffectiveSkill[] = [];
-    for (let i = 0; i < nSkills; i++) {
+    for (let i = 0; i < st.nSkills; i++) {
       const id = ENEMY_SKILL_POOL[Math.floor(rng() * ENEMY_SKILL_POOL.length)];
       const base = SKILLS.find((s) => s.id === id);
       if (base) skills.push(fieldTransform(base, field, 0));
     }
     const c: Combatant = {
       uid: `enemy-${slot}-${m.id}`,
-      name: bossLead ? `【ボス】${m.name}` : m.name,
-      emoji: bossLead ? "👑" : m.emoji,
+      name: st.bossLead ? `【ボス】${m.name}` : m.name,
+      emoji: st.bossLead ? "👑" : m.emoji,
       side: "enemy",
       slot,
-      maxHp: Math.round(m.hp * sf * 1.05 * lead),
+      maxHp: st.maxHp,
       hp: 0,
-      baseAttack: Math.round(m.attack * sf * (bossLead ? 1.2 : 1)),
-      baseDefense: Math.round(m.defense * sf * fStat.defMult * (bossLead ? 1.3 : 1)),
-      baseSpeed: Math.max(1, Math.round(m.speed * fStat.spdMult)),
+      baseAttack: st.attack,
+      baseDefense: st.defense,
+      baseSpeed: st.speed,
       crit: 5,
       reflectPct: 0,
       regenFlat: 0,
@@ -337,6 +331,55 @@ function buildEnemies(
     enemies.push(c);
   }
   return enemies;
+}
+
+/** 敵1体の決定論ステータス（戦闘とプレビューで共有）。 */
+export function enemyStat(round: number, field: FieldId, slot: number) {
+  const boss = isBossRound(round);
+  const sf = (1 + (round - 1) * 0.2) * (boss ? 1.25 : 1);
+  const fStat = fieldStatMods(field);
+  const nSkills = boss ? 3 : round < 3 ? 1 : round < 9 ? 2 : 3;
+  const m = MONSTERS[(round * 3 + slot) % MONSTERS.length];
+  const bossLead = boss && slot === 1;
+  const lead = bossLead ? 1.6 : 1;
+  return {
+    m,
+    boss,
+    bossLead,
+    nSkills,
+    maxHp: Math.round(m.hp * sf * 1.05 * lead),
+    attack: Math.round(m.attack * sf * (bossLead ? 1.2 : 1)),
+    defense: Math.round(m.defense * sf * fStat.defMult * (bossLead ? 1.3 : 1)),
+    speed: Math.max(1, Math.round(m.speed * fStat.spdMult)),
+  };
+}
+
+export interface EnemyPreviewUnit {
+  id: string;
+  name: string;
+  emoji: string;
+  color: MonsterColor;
+  boss: boolean;
+  threat: string; // 脅威の一言ヒント
+}
+
+/** 次に戦う敵編成のプレビュー（色・脅威・ボス有無のみ。詳細ステータスは伏せる）。 */
+export function previewEnemies(round: number, field: FieldId): EnemyPreviewUnit[] {
+  const threatOf = (color: MonsterColor) =>
+    color === "red" ? "🔥 火力" : color === "green" ? "🛡️ 耐久/毒" : "💨 速さ/妨害";
+  const out: EnemyPreviewUnit[] = [];
+  for (let slot = 0; slot < 3; slot++) {
+    const st = enemyStat(round, field, slot);
+    out.push({
+      id: st.m.id,
+      name: st.bossLead ? `【ボス】${st.m.name}` : st.m.name,
+      emoji: st.bossLead ? "👑" : st.m.emoji,
+      color: st.m.color,
+      boss: st.bossLead,
+      threat: st.bossLead ? "👑 強大" : threatOf(st.m.color),
+    });
+  }
+  return out;
 }
 
 function applySkillStatuses(

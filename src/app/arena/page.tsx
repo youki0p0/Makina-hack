@@ -17,6 +17,7 @@ import BattleView from "@/components/arena/BattleView";
 import BlessingChoice from "@/components/arena/BlessingChoice";
 import BuildListPanel from "@/components/arena/BuildListPanel";
 import CodexOverlay from "@/components/arena/CodexOverlay";
+import EnemyPreview from "@/components/arena/EnemyPreview";
 import HelpOverlay from "@/components/arena/HelpOverlay";
 import CardDraft from "@/components/arena/CardDraft";
 import FieldBanner from "@/components/arena/FieldBanner";
@@ -322,6 +323,14 @@ function GameScreen() {
       )}
 
       <FieldBanner field={run.field} round={run.round} boss={isBossRound(run.round)} />
+
+      <EnemyPreview
+        builds={run.builds}
+        field={run.field}
+        operatorId={run.operatorId}
+        blessings={run.blessings}
+        round={run.round}
+      />
 
       <CardDraft
         draft={run.draft}
