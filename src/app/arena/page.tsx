@@ -7,8 +7,10 @@ import { OPERATORS } from "@/data/arena/operators";
 import { getOperator } from "@/data/arena/operators";
 import { MODE_CONFIG } from "@/lib/arena/gameState";
 import { rankTitle } from "@/lib/arena/rank";
+import { sfx } from "@/lib/audio/sfx";
 import { useArenaStore } from "@/store/arenaStore";
 import type { GameMode } from "@/types/arena";
+import SoundToggle from "@/components/SoundToggle";
 import BattleView from "@/components/arena/BattleView";
 import BuildListPanel from "@/components/arena/BuildListPanel";
 import CardDraft from "@/components/arena/CardDraft";
@@ -196,6 +198,7 @@ function GameScreen() {
     if (!selected) return;
     assignCard(selected, slot);
     setSelected(null);
+    sfx("coin");
   };
 
   return (
@@ -203,9 +206,10 @@ function GameScreen() {
       {/* ヘッダー：成績 + オペレーター */}
       <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-2">
         <OperatorBadge operator={op} size={32} />
-        <div className="flex gap-1.5 text-[10px] font-bold">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold">
           <span className="rounded bg-emerald-500/20 px-2 py-1">🏅{run.wins}/{cfg.targetWins}</span>
           <span className="rounded bg-white/10 px-2 py-1">❤️{run.life}</span>
+          <SoundToggle />
         </div>
       </div>
 
@@ -215,12 +219,18 @@ function GameScreen() {
         draft={run.draft}
         rerolls={run.rerolls}
         selectedCardId={selected}
-        onSelect={(id) => setSelected((cur) => (cur === id ? null : id))}
+        onSelect={(id) => {
+          setSelected((cur) => (cur === id ? null : id));
+          sfx("select");
+        }}
         onDiscard={(id) => {
           discardCard(id);
           if (selected === id) setSelected(null);
         }}
-        onReroll={rerollDraft}
+        onReroll={() => {
+          rerollDraft();
+          sfx("roll");
+        }}
       />
 
       {/* 2カラム：左=カードセット / 右=3体＋オペレーター（モックアップ準拠） */}
@@ -236,7 +246,10 @@ function GameScreen() {
       </div>
 
       <button
-        onClick={confirmPrep}
+        onClick={() => {
+          sfx("select");
+          confirmPrep();
+        }}
         className="sticky bottom-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 py-4 text-lg font-extrabold text-white shadow-xl active:scale-95"
       >
         ⚔️ 準備完了！！

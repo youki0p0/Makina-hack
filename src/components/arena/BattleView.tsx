@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getField } from "@/data/arena/fields";
+import { sfx } from "@/lib/audio/sfx";
 import type { BattleResult, StatusType, UnitSnapshot } from "@/types/arena";
 
 const STATUS_EMOJI: Record<StatusType, string> = {
@@ -75,6 +76,19 @@ export default function BattleView({
       if (timer.current) clearTimeout(timer.current);
     };
   }, [idx, done, speed]);
+
+  // フレームのイベントに応じて効果音（mute は engine 側で尊重）。1フレーム1音に絞る。
+  useEffect(() => {
+    const evs = result.frames[idx]?.events ?? [];
+    if (evs.length === 0) return;
+    const text = evs.join(" ");
+    if (text.includes("勝利")) sfx("win");
+    else if (text.includes("敗北")) sfx("lose");
+    else if (text.includes("クリティカル")) sfx("crit");
+    else if (text.includes("回復") || text.includes("蘇")) sfx("heal");
+    else if (text.includes("倒れた")) sfx("hurt");
+    else if (/⚔️|🔥|💥|🎯|🪞|火傷|毒/.test(text)) sfx("hit");
+  }, [idx, result.frames]);
 
   const enemies = frame.units.filter((u) => u.side === "enemy").sort((a, b) => a.slot - b.slot);
   const allies = frame.units.filter((u) => u.side === "ally").sort((a, b) => a.slot - b.slot);
