@@ -4,10 +4,13 @@
 // 結果が固定なので、振った後にリロードしても出目は変わらない（リロール不可）。
 // 報酬は Reward 型なので、store の rewardPatch でそのまま付与できる。
 //
-// 面ごとに報酬の“寄り”が違う：
-//   ⚔️ 攻めの目 … コイン/ゴールド寄り（手堅い）
-//   🛡️ 守りの目 … ★アップ素材寄り（コツコツ）
-//   ✦ 運の目   … 魂・レア刻印寄り（ハイリスク・ハイリターン）
+// 面ごとに“もらえる通貨”が違う。各面は出目6に同価値の大当たりを1つだけ持ち
+// （🎰コイン1000 ≒ 💠刻印1 ≒ 🪽魂1 が等価）、出目1〜5はその系統のおまけ。
+// 3面が等価なので「今日はどの通貨が欲しい？」という純粋な好みの選択になる：
+//   ⚔️ 攻めの目 … コイン/ゴールド（現金）。大当たり = 🎰コイン1000
+//   🛡️ 守りの目 … ★アップ素材（🔹欠片/🔶核）。大当たり = 💠刻印1
+//   ✦ 運の目   … ガチャ/コイン。大当たり = 🪽魂1
+// ※💠刻印は★アップの最希少素材なので、ばら撒かないよう「守りの出目6」1枠だけに限定。
 
 import type { Reward } from "@/types/game";
 
@@ -31,12 +34,12 @@ export const DICE_FACES: readonly DiceFaceDef[] = [
     label: "攻めの目",
     hint: "コイン寄り",
     rewards: [
-      { kind: "gold", amount: 200 },
-      { kind: "gold", amount: 350 },
-      { kind: "coins", amount: 30 },
-      { kind: "gold", amount: 600 },
-      { kind: "coins", amount: 60 },
-      { kind: "gold", amount: 1200 },
+      { kind: "gold", amount: 300 },
+      { kind: "gold", amount: 500 },
+      { kind: "coins", amount: 100 },
+      { kind: "gold", amount: 900 },
+      { kind: "coins", amount: 300 },
+      { kind: "coins", amount: 1000 }, // 大当たり（≒💠1・🪽1）
     ],
   },
   {
@@ -45,26 +48,26 @@ export const DICE_FACES: readonly DiceFaceDef[] = [
     label: "守りの目",
     hint: "★素材寄り",
     rewards: [
-      { kind: "gacha", amount: 20 },
+      { kind: "gacha", amount: 40 },
       { kind: "shard", amount: 2 },
-      { kind: "shard", amount: 3 },
-      { kind: "gacha", amount: 50 },
-      { kind: "shard", amount: 6 },
+      { kind: "shard", amount: 4 },
+      { kind: "core", amount: 1 },
       { kind: "core", amount: 2 },
+      { kind: "sigil", amount: 1 }, // 大当たり（最希少素材・この1枠だけ）
     ],
   },
   {
     id: "luck",
     emoji: "✦",
     label: "運の目",
-    hint: "魂・レア寄り",
+    hint: "魂・一発",
     rewards: [
       { kind: "gacha", amount: 30 },
-      { kind: "coins", amount: 40 },
-      { kind: "souls", amount: 1 },
-      { kind: "gacha", amount: 80 },
-      { kind: "souls", amount: 2 },
-      { kind: "sigil", amount: 1 },
+      { kind: "coins", amount: 80 },
+      { kind: "gacha", amount: 60 },
+      { kind: "coins", amount: 150 },
+      { kind: "gacha", amount: 120 },
+      { kind: "souls", amount: 1 }, // 大当たり（≒💠1・🎰1000）
     ],
   },
 ];
