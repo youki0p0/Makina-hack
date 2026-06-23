@@ -18,6 +18,21 @@ const STATUS_EMOJI: Record<StatusType, string> = {
   atkUp: "💢",
 };
 
+function UnitSprite({ uid, emoji }: { uid: string; emoji: string }) {
+  const [err, setErr] = useState(false);
+  const monsterId = uid.split("-")[2] ?? "";
+  if (err || !monsterId) return <span>{emoji}</span>;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/arena/monsters/${monsterId}.png`}
+      alt={emoji}
+      onError={() => setErr(true)}
+      style={{ imageRendering: "pixelated", width: 38, height: 38, objectFit: "contain" }}
+    />
+  );
+}
+
 function UnitCard({ u, delta, frameKey }: { u: UnitSnapshot; delta: number; frameKey: number }) {
   const ratio = u.maxHp > 0 ? Math.max(0, u.hp / u.maxHp) : 0;
   const barColor = u.side === "ally" ? "bg-emerald-500" : "bg-rose-500";
@@ -40,10 +55,10 @@ function UnitCard({ u, delta, frameKey }: { u: UnitSnapshot; delta: number; fram
       )}
       <div
         key={`s${frameKey}`}
-        className="text-2xl leading-none"
+        className="flex h-10 items-center justify-center text-2xl leading-none"
         style={damaged ? { animation: "fxShake 0.3s" } : healed ? { animation: "fatePop 0.3s" } : undefined}
       >
-        {u.alive ? u.emoji : "💀"}
+        {u.alive ? <UnitSprite uid={u.uid} emoji={u.emoji} /> : <span>💀</span>}
       </div>
       <div className="w-full truncate text-center text-[8px] text-white/80">{u.name}</div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/15">

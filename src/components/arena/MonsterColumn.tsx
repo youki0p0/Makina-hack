@@ -44,9 +44,14 @@ export default function MonsterColumn({
                 background: `radial-gradient(circle at 35% 30%, ${light} 0%, ${mid} 45%, ${dark} 100%)`,
                 borderColor: light,
               }}
-              className="relative flex h-12 w-12 items-center justify-center rounded-full border-2 shadow-md"
+              className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 shadow-md"
             >
-              <span className="text-xl leading-none">{m.emoji}</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/arena/monsters/${m.id}.png`}
+                alt={m.name}
+                style={{ imageRendering: "pixelated", width: "112%", height: "112%", objectFit: "cover" }}
+              />
               {nCards > 0 && (
                 <span className="absolute -right-1 -top-1 rounded-full bg-black/70 px-1 text-[8px] font-bold text-white">
                   {nCards}
