@@ -14,6 +14,7 @@
 // ※💠刻印は★アップの最希少素材なので、ばら撒かないよう「守りの出目6」1枠だけに限定。
 
 import type { Reward } from "@/types/game";
+import { hashSeed } from "@/lib/hashSeed";
 
 export type DiceFaceId = "atk" | "def" | "luck";
 
@@ -78,16 +79,6 @@ export function faceById(id: string): DiceFaceDef | null {
   return DICE_FACES.find((f) => f.id === id) ?? null;
 }
 
-/** 決定論ハッシュ（FNV-1a, daily.ts と同方式）。 */
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
 export interface DiceResult {
   /** 出目(1..6)。 */
   value: number;
@@ -101,6 +92,6 @@ export interface DiceResult {
  */
 export function spinDailyDice(faceId: DiceFaceId, seed: string): DiceResult {
   const face = faceById(faceId) ?? DICE_FACES[0];
-  const value = (hash(`${seed}#${faceId}`) % 6) + 1; // 1..6
+  const value = (hashSeed(`${seed}#${faceId}`) % 6) + 1; // 1..6
   return { value, reward: face.rewards[value - 1] };
 }
