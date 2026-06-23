@@ -278,18 +278,27 @@ const ENEMY_SKILL_POOL = [
   "guard_stance",
 ];
 
+/** 5の倍数ラウンドはボス戦。 */
+export function isBossRound(round: number): boolean {
+  return round % 5 === 0;
+}
+
 function buildEnemies(
   round: number,
   field: FieldId,
   rng: () => number,
 ): Combatant[] {
-  const sf = 1 + (round - 1) * 0.13;
+  const boss = isBossRound(round);
+  const sf = (1 + (round - 1) * 0.13) * (boss ? 1.25 : 1);
   const fStat = fieldStatMods(field);
-  const nSkills = round < 3 ? 1 : round < 9 ? 2 : 3;
+  const nSkills = boss ? 3 : round < 3 ? 1 : round < 9 ? 2 : 3;
   const enemies: Combatant[] = [];
 
   for (let slot = 0; slot < 3; slot++) {
     const m = MONSTERS[(round * 3 + slot) % MONSTERS.length];
+    // ボス戦は中央(slot 1)を強大な「ボス」に。HP・攻撃を大きく盛る。
+    const bossLead = boss && slot === 1;
+    const lead = bossLead ? 1.9 : 1;
     const skills: EffectiveSkill[] = [];
     for (let i = 0; i < nSkills; i++) {
       const id = ENEMY_SKILL_POOL[Math.floor(rng() * ENEMY_SKILL_POOL.length)];
@@ -298,14 +307,14 @@ function buildEnemies(
     }
     const c: Combatant = {
       uid: `enemy-${slot}-${m.id}`,
-      name: m.name,
-      emoji: m.emoji,
+      name: bossLead ? `【ボス】${m.name}` : m.name,
+      emoji: bossLead ? "👑" : m.emoji,
       side: "enemy",
       slot,
-      maxHp: Math.round(m.hp * sf * 1.05),
+      maxHp: Math.round(m.hp * sf * 1.05 * lead),
       hp: 0,
-      baseAttack: Math.round(m.attack * sf),
-      baseDefense: Math.round(m.defense * sf * fStat.defMult),
+      baseAttack: Math.round(m.attack * sf * (bossLead ? 1.2 : 1)),
+      baseDefense: Math.round(m.defense * sf * fStat.defMult * (bossLead ? 1.3 : 1)),
       baseSpeed: Math.max(1, Math.round(m.speed * fStat.spdMult)),
       crit: 5,
       reflectPct: 0,
@@ -503,8 +512,10 @@ export function simulateBattle(
   const frames: BattleFrame[] = [];
   const log: string[] = [];
 
-  frames.push({ tick: 0, units: snapshot(all), events: [`⚔️ 戦闘開始（${round}回戦）`] });
-  log.push(`⚔️ 戦闘開始（${round}回戦）`);
+  const boss = isBossRound(round);
+  const startMsg = boss ? `👑 ボス戦！（${round}回戦）` : `⚔️ 戦闘開始（${round}回戦）`;
+  frames.push({ tick: 0, units: snapshot(all), events: [startMsg] });
+  log.push(startMsg);
 
   let reason: "wipe" | "timeout" = "timeout";
 
@@ -583,5 +594,6 @@ export function simulateBattle(
     enemyHpLeft,
     field,
     round,
+    boss,
   };
 }

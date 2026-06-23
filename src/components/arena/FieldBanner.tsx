@@ -5,17 +5,21 @@ import type { FieldId } from "@/types/arena";
 export default function FieldBanner({
   field,
   round,
+  boss = false,
   children,
 }: {
   field: FieldId;
   round?: number;
+  boss?: boolean;
   children?: React.ReactNode;
 }) {
   const f = getField(field);
   return (
     <div
-      style={{ background: f.background, borderColor: f.accent }}
-      className="relative w-full overflow-hidden rounded-2xl border p-3"
+      style={{ background: f.background, borderColor: boss ? "#fbbf24" : f.accent }}
+      className={`relative w-full overflow-hidden rounded-2xl border p-3 ${
+        boss ? "ring-2 ring-amber-400/60" : ""
+      }`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -28,8 +32,12 @@ export default function FieldBanner({
           </div>
         </div>
         {round != null && (
-          <span className="rounded-full bg-black/40 px-2 py-0.5 text-[11px] font-bold text-white">
-            {round} 回戦
+          <span
+            className={`rounded-full px-2 py-0.5 text-[11px] font-bold text-white ${
+              boss ? "bg-amber-500/80" : "bg-black/40"
+            }`}
+          >
+            {boss ? "👑 ボス" : ""} {round} 回戦
           </span>
         )}
       </div>

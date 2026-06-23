@@ -103,7 +103,10 @@ export default function BattleView({
           <span>
             {f.emoji} {f.name}
           </span>
-          <span>{result.round} 回戦</span>
+          <span className={result.boss ? "font-bold text-amber-300" : ""}>
+            {result.boss ? "👑 ボス " : ""}
+            {result.round} 回戦
+          </span>
         </div>
 
         {/* 敵 3体 */}

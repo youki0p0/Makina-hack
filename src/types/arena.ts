@@ -244,6 +244,7 @@ export interface BattleResult {
   enemyHpLeft: number;
   field: FieldId;
   round: number;
+  boss: boolean;
 }
 
 export interface RankRecord {

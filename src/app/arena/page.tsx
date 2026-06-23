@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { MONSTERS, getMonster, COLOR_DOT } from "@/data/arena/monsters";
 import { OPERATORS } from "@/data/arena/operators";
 import { getOperator } from "@/data/arena/operators";
+import { isBossRound } from "@/lib/arena/battle";
 import { MODE_CONFIG } from "@/lib/arena/gameState";
 import { rankTitle } from "@/lib/arena/rank";
 import { sfx } from "@/lib/audio/sfx";
@@ -13,6 +14,7 @@ import type { GameMode } from "@/types/arena";
 import SoundToggle from "@/components/SoundToggle";
 import BattleView from "@/components/arena/BattleView";
 import BuildListPanel from "@/components/arena/BuildListPanel";
+import HelpOverlay from "@/components/arena/HelpOverlay";
 import CardDraft from "@/components/arena/CardDraft";
 import FieldBanner from "@/components/arena/FieldBanner";
 import MonsterColumn from "@/components/arena/MonsterColumn";
@@ -49,6 +51,17 @@ function SetupScreen() {
   const [mode, setMode] = useState<GameMode>("short");
   const [operatorId, setOperatorId] = useState(OPERATORS[0].id);
   const [team, setTeam] = useState<string[]>([]);
+  const [showHelp, setShowHelp] = useState(false);
+
+  useEffect(() => {
+    if (window.localStorage.getItem("arena-help-seen") !== "1") setShowHelp(true);
+  }, []);
+  const closeHelp = () => {
+    setShowHelp(false);
+    try {
+      window.localStorage.setItem("arena-help-seen", "1");
+    } catch {}
+  };
 
   const op = getOperator(operatorId);
 
@@ -71,10 +84,17 @@ function SetupScreen() {
         <p className="text-[11px] text-gray-400">
           カードセット構築型 3v3 オートバトラー
         </p>
-        <Link href="/" className="text-[10px] text-gray-500 underline">
-          ← Dice Ex Machina メニューへ
-        </Link>
+        <div className="flex items-center justify-center gap-3">
+          <Link href="/" className="text-[10px] text-gray-500 underline">
+            ← Dice Ex Machina メニューへ
+          </Link>
+          <button onClick={() => setShowHelp(true)} className="text-[10px] text-sky-400 underline">
+            ❓ 遊び方
+          </button>
+        </div>
       </header>
+
+      {showHelp && <HelpOverlay onClose={closeHelp} />}
 
       {/* モード選択 */}
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
@@ -213,7 +233,7 @@ function GameScreen() {
         </div>
       </div>
 
-      <FieldBanner field={run.field} round={run.round} />
+      <FieldBanner field={run.field} round={run.round} boss={isBossRound(run.round)} />
 
       <CardDraft
         draft={run.draft}
