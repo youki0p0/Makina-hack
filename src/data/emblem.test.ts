@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeSetEffects, emblemSetMult } from "@/data/sets";
-import { genEmblem } from "@/data/items";
+import { genEmblem, getItemById } from "@/data/items";
 import { emptyEquipped } from "@/store/helpers";
 import type { EquippedItems } from "@/types/game";
 
@@ -48,6 +48,16 @@ describe("genEmblem", () => {
     expect(e.rarity).toBe("legendary");
     expect(e.equipTag).toBeUndefined();
     expect(e.minFloor).toBe(3000);
+  });
+
+  it("getItemById で id から復元でき setAmplifier が保たれる（セーブ往復で消えない）", () => {
+    const e = genEmblem(4200);
+    expect(e.id).toMatch(/^emblem_\d+$/);
+    const restored = getItemById(e.id);
+    expect(restored).not.toBeNull();
+    expect(restored!.slot).toBe("emblem");
+    expect(restored!.setAmplifier).toBe(true);
+    expect(restored!.id).toBe(e.id);
   });
 });
 

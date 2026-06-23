@@ -2058,6 +2058,7 @@ export const useGameStore = create<GameState>((set, get) => {
 
     pullTargeted: (slot: EquipmentSlot) => {
       const state = get();
+      if (slot === "emblem") return; // 紋章は3000階+ボス限定ドロップ。ガチャ対象外。
       if (state.gachaPoints < TARGETED_COST) return;
       // Reference = the player's current best for this slot, so the pull lands
       // around (±) their owned power instead of a random low roll.

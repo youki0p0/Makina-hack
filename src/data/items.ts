@@ -1167,23 +1167,30 @@ export function genItem(slot: EquipmentSlot, tier: number): Equipment {
 }
 
 /**
- * 紋章(emblem)を生成する。3000階+のボスからのみドロップする上位部位。
- * セット効果の数値を深層ほど増幅する setAmplifier を持つ（倍率は装備時に階層から算出）。
- * ベースステは accessory 相当（genItem の汎用分岐）＋レジェ確定で品質ロールにも乗る。
+ * 紋章(emblem)を tier から生成する。id=`emblem_<tier>` で getItemById から復元可能
+ * （セーブ往復で消えないように）。setAmplifier はここで必ず付与する。
  */
-export function genEmblem(floor: number): Equipment {
-  const t = genTierForFloor(floor);
+export function genEmblemTier(tier: number): Equipment {
+  const t = Math.max(1, Math.round(tier));
   const base = genItem("emblem", t);
   return {
     ...base,
     id: `emblem_${t}`,
-    name: `共鳴の紋章`,
+    name: "共鳴の紋章",
     rarity: "legendary",
     equipTag: undefined, // どのジョブでも装備可
     setAmplifier: true,
     minFloor: 3000,
     description: `${base.description} ／ セット効果の数値を深層ほど増幅`,
   };
+}
+
+/**
+ * 紋章(emblem)を生成する。3000階+のボスからのみドロップする上位部位。
+ * セット効果の数値を深層ほど増幅する setAmplifier を持つ（倍率は装備時に階層から算出）。
+ */
+export function genEmblem(floor: number): Equipment {
+  return genEmblemTier(genTierForFloor(floor));
 }
 
 const randInt = (lo: number, hi: number) =>
@@ -1401,6 +1408,11 @@ export function getItemById(id: string): Equipment | null {
   if (gen) return genItem(gen.slot, gen.tier);
   const setp = parseSetPieceId(id);
   if (setp) return genSetItem(setp.key, setp.slot, setp.tier);
+  // 紋章(emblem_<tier>): setAmplifier 付きで復元（通常の gen_ 復元では失われるため専用処理）。
+  if (id.startsWith("emblem_")) {
+    const t = Number(id.slice("emblem_".length));
+    if (Number.isFinite(t) && t > 0) return genEmblemTier(t);
+  }
   const item = ITEM_MAP.get(id);
   return item ? { ...item } : null;
 }
