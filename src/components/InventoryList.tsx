@@ -71,6 +71,26 @@ export default function InventoryList() {
   const [filter, setFilter] = useState<Filter>("all");
   const [setKeyFilter, setSetKeyFilter] = useState<string>("all");
   const [sort, setSort] = useState<Sort>("rarity");
+
+  // 表示設定（フィルタ／並び）を localStorage に記憶し、次に開いたとき復元する。
+  // セットフィルタは所持状況で消えうるのでセッション限り（ストランド防止）。
+  const [viewLoaded, setViewLoaded] = useState(false);
+  useEffect(() => {
+    try {
+      const f = window.localStorage.getItem("inv.filter");
+      if (f && FILTERS.some((x) => x.id === f)) setFilter(f as Filter);
+      const s = window.localStorage.getItem("inv.sort");
+      if (s && SORTS.some((x) => x.id === s)) setSort(s as Sort);
+    } catch {}
+    setViewLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (!viewLoaded) return; // 復元前の初期値で上書きしない
+    try {
+      window.localStorage.setItem("inv.filter", filter);
+      window.localStorage.setItem("inv.sort", sort);
+    } catch {}
+  }, [filter, sort, viewLoaded]);
   // 一括分解の確認はアプリ内ダイアログで行う（PWA/モバイルで window.confirm が
   // ネイティブダイアログを出せずフリーズ/表示崩れする不具合の回避）。
   const [bulkConfirm, setBulkConfirm] = useState<{ msg: string; run: () => void } | null>(null);
