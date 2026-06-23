@@ -103,6 +103,7 @@ export interface EquipmentCard extends CardCommon {
   reflectPct?: number;
   regen?: number;
   critAdd?: number;
+  grantRevive?: boolean; // 戦闘不能時に一度だけ蘇る保険を付与
 }
 
 export interface SkillCard extends CardCommon {

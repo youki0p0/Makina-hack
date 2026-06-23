@@ -198,6 +198,7 @@ function buildAllies(
     let reflect = 0;
     let regen = 0;
     let crit = 5;
+    let equipRevive = false;
 
     for (const id of b.equipmentIds) {
       const c = getCard(id);
@@ -209,6 +210,7 @@ function buildAllies(
       reflect += c.reflectPct ?? 0;
       regen += c.regen ?? 0;
       crit += c.critAdd ?? 0;
+      if (c.grantRevive) equipRevive = true;
     }
 
     const skillCards = b.skillIds
@@ -256,7 +258,7 @@ function buildAllies(
       statuses: [],
       shield: mods.shieldStart,
       alive: true,
-      revive: fieldGrantsRevive(field),
+      revive: fieldGrantsRevive(field) || equipRevive,
     };
     c.hp = c.maxHp;
     // CT 倍率を後で再利用するため skillTimer に反映済み（リセット時も同倍率）
