@@ -569,7 +569,7 @@ export interface DungeonMaterials {
 
 // ===== デイリー/ウィークリー（ログインボーナス & クエスト）=====
 /** 報酬の種類。 */
-export type RewardKind = "gold" | "gacha" | "coins" | "souls" | "shard" | "core" | "sigil";
+export type RewardKind = "gold" | "gacha" | "coins" | "hiCoins" | "souls" | "shard" | "core" | "sigil";
 export interface Reward {
   kind: RewardKind;
   amount: number;
