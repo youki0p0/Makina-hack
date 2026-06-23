@@ -1,3 +1,4 @@
+import { isBossRound } from "@/lib/arena/battle";
 import { MODE_CONFIG } from "@/lib/arena/gameState";
 import { rankTitle } from "@/lib/arena/rank";
 import type { RunState } from "@/types/arena";
@@ -56,6 +57,11 @@ export default function ResultView({
       </div>
 
       <div className="mt-2 flex w-full max-w-xs flex-col gap-2">
+        {!terminal && isBossRound(run.round + 1) && (
+          <div className="rounded-xl border border-amber-400/50 bg-amber-500/10 py-2 text-[12px] font-bold text-amber-200">
+            👑 次は ボス戦！ 編成を整えよう
+          </div>
+        )}
         {!terminal ? (
           <button
             onClick={onNext}

@@ -55,6 +55,13 @@ function SetupScreen() {
 
   useEffect(() => {
     if (window.localStorage.getItem("arena-help-seen") !== "1") setShowHelp(true);
+    try {
+      const pref = JSON.parse(window.localStorage.getItem("arena-pref-v1") || "{}");
+      if (pref.mode === "short" || pref.mode === "long") setMode(pref.mode);
+      if (pref.operatorId && OPERATORS.some((o) => o.id === pref.operatorId)) {
+        setOperatorId(pref.operatorId);
+      }
+    } catch {}
   }, []);
   const closeHelp = () => {
     setShowHelp(false);
@@ -177,7 +184,13 @@ function SetupScreen() {
 
       <button
         disabled={!canStart}
-        onClick={() => startRun(mode, operatorId, team)}
+        onClick={() => {
+          try {
+            window.localStorage.setItem("arena-pref-v1", JSON.stringify({ mode, operatorId }));
+          } catch {}
+          sfx("select");
+          startRun(mode, operatorId, team);
+        }}
         className="rounded-2xl bg-emerald-600 py-4 text-lg font-extrabold text-white shadow-lg disabled:opacity-40 active:scale-95"
       >
         {canStart ? "▶ バトル開始！" : "モンスターを3体選んでね"}
