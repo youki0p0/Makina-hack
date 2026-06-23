@@ -37,6 +37,36 @@ export default function DailyDiceCard() {
   if (done && !spinning) {
     const face = faceById(diceFace);
     const reward = face ? spinDailyDice(face.id, todayKey()).reward : null;
+    const jackpot = diceValue === 6; // 出目6＝各面の大当たり
+
+    if (jackpot) {
+      // 大当たり：金枠＋✨でちょっと派手にお祝い。
+      return (
+        <div className="animate-pop rounded-xl border border-amber-400/60 bg-amber-500/15 p-2.5 text-[12px] shadow-[0_0_18px_rgba(251,191,36,0.25)]">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-amber-100">🎲 今日のダイス</span>
+            <span className="text-[10px] text-amber-300/80">また明日 0時に！</span>
+          </div>
+          <div className="mt-1 text-center text-[13px] font-black tracking-wide text-amber-200">
+            ✨ 大当たり！ ✨
+          </div>
+          <div className="mt-1 flex items-center justify-center gap-2">
+            <span className="text-3xl leading-none drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]">
+              {PIPS[diceValue] ?? "🎲"}
+            </span>
+            <div className="text-left">
+              <div className="text-[11px] text-amber-100/80">
+                {face?.emoji} {face?.label} → 出目 <span className="font-bold">{diceValue}</span>
+              </div>
+              {reward && (
+                <div className="text-[13px] font-black text-amber-100">{rewardText(reward)} 獲得！</div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-2.5 text-[12px]">
         <div className="flex items-center justify-between">
