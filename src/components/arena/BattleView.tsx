@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getField } from "@/data/arena/fields";
+import { setBgmTheme } from "@/lib/audio";
 import { sfx } from "@/lib/audio/sfx";
 import type { BattleResult, StatusType, UnitSnapshot } from "@/types/arena";
 
@@ -91,6 +92,14 @@ export default function BattleView({
 
   const frame = result.frames[Math.min(idx, result.frames.length - 1)];
   const done = idx >= result.frames.length - 1;
+
+  // ボス戦中だけ緊迫の boss テーマへ。戦闘を抜けたらアリーナのベース(idol)へ戻す。
+  useEffect(() => {
+    if (result.boss) setBgmTheme("boss");
+    return () => {
+      setBgmTheme("idol");
+    };
+  }, [result.boss]);
 
   // 現フレームまでに起きたイベントを蓄積（直近を表示）
   const logLines = useMemo(() => {

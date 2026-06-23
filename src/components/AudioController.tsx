@@ -30,7 +30,11 @@ export default function AudioController() {
   useEffect(() => {
     if (pathname?.startsWith("/casino")) setBgmTheme("casino");
     else if (pathname?.startsWith("/forge")) setBgmTheme("forge");
-    else if (pathname?.startsWith("/battle")) {
+    else if (pathname?.startsWith("/arena")) {
+      // アリーナ（独立ゲーム）の準備フェーズ用ベーステーマ。
+      // ボス戦中の切替は arena/BattleView 側が行う。
+      setBgmTheme("idol");
+    } else if (pathname?.startsWith("/battle")) {
       if (floor === FINAL_FLOOR) {
         setBgmTheme("final"); // 1000F ラスボス: 専用の最高潮テーマ
       } else if (bossRank(floor) >= 2) {
