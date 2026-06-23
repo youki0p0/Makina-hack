@@ -15,6 +15,15 @@ export const MOD_BONUS_PER_STAR = 0.2;
  */
 export const ENEMY_MOD_BONUS_PER_STAR = 0.13;
 
+/** 深層の敵ランプ再加速の開始tier（200 = floor 10,000）。 */
+export const DEEP_RAMP_TIER = 200;
+/**
+ * 開始tier以降、1tier(50階)ごとに敵ランプへ加算する量。mult=1+ramp*tier なので
+ * これは敵の伸びを超線形(≒二次)にし、2万階以上を段階的にかなり難しくする。
+ * 例: 20,000階(tier400) で ramp +0.50、30,000階(tier600) で +1.00。
+ */
+export const DEEP_RAMP_SLOPE = 0.0025;
+
 /** How many floors between star tiers. */
 export const FLOORS_PER_STAR = 50;
 
@@ -85,7 +94,11 @@ export function applyEnemyModifier(
   // ステ成長(線形)で追いつけず詰む。そこで (tier-8) 項を tier20(=1000階) で頭打ちにし、
   // 1000階超は線形成長に留める。プレイヤー側は深淵到達補正(endlessAscension)で追従する。
   // ★8以下(1000階以下)は完全に不変。
-  const ramp = tier <= 8 ? bonusPerStar : bonusPerStar + (Math.min(tier, 20) - 8) * 0.02;
+  let ramp = tier <= 8 ? bonusPerStar : bonusPerStar + (Math.min(tier, 20) - 8) * 0.02;
+  // ただし1万階(tier200)を超えるとプレイヤー強化が線形の敵を上回り緩くなるため、
+  // tier200から ramp を再加速(超線形)させ、2万階以上を段階的にかなり難しくする。
+  // mult = 1 + ramp*tier に tier 比例項が入るので、敵は深層で二次関数的に伸びる。
+  ramp += Math.max(0, tier - DEEP_RAMP_TIER) * DEEP_RAMP_SLOPE;
   const mult = 1 + ramp * Math.max(0, tier);
   const hp = Math.round(enemy.maxHp * mult);
   return {
