@@ -6,6 +6,7 @@ import { MONSTERS, getMonster, COLOR_DOT } from "@/data/arena/monsters";
 import { OPERATORS } from "@/data/arena/operators";
 import { getOperator } from "@/data/arena/operators";
 import { isBossRound } from "@/lib/arena/battle";
+import { BLESSING_MAP } from "@/lib/arena/blessings";
 import { MODE_CONFIG } from "@/lib/arena/gameState";
 import { rankTitle } from "@/lib/arena/rank";
 import { sfx } from "@/lib/audio/sfx";
@@ -307,6 +308,18 @@ function GameScreen() {
           <SoundToggle />
         </div>
       </div>
+
+      {/* 取得済み祝福（ラン内で永続・累積） */}
+      {run.blessings.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1 rounded-xl border border-amber-400/20 bg-amber-500/[0.06] px-2 py-1">
+          <span className="text-[9px] font-bold text-amber-300">✨祝福</span>
+          {run.blessings.map((id, i) => (
+            <span key={i} className="text-[13px]" title={BLESSING_MAP[id]?.name}>
+              {BLESSING_MAP[id]?.emoji}
+            </span>
+          ))}
+        </div>
+      )}
 
       <FieldBanner field={run.field} round={run.round} boss={isBossRound(run.round)} />
 
