@@ -3,6 +3,11 @@
 import { create } from "zustand";
 import { getCard, isEquipment } from "@/data/arena/cards";
 import { simulateBattle } from "@/lib/arena/battle";
+import {
+  evaluateAchievements,
+  loadAchievements,
+  unlockAchievements,
+} from "@/lib/arena/achievements";
 import { generateDraft, MODE_CONFIG, newRun, rollField } from "@/lib/arena/gameState";
 import { loadRank, recordResult } from "@/lib/arena/rank";
 import type { GameMode, RankRecord, RunState } from "@/types/arena";
@@ -13,8 +18,11 @@ interface ArenaStore {
   hydrated: boolean;
   run: RunState | null;
   ranks: { short: RankRecord; long: RankRecord };
+  achievements: string[];
+  freshAchievements: string[];
 
   hydrate: () => void;
+  clearFreshAchievements: () => void;
   startRun: (mode: GameMode, operatorId: string, monsterIds: string[]) => void;
   rerollDraft: () => void;
   assignCard: (cardId: string, slot: number) => void;
@@ -50,6 +58,8 @@ export const useArenaStore = create<ArenaStore>((set, get) => ({
   hydrated: false,
   run: null,
   ranks: { short: { bestWins: 0, bestRound: 0, games: 0, wins: 0 }, long: { bestWins: 0, bestRound: 0, games: 0, wins: 0 } },
+  achievements: [],
+  freshAchievements: [],
 
   hydrate: () => {
     if (get().hydrated) return;
@@ -57,8 +67,11 @@ export const useArenaStore = create<ArenaStore>((set, get) => ({
       hydrated: true,
       run: loadRun(),
       ranks: { short: loadRank("short"), long: loadRank("long") },
+      achievements: loadAchievements(),
     });
   },
+
+  clearFreshAchievements: () => set({ freshAchievements: [] }),
 
   startRun: (mode, operatorId, monsterIds) => {
     const run = newRun(mode, operatorId, monsterIds);
@@ -139,8 +152,12 @@ export const useArenaStore = create<ArenaStore>((set, get) => ({
       const rec = recordResult(run.mode, wins, run.round, cleared);
       ranks = { ...ranks, [run.mode]: rec };
     }
+
+    // 実績判定（決着反映後の状態で）
+    const { all, fresh } = unlockAchievements(evaluateAchievements(next, win));
+
     persistRun(next);
-    set({ run: next, ranks });
+    set({ run: next, ranks, achievements: all, freshAchievements: fresh });
   },
 
   nextRound: () => {

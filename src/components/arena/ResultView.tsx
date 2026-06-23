@@ -1,4 +1,5 @@
 import { isBossRound } from "@/lib/arena/battle";
+import { ACHIEVEMENTS } from "@/lib/arena/achievements";
 import { MODE_CONFIG } from "@/lib/arena/gameState";
 import { rankTitle } from "@/lib/arena/rank";
 import type { RunState } from "@/types/arena";
@@ -6,13 +7,16 @@ import type { RunState } from "@/types/arena";
 /** ラウンド結果 / 優勝 / 敗退の表示。 */
 export default function ResultView({
   run,
+  fresh = [],
   onNext,
   onQuit,
 }: {
   run: RunState;
+  fresh?: string[];
   onNext: () => void;
   onQuit: () => void;
 }) {
+  const freshDefs = ACHIEVEMENTS.filter((a) => fresh.includes(a.id));
   const cfg = MODE_CONFIG[run.mode];
   const r = run.lastResult;
   const terminal = run.phase === "victory" || run.phase === "gameover";
@@ -48,6 +52,17 @@ export default function ResultView({
             （味方残HP {r.allyHpLeft} / 敵残HP {r.enemyHpLeft}）
           </p>
         </>
+      )}
+
+      {freshDefs.length > 0 && (
+        <div className="w-full max-w-xs space-y-1 rounded-xl border border-amber-400/50 bg-amber-500/10 p-2">
+          <div className="text-[11px] font-bold text-amber-200">🏆 実績解除！</div>
+          {freshDefs.map((a) => (
+            <div key={a.id} className="text-[11px] text-amber-100">
+              {a.emoji} {a.name} <span className="text-amber-200/70">— {a.desc}</span>
+            </div>
+          ))}
+        </div>
       )}
 
       <div className="flex gap-3 text-sm font-bold text-gray-200">

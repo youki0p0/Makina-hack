@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { ACHIEVEMENTS } from "@/lib/arena/achievements";
 import { EQUIPMENT, SKILLS } from "@/data/arena/cards";
 import { FIELDS } from "@/data/arena/fields";
 import { COLOR_DOT, COLOR_LABEL, MONSTERS } from "@/data/arena/monsters";
 import { OPERATORS } from "@/data/arena/operators";
+import { useArenaStore } from "@/store/arenaStore";
 import CardChip from "./CardChip";
 import MonsterSprite from "./MonsterSprite";
 import OperatorBadge from "./OperatorBadge";
 
-type Tab = "monster" | "card" | "field" | "operator" | "synergy";
+type Tab = "monster" | "card" | "field" | "operator" | "synergy" | "achieve";
 
 const SYNERGY_REF: { emoji: string; name: string; cond: string; effect: string }[] = [
   { emoji: "🌿", name: "森の陣", cond: "緑×3", effect: "味方全体に毎秒回復+4" },
@@ -36,10 +38,12 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "field", label: "🌋 フィールド" },
   { id: "operator", label: "🧑‍🚀 操者" },
   { id: "synergy", label: "✦ シナジー" },
+  { id: "achieve", label: "🏆 実績" },
 ];
 
 export default function CodexOverlay({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("monster");
+  const unlocked = useArenaStore((s) => s.achievements);
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-3">
       <div className="flex max-h-[88dvh] w-full max-w-sm flex-col rounded-2xl border border-white/15 bg-[#14121d]">
@@ -116,6 +120,31 @@ export default function CodexOverlay({ onClose }: { onClose: () => void }) {
                 <div className="mt-1 text-[9px] text-gray-400">{o.concept}</div>
               </div>
             ))}
+
+          {tab === "achieve" && (
+            <>
+              <div className="mb-1 text-[10px] text-gray-400">
+                {unlocked.length} / {ACHIEVEMENTS.length} 達成
+              </div>
+              {ACHIEVEMENTS.map((a) => {
+                const got = unlocked.includes(a.id);
+                return (
+                  <div
+                    key={a.id}
+                    className={`flex items-center gap-2 rounded-xl border p-2 text-[11px] ${
+                      got ? "border-amber-400/50 bg-amber-500/10" : "border-white/10 bg-black/20 opacity-60"
+                    }`}
+                  >
+                    <span className="text-lg">{got ? a.emoji : "🔒"}</span>
+                    <div>
+                      <div className="font-bold text-gray-100">{a.name}</div>
+                      <div className="text-[9px] text-gray-400">{a.desc}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
 
           {tab === "synergy" &&
             SYNERGY_REF.map((s) => (

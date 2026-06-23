@@ -246,6 +246,8 @@ function GameScreen() {
   const finishBattle = useArenaStore((s) => s.finishBattle);
   const nextRound = useArenaStore((s) => s.nextRound);
   const quitToMenu = useArenaStore((s) => s.quitToMenu);
+  const freshAchievements = useArenaStore((s) => s.freshAchievements);
+  const clearFresh = useArenaStore((s) => s.clearFreshAchievements);
 
   const [selected, setSelected] = useState<string | null>(null);
   const op = getOperator(run.operatorId);
@@ -256,7 +258,20 @@ function GameScreen() {
   }
 
   if (run.phase === "result" || run.phase === "victory" || run.phase === "gameover") {
-    return <ResultView run={run} onNext={nextRound} onQuit={quitToMenu} />;
+    return (
+      <ResultView
+        run={run}
+        fresh={freshAchievements}
+        onNext={() => {
+          clearFresh();
+          nextRound();
+        }}
+        onQuit={() => {
+          clearFresh();
+          quitToMenu();
+        }}
+      />
+    );
   }
 
   // draft フェーズ
