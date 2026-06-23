@@ -70,6 +70,8 @@ interface Combatant {
 
 // 1戦のうちで最初に倒れたユニット（勝因/敗因サマリ用）。simulateBattle 開始時にリセット。
 let firstDown: { name: string; side: "ally" | "enemy" } | null = null;
+// 相性の効き具合（序盤は小さく＝事故防止／中盤以降フル）。simulateBattle 開始時に設定。
+let battleMatchupScale = 1;
 
 /**
  * 色の三すくみ：緑→赤→青→緑（緑は赤に強い／赤は青に強い／青は緑に強い）。
@@ -156,8 +158,8 @@ function dealDamage(
   events: string[],
 ): void {
   if (!target.alive) return;
-  // 色の三すくみ補正（直接ダメージに適用）
-  const mu = colorMatchup(attacker.color, target.color);
+  // 色の三すくみ補正（直接ダメージに適用。序盤は battleMatchupScale で弱める）
+  const mu = 1 + (colorMatchup(attacker.color, target.color) - 1) * battleMatchupScale;
   raw = raw * mu;
   let dmg = pierce ? raw : Math.max(1, raw - effDefense(target));
   const curse = sumStatus(target, "curse");
@@ -394,7 +396,9 @@ function buildEnemies(
 /** 敵1体の決定論ステータス（戦闘とプレビューで共有）。 */
 export function enemyStat(round: number, field: FieldId, slot: number) {
   const boss = isBossRound(round);
-  const sf = (1 + (round - 1) * 0.2) * (boss ? 1.25 : 1);
+  // 序盤(1〜3回戦)は立ち上がりを安定させるため敵を控えめに。
+  const early = round <= 3 ? [0.84, 0.9, 0.96][round - 1] : 1;
+  const sf = (1 + (round - 1) * 0.2) * (boss ? 1.25 : 1) * early;
   const fStat = fieldStatMods(field);
   const nSkills = boss ? 3 : round < 3 ? 1 : round < 9 ? 2 : 3;
   const m = MONSTERS[(round * 3 + slot) % MONSTERS.length];
@@ -612,6 +616,7 @@ export function simulateBattle(
   const { mods } = computeSynergies(builds, operatorId);
   applyBlessings(mods, blessings);
   firstDown = null; // 1戦ごとにリセット
+  battleMatchupScale = Math.min(1, round / 6); // 序盤ほど相性の振れを抑える
   const rng = mulberry32(round * 2654435761 + builds.length * 40503 + 7);
 
   const allies = buildAllies(builds, operatorId, field, mods);
