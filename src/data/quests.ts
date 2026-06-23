@@ -20,6 +20,7 @@ export const REWARD_INFO: Record<RewardKind, { label: string; icon: string }> = 
   gold: { label: "ゴールド", icon: "🪙" },
   gacha: { label: "強化素材", icon: "🔮" },
   coins: { label: "コイン", icon: "🎰" },
+  hiCoins: { label: "ハイコイン", icon: "💎" },
   souls: { label: "転生ポイント", icon: "🪽" },
   shard: { label: "欠片", icon: "🔹" },
   core: { label: "核", icon: "🔶" },

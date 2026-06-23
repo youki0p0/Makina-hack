@@ -602,6 +602,8 @@ export const useGameStore = create<GameState>((set, get) => {
         return { gachaPoints: s.gachaPoints + r.amount };
       case "coins":
         return { coins: s.coins + r.amount };
+      case "hiCoins":
+        return { hiCoins: s.hiCoins + r.amount };
       case "souls":
         return { souls: s.souls + r.amount };
       case "shard":

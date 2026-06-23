@@ -39,8 +39,8 @@ describe("dailyDice", () => {
     expect(values.size).toBeGreaterThan(1);
   });
 
-  it("各面の出目6は大当たり：コイン1000 / 刻印1 / 魂1（等価設計）", () => {
-    expect(faceById("atk")!.rewards[5]).toEqual({ kind: "coins", amount: 1000 });
+  it("各面の出目6は大当たり：ハイコイン1000 / 刻印1 / 魂1（等価設計）", () => {
+    expect(faceById("atk")!.rewards[5]).toEqual({ kind: "hiCoins", amount: 1000 });
     expect(faceById("def")!.rewards[5]).toEqual({ kind: "sigil", amount: 1 });
     expect(faceById("luck")!.rewards[5]).toEqual({ kind: "souls", amount: 1 });
   });
