@@ -87,8 +87,15 @@ export default function BattleView({
 }) {
   const [idx, setIdx] = useState(0);
   const [speed, setSpeed] = useState(1);
+  const [intro, setIntro] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const f = getField(result.field);
+
+  // 開幕イントロ（バトル開始 / ボス出現）。少し見せてから再生開始。
+  useEffect(() => {
+    const t = setTimeout(() => setIntro(false), result.boss ? 1400 : 1000);
+    return () => clearTimeout(t);
+  }, [result.boss]);
 
   const frame = result.frames[Math.min(idx, result.frames.length - 1)];
   const done = idx >= result.frames.length - 1;
@@ -111,12 +118,12 @@ export default function BattleView({
   }, [idx, result.frames]);
 
   useEffect(() => {
-    if (done) return;
+    if (done || intro) return;
     timer.current = setTimeout(() => setIdx((v) => v + 1), 520 / speed);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [idx, done, speed]);
+  }, [idx, done, speed, intro]);
 
   // フレームのイベントに応じて効果音（mute は engine 側で尊重）。1フレーム1音に絞る。
   useEffect(() => {
@@ -142,6 +149,26 @@ export default function BattleView({
 
   return (
     <div className="flex flex-col gap-2">
+      {intro && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70">
+          <div
+            className="text-center"
+            style={{ animation: "fatePop 0.4s ease-out" }}
+          >
+            <div className="text-5xl">{result.boss ? "👑" : f.emoji}</div>
+            <div
+              className={`mt-2 text-3xl font-black ${
+                result.boss ? "text-amber-300" : "text-white"
+              }`}
+            >
+              {result.boss ? "BOSS BATTLE" : "BATTLE START"}
+            </div>
+            <div className="mt-1 text-sm text-white/80">
+              {f.name} ・ {result.round} 回戦
+            </div>
+          </div>
+        </div>
+      )}
       <div
         style={{ background: f.background, borderColor: f.accent }}
         className="rounded-2xl border p-2"
