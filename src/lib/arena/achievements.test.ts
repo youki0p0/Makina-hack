@@ -33,6 +33,8 @@ const bossResult: BattleResult = {
   field: "forest",
   round: 5,
   boss: true,
+  mvp: null,
+  firstDown: null,
 };
 
 describe("evaluateAchievements", () => {

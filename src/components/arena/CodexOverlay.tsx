@@ -14,10 +14,10 @@ import OperatorBadge from "./OperatorBadge";
 type Tab = "monster" | "card" | "field" | "operator" | "synergy" | "achieve";
 
 const SYNERGY_REF: { emoji: string; name: string; cond: string; effect: string }[] = [
-  { emoji: "🌿", name: "森の陣", cond: "緑×3", effect: "味方全体に毎秒回復+4" },
-  { emoji: "🔷", name: "魔導陣", cond: "青×3", effect: "技クールダウン-20%" },
-  { emoji: "🔺", name: "猛火陣", cond: "赤×3", effect: "攻撃力+15%" },
-  { emoji: "🌈", name: "三原陣", cond: "緑+青+赤", effect: "全ステータス+8%" },
+  { emoji: "🌿", name: "森の陣", cond: "緑×3", effect: "毎秒回復+8・防御+10%・HP+10%" },
+  { emoji: "🔷", name: "魔導陣", cond: "青×3", effect: "CT-25%・速度+10%・開幕シールド+30" },
+  { emoji: "🔺", name: "猛火陣", cond: "赤×3", effect: "攻撃+28%・クリ率+12%" },
+  { emoji: "🌈", name: "三原陣", cond: "緑+青+赤", effect: "全ステータス+10%" },
   { emoji: "☠️", name: "毒炎", cond: "緑+赤", effect: "毒状態の敵に火傷追加" },
   { emoji: "💨", name: "加速火力", cond: "青+赤", effect: "速度とクリ率上昇" },
   { emoji: "🛡️", name: "守護術式", cond: "緑+青", effect: "防御と回復量上昇" },
@@ -28,7 +28,7 @@ const SYNERGY_REF: { emoji: string; name: string; cond: string; effect: string }
   { emoji: "🎯", name: "急所連携", cond: "criticalタグ×2", effect: "クリ率+12%" },
   { emoji: "⚡", name: "疾風連携", cond: "hasteタグ×2", effect: "速度+10%" },
   { emoji: "🪞", name: "鏡面陣", cond: "reflectタグ×2", effect: "防御+5%・反射強化" },
-  { emoji: "💢", name: "集中", cond: "1体に技3枚以上", effect: "威力+25%・被ダメ+20%" },
+  { emoji: "💢", name: "集中", cond: "1体に技3枚以上", effect: "威力+40%・被ダメ+10%" },
   { emoji: "🤝", name: "分散", cond: "全員が技持ち", effect: "崩れにくい安定布陣" },
 ];
 

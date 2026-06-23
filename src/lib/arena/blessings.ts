@@ -27,6 +27,43 @@ export const BLESSINGS: readonly Blessing[] = [
   { id: "ember", name: "業火の祝福", emoji: "🔥", desc: "火傷ダメージ +4", apply: (m) => (m.burnBonus += 4) },
   { id: "heal", name: "慈愛の祝福", emoji: "💚", desc: "回復量 +20%", apply: (m) => (m.healMult *= 1.2) },
   { id: "budget", name: "豊穣の祝福", emoji: "🪙", desc: "毎ラウンドのコスト予算 +1", budgetBonus: 1 },
+  // ---- ビルド変容系（数値盛りでなく戦い方が変わる） ----
+  {
+    id: "spread_poison",
+    name: "瘴気の祝福",
+    emoji: "🟣",
+    desc: "毒が周囲の敵に拡散するようになる",
+    apply: (m) => {
+      m.poisonSpread = true;
+    },
+  },
+  {
+    id: "venom_flame",
+    name: "毒炎の祝福",
+    emoji: "☠️",
+    desc: "毒状態の敵に火傷ダメージを追加",
+    apply: (m) => {
+      m.poisonBurn = true;
+    },
+  },
+  {
+    id: "phoenix",
+    name: "不死鳥の祝福",
+    emoji: "🐣",
+    desc: "戦闘ごとに、倒れた味方が一度だけ蘇る",
+    apply: (m) => {
+      m.reviveOnce = true;
+    },
+  },
+  {
+    id: "inferno",
+    name: "業火連鎖の祝福",
+    emoji: "🔥",
+    desc: "火傷ダメージ +6（火力ビルドの核）",
+    apply: (m) => {
+      m.burnBonus += 6;
+    },
+  },
 ];
 
 export const BLESSING_MAP: Record<string, Blessing> = Object.fromEntries(

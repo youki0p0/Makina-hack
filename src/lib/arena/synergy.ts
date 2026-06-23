@@ -71,38 +71,43 @@ export function computeSynergies(
   const views: SynergyView[] = [];
   const { colors, tagCount, monstersWithSkill, maxSkillsOnOne } = tally(builds);
 
-  // ---- 色シナジー ----
+  // ---- 色シナジー（単色は“役割の穴”を埋める生存力も付与して罠化を防ぐ） ----
   if (countColor(colors, "green") === 3) {
-    mods.regenAdd += 4;
-    views.push({ id: "ggg", name: "森の陣", emoji: "🌿", desc: "味方全体に毎秒回復 +4。" });
+    mods.regenAdd += 8;
+    mods.defMult *= 1.1;
+    mods.hpMult *= 1.1;
+    views.push({ id: "ggg", name: "森の陣", emoji: "🌿", desc: "毎秒回復+8・防御+10%・HP+10%。" });
   }
   if (countColor(colors, "blue") === 3) {
-    mods.cdMult *= 0.8;
-    views.push({ id: "bbb", name: "魔導陣", emoji: "🔷", desc: "技クールダウン -20%。" });
+    mods.cdMult *= 0.75;
+    mods.spdMult *= 1.1;
+    mods.shieldStart += 30;
+    views.push({ id: "bbb", name: "魔導陣", emoji: "🔷", desc: "CT-25%・速度+10%・開幕シールド+30。" });
   }
   if (countColor(colors, "red") === 3) {
-    mods.atkMult *= 1.15;
-    views.push({ id: "rrr", name: "猛火陣", emoji: "🔺", desc: "攻撃力 +15%。" });
+    mods.atkMult *= 1.28;
+    mods.critAdd += 12;
+    views.push({ id: "rrr", name: "猛火陣", emoji: "🔺", desc: "攻撃+28%・クリ率+12%。" });
   }
   if (has(colors, "green") && has(colors, "blue") && has(colors, "red")) {
-    mods.atkMult *= 1.08;
-    mods.defMult *= 1.08;
-    mods.hpMult *= 1.08;
-    mods.spdMult *= 1.08;
-    views.push({ id: "gbr", name: "三原陣", emoji: "🌈", desc: "全ステータス +8%。" });
+    mods.atkMult *= 1.1;
+    mods.defMult *= 1.1;
+    mods.hpMult *= 1.1;
+    mods.spdMult *= 1.1;
+    views.push({ id: "gbr", name: "三原陣", emoji: "🌈", desc: "全ステータス +10%。" });
   }
   if (has(colors, "green") && has(colors, "red")) {
     mods.poisonBurn = true;
     views.push({ id: "gr", name: "毒炎", emoji: "☠️", desc: "毒状態の敵に火傷追加ダメージ。" });
   }
   if (has(colors, "blue") && has(colors, "red")) {
-    mods.spdMult *= 1.1;
-    mods.critAdd += 10;
+    mods.spdMult *= 1.12;
+    mods.critAdd += 12;
     views.push({ id: "br", name: "加速火力", emoji: "💨", desc: "攻撃速度とクリ率上昇。" });
   }
   if (has(colors, "green") && has(colors, "blue")) {
-    mods.defMult *= 1.12;
-    mods.healMult *= 1.2;
+    mods.defMult *= 1.15;
+    mods.healMult *= 1.25;
     views.push({ id: "gb", name: "守護術式", emoji: "🛡️", desc: "防御と回復量上昇。" });
   }
 
@@ -143,7 +148,7 @@ export function computeSynergies(
       id: "focus",
       name: "集中（エース運用）",
       emoji: "💢",
-      desc: "技3枚以上のエースは威力+25%。ただし被ダメージ+20%。",
+      desc: "技3枚以上のエースは威力+40%。被ダメージは+10%だけ。",
     });
   }
   const monstersTotal = builds.filter((b) => getMonster(b.monsterId)).length;
