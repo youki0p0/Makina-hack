@@ -8,7 +8,8 @@ const KEY = "dice-hackslash-maint";
 
 // この値を上げると、全プレイヤーで「次回起動時に1回だけ」強制リロードが走る。
 // （= 「初回の今だけメモリ解放」を配布するためのスイッチ。）
-export const MAINT_FORCE_VERSION = 1;
+// v2: 直近の更新（深層難化/紋章修正/セット調整 等）を未更新の端末へ確実に届けるため強制リロード。
+export const MAINT_FORCE_VERSION = 2;
 
 /** 保存しているメンテ状態。 */
 export interface MaintState {
