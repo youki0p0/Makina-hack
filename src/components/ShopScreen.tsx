@@ -3,15 +3,64 @@
 import Link from "next/link";
 import PlayerStatus from "@/components/PlayerStatus";
 import PixelGlyph from "@/components/PixelGlyph";
+import { canEquip } from "@/data/classes";
 import { fmt } from "@/lib/ui";
 import { rarityLabel, rarityStyle, slotLabel } from "@/lib/ui";
 import { getWorld, getWorldBackground } from "@/data/worlds";
 import { useGameStore } from "@/store/gameStore";
+import type { ClassId, Equipment, EquippedItems } from "@/types/game";
+
+/** Colored stat delta vs the equipped item (緑=up / 赤=down / 灰=±0), matching
+ *  the inventory detail modal's coloring. */
+function StatDelta({ label, value }: { label: string; value: number }) {
+  const color = value > 0 ? "text-emerald-300" : value < 0 ? "text-red-300" : "text-gray-500";
+  return (
+    <span className={color}>
+      {label}
+      {value > 0 ? "+" : ""}
+      {value}
+    </span>
+  );
+}
+
+/** A buy-decision helper line for a shop equipment: 装備不可 or stat deltas vs equipped. */
+function ShopCompare({
+  item,
+  equipped,
+  classId,
+}: {
+  item: Equipment;
+  equipped: EquippedItems;
+  classId: ClassId;
+}) {
+  if (!canEquip(item, classId)) {
+    return (
+      <p className="mt-0.5 text-[10px] font-bold text-red-400">⚠ 装備不可（このジョブでは装備できない）</p>
+    );
+  }
+  const cur = equipped[item.slot];
+  if (!cur) {
+    return <p className="mt-0.5 text-[10px] text-emerald-300">空きスロット（装備で全ステアップ）</p>;
+  }
+  return (
+    <p className="mt-0.5 flex flex-wrap gap-x-2 text-[10px]">
+      <span className="text-gray-400">装備中と比較:</span>
+      <StatDelta label="攻" value={item.attack - cur.attack} />
+      <StatDelta label="防" value={item.defense - cur.defense} />
+      <StatDelta label="HP" value={item.maxHp - cur.maxHp} />
+      {item.rerollModifier - cur.rerollModifier !== 0 && (
+        <StatDelta label="リロール" value={item.rerollModifier - cur.rerollModifier} />
+      )}
+    </p>
+  );
+}
 
 export default function ShopScreen() {
   const floor = useGameStore((s) => s.currentFloor);
   const stock = useGameStore((s) => s.shopStock);
   const gold = useGameStore((s) => s.player.gold);
+  const equipped = useGameStore((s) => s.equipped);
+  const classId = useGameStore((s) => s.classId);
   const buy = useGameStore((s) => s.buyShopItem);
   const buyAll = useGameStore((s) => s.buyAffordableShop);
   const leave = useGameStore((s) => s.leaveShop);
@@ -71,6 +120,9 @@ export default function ShopScreen() {
                   </span>
                 </div>
                 <p className="mt-0.5 text-[10px] text-gray-300">{desc}</p>
+                {entry.kind === "equipment" && (
+                  <ShopCompare item={entry.equipment!} equipped={equipped} classId={classId} />
+                )}
               </button>
             );
           }
@@ -93,6 +145,9 @@ export default function ShopScreen() {
                 </button>
               </div>
               <p className="mt-0.5 text-[10px] text-gray-300">{desc}</p>
+              {entry.kind === "equipment" && (
+                <ShopCompare item={entry.equipment!} equipped={equipped} classId={classId} />
+              )}
             </div>
           );
         })}
