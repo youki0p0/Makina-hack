@@ -14,13 +14,13 @@ import OperatorBadge from "./OperatorBadge";
 type Tab = "monster" | "card" | "field" | "operator" | "synergy" | "achieve";
 
 const SYNERGY_REF: { emoji: string; name: string; cond: string; effect: string }[] = [
-  { emoji: "🌿", name: "森の陣", cond: "緑×3", effect: "毎秒回復+8・防御+10%・HP+10%" },
-  { emoji: "🔷", name: "魔導陣", cond: "青×3", effect: "CT-25%・速度+10%・開幕シールド+30" },
-  { emoji: "🔺", name: "猛火陣", cond: "赤×3", effect: "攻撃+28%・クリ率+12%" },
-  { emoji: "🌈", name: "三原陣", cond: "緑+青+赤", effect: "全ステータス+10%" },
-  { emoji: "☠️", name: "毒炎", cond: "緑+赤", effect: "毒状態の敵に火傷追加" },
-  { emoji: "💨", name: "加速火力", cond: "青+赤", effect: "速度とクリ率上昇" },
-  { emoji: "🛡️", name: "守護術式", cond: "緑+青", effect: "防御と回復量上昇" },
+  { emoji: "🌿", name: "森の陣", cond: "緑×3", effect: "毎秒回復+12・防御/HP+18%・攻撃+8%" },
+  { emoji: "🔷", name: "魔導陣", cond: "青×3", effect: "CT-35%・速度+15%・シールド+70・防御+20%" },
+  { emoji: "🔺", name: "猛火陣", cond: "赤×3", effect: "攻撃+35%・クリ+18%・HP+15%・防御+10%" },
+  { emoji: "🌈", name: "三原陣", cond: "緑+青+赤", effect: "全ステータス+8%（役割コンプ）" },
+  { emoji: "☠️", name: "毒炎", cond: "緑+赤の2色", effect: "毒に火傷追加・攻撃+10%・HP+6%・回復+5" },
+  { emoji: "💨", name: "加速火力", cond: "青+赤の2色", effect: "速度/クリ大・シールド+60・HP+16%・防御+10%" },
+  { emoji: "🛡️", name: "守護術式", cond: "緑+青の2色", effect: "防御+18%・回復+28%・シールド+28・CT-8%" },
   { emoji: "🔥", name: "業火結界", cond: "fireタグ×3", effect: "火傷ダメージ+4" },
   { emoji: "🟣", name: "瘴気蔓延", cond: "poisonタグ×3", effect: "毒が拡散" },
   { emoji: "🧱", name: "鉄壁布陣", cond: "defenseタグ×3", effect: "防御+12%" },
@@ -146,6 +146,13 @@ export default function CodexOverlay({ onClose }: { onClose: () => void }) {
             </>
           )}
 
+          {tab === "synergy" && (
+            <div className="mb-1 rounded-xl border border-amber-400/40 bg-amber-500/10 p-2 text-[10px] text-amber-100">
+              🔺 <b>色の三すくみ</b>：緑 → 赤 → 青 → 緑（緑は赤に強い／赤は青に強い／青は緑に強い）。
+              有利な色は与ダメ増。敵の色は毎ラウンド変わるので、単色で染めると得意・不得意が交互に来る。
+              色シナジーは <b>単色＝単色陣 / 2色＝該当ペア / 3色＝三原陣</b> のいずれか1つが付く（重複しない）。
+            </div>
+          )}
           {tab === "synergy" &&
             SYNERGY_REF.map((s) => (
               <div key={s.name} className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-2 text-[10px]">

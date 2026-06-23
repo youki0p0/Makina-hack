@@ -1,9 +1,9 @@
 "use client";
 
-import { previewEnemies } from "@/lib/arena/battle";
-import { COLOR_DOT } from "@/data/arena/monsters";
+import { previewEnemies, teamColorAdvantage } from "@/lib/arena/battle";
+import { COLOR_DOT, getMonster } from "@/data/arena/monsters";
 import { allyTeamPower, enemyTeamPower } from "@/lib/arena/power";
-import type { FieldId, MonsterBuild } from "@/types/arena";
+import type { FieldId, MonsterBuild, MonsterColor } from "@/types/arena";
 
 /**
  * 準備中に「次に戦う敵編成」と、自軍★ vs 敵★ の総合力比較を表示する。
@@ -25,6 +25,18 @@ export default function EnemyPreview({
   const enemies = previewEnemies(round, field);
   const mine = allyTeamPower(builds, field, operatorId, blessings);
   const theirs = enemyTeamPower(round, field);
+
+  // 三すくみ色相性（緑→赤→青→緑）
+  const allyColors = builds
+    .map((b) => getMonster(b.monsterId)?.color)
+    .filter((c): c is MonsterColor => !!c);
+  const adv = teamColorAdvantage(allyColors, enemies.map((e) => e.color));
+  const colorVerdict =
+    adv >= 1.05
+      ? { text: "色相性 有利", cls: "bg-emerald-500/20 text-emerald-200" }
+      : adv <= 0.96
+        ? { text: "色相性 不利", cls: "bg-rose-500/20 text-rose-200" }
+        : { text: "色相性 互角", cls: "bg-white/10 text-gray-300" };
   const advantage = mine - theirs;
   const verdict =
     advantage >= theirs * 0.15
@@ -50,7 +62,12 @@ export default function EnemyPreview({
       </div>
 
       {/* 次の敵3体 */}
-      <div className="mb-1 text-[10px] font-bold text-gray-400">⚔️ 次に戦う敵</div>
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[10px] font-bold text-gray-400">⚔️ 次に戦う敵</span>
+        <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${colorVerdict.cls}`}>
+          🔺{colorVerdict.text}
+        </span>
+      </div>
       <div className="flex justify-between gap-1">
         {enemies.map((e, i) => (
           <div

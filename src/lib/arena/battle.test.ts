@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isBossRound, simulateBattle } from "@/lib/arena/battle";
+import { colorMatchup, isBossRound, simulateBattle, teamColorAdvantage } from "@/lib/arena/battle";
 import { budgetForRound, DRAFT_SIZE, generateDraft, newRun } from "@/lib/arena/gameState";
 import { computeSynergies, emptyTeamMods } from "@/lib/arena/synergy";
 import { applyBlessings, offerBlessings } from "@/lib/arena/blessings";
@@ -98,6 +98,40 @@ describe("ボスラウンド", () => {
     const b = rainbowBuilds();
     expect(simulateBattle(b, "calibrator", "ruins", 5, "long").boss).toBe(true);
     expect(simulateBattle(b, "calibrator", "ruins", 6, "long").boss).toBe(false);
+  });
+});
+
+describe("色の三すくみ（緑→赤→青→緑）", () => {
+  it("有利な色は1超、不利は1未満、同色/中立は1", () => {
+    expect(colorMatchup("green", "red")).toBeGreaterThan(1);
+    expect(colorMatchup("red", "blue")).toBeGreaterThan(1);
+    expect(colorMatchup("blue", "green")).toBeGreaterThan(1);
+    expect(colorMatchup("red", "green")).toBeLessThan(1);
+    expect(colorMatchup("green", "green")).toBe(1);
+  });
+
+  it("チーム相性：緑単 vs 赤単は有利、その逆は不利", () => {
+    const greenVsRed = teamColorAdvantage(["green", "green", "green"], ["red", "red", "red"]);
+    const redVsGreen = teamColorAdvantage(["red", "red", "red"], ["green", "green", "green"]);
+    expect(greenVsRed).toBeGreaterThan(1);
+    expect(redVsGreen).toBeLessThan(1);
+  });
+});
+
+describe("色シナジーの排他性", () => {
+  const mk = (ids: string[]) => ids.map((monsterId) => ({ monsterId, equipmentIds: [], skillIds: [] }));
+  it("単色は単色陣のみ、虹は三原陣のみ（ペアは付かない）", () => {
+    const mono = computeSynergies(mk(["moss_golem", "venom_toad", "elder_treant"]), "calibrator");
+    expect(mono.views.some((v) => v.id === "ggg")).toBe(true);
+    expect(mono.views.some((v) => ["gr", "br", "gb", "gbr"].includes(v.id))).toBe(false);
+
+    const rainbow = computeSynergies(mk(["moss_golem", "frost_sprite", "ember_imp"]), "calibrator");
+    expect(rainbow.views.some((v) => v.id === "gbr")).toBe(true);
+    expect(rainbow.views.some((v) => ["gr", "br", "gb"].includes(v.id))).toBe(false);
+
+    const dual = computeSynergies(mk(["moss_golem", "elder_treant", "ember_imp"]), "calibrator");
+    expect(dual.views.some((v) => v.id === "gr")).toBe(true);
+    expect(dual.views.some((v) => v.id === "gbr")).toBe(false);
   });
 });
 
