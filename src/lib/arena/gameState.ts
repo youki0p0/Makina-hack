@@ -1,6 +1,10 @@
 import { ALL_CARDS } from "@/data/arena/cards";
 import { FIELDS } from "@/data/arena/fields";
+import { blessingBudgetBonus } from "@/lib/arena/blessings";
 import type { FieldId, GameMode, MonsterBuild, RunState } from "@/types/arena";
+
+/** ドラフトで毎ラウンド提示するカード枚数（横スクロールで全部見れる）。 */
+export const DRAFT_SIZE = 6;
 
 export interface ModeConfig {
   id: GameMode;
@@ -19,7 +23,12 @@ export function rollField(): FieldId {
   return FIELDS[Math.floor(Math.random() * FIELDS.length)].id;
 }
 
-/** ラウンドに応じた3枚のドラフトを生成（後半ほどレアが出やすい）。 */
+/** 1ターンに使えるコスト予算。ラウンドが進むほど増え、祝福でさらに増える。 */
+export function budgetForRound(round: number, blessings: string[] = []): number {
+  return 5 + Math.floor((round - 1) / 2) + blessingBudgetBonus(blessings);
+}
+
+/** ラウンドに応じたドラフトを生成（後半ほどレアが出やすい・横スクロールで全表示）。 */
 export function generateDraft(round: number): string[] {
   const weightOf = (rarity: number) => {
     if (rarity === 1) return 5;
@@ -28,7 +37,7 @@ export function generateDraft(round: number): string[] {
   };
   const picks: string[] = [];
   const pool = [...ALL_CARDS];
-  for (let n = 0; n < 3 && pool.length > 0; n++) {
+  for (let n = 0; n < DRAFT_SIZE && pool.length > 0; n++) {
     const total = pool.reduce((a, c) => a + weightOf(c.rarity), 0);
     let r = Math.random() * total;
     let idx = 0;
@@ -66,9 +75,11 @@ export function newRun(
     life: cfg.lives,
     field: rollField(),
     draft: generateDraft(1),
-    rerolls: 2,
+    budget: budgetForRound(1, []),
     phase: "draft",
     lastResult: null,
+    blessings: [],
+    pendingBlessings: [],
   };
 }
 

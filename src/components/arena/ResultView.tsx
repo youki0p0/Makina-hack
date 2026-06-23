@@ -1,8 +1,11 @@
 import { isBossRound } from "@/lib/arena/battle";
 import { ACHIEVEMENTS } from "@/lib/arena/achievements";
+import { BLESSING_MAP } from "@/lib/arena/blessings";
+import { getMonster } from "@/data/arena/monsters";
 import { MODE_CONFIG } from "@/lib/arena/gameState";
 import { rankTitle } from "@/lib/arena/rank";
 import type { RunState } from "@/types/arena";
+import MonsterSprite from "./MonsterSprite";
 
 /** ラウンド結果 / 優勝 / 敗退の表示。 */
 export default function ResultView({
@@ -52,6 +55,28 @@ export default function ResultView({
             （味方残HP {r.allyHpLeft} / 敵残HP {r.enemyHpLeft}）
           </p>
         </>
+      )}
+
+      {terminal && (
+        <div className="w-full max-w-xs space-y-2 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+          <div className="text-[11px] font-bold text-gray-300">このランの軌跡</div>
+          <div className="flex justify-center gap-3">
+            {run.builds.map((b, i) => {
+              const m = getMonster(b.monsterId);
+              return m ? <MonsterSprite key={i} monster={m} size={44} /> : null;
+            })}
+          </div>
+          {run.blessings.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-1">
+              <span className="text-[10px] text-amber-300">✨</span>
+              {run.blessings.map((id, i) => (
+                <span key={i} className="text-[14px]" title={BLESSING_MAP[id]?.name}>
+                  {BLESSING_MAP[id]?.emoji}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {freshDefs.length > 0 && (

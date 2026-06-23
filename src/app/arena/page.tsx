@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { MONSTERS, getMonster, COLOR_DOT } from "@/data/arena/monsters";
+import { MONSTERS, getMonster, COLOR_DOT, COLOR_LABEL } from "@/data/arena/monsters";
 import { OPERATORS } from "@/data/arena/operators";
 import { getOperator } from "@/data/arena/operators";
 import { isBossRound } from "@/lib/arena/battle";
+import { BLESSING_MAP } from "@/lib/arena/blessings";
 import { MODE_CONFIG } from "@/lib/arena/gameState";
 import { rankTitle } from "@/lib/arena/rank";
 import { sfx } from "@/lib/audio/sfx";
@@ -13,8 +14,10 @@ import { useArenaStore } from "@/store/arenaStore";
 import type { GameMode } from "@/types/arena";
 import SoundToggle from "@/components/SoundToggle";
 import BattleView from "@/components/arena/BattleView";
+import BlessingChoice from "@/components/arena/BlessingChoice";
 import BuildListPanel from "@/components/arena/BuildListPanel";
 import CodexOverlay from "@/components/arena/CodexOverlay";
+import EnemyPreview from "@/components/arena/EnemyPreview";
 import HelpOverlay from "@/components/arena/HelpOverlay";
 import CardDraft from "@/components/arena/CardDraft";
 import FieldBanner from "@/components/arena/FieldBanner";
@@ -22,6 +25,7 @@ import MonsterColumn from "@/components/arena/MonsterColumn";
 import MonsterSprite from "@/components/arena/MonsterSprite";
 import OperatorBadge from "@/components/arena/OperatorBadge";
 import ResultView from "@/components/arena/ResultView";
+import TutorialCoach from "@/components/arena/TutorialCoach";
 
 export default function ArenaPage() {
   const hydrate = useArenaStore((s) => s.hydrate);
@@ -188,25 +192,31 @@ function SetupScreen() {
         <div className="mb-2 text-xs font-bold text-gray-300">
           ③ 使役モンスターを3体選ぶ（{team.length}/3）
         </div>
+        {/* 色ごとの縦カラム（緑/青/赤）。各色に増えても下に伸びるだけで崩れない。 */}
         <div className="grid grid-cols-3 gap-1.5">
-          {MONSTERS.map((m) => {
-            const picked = team.includes(m.id);
-            return (
-              <button
-                key={m.id}
-                onClick={() => toggleMonster(m.id)}
-                className={`flex flex-col items-center gap-1 rounded-xl border p-1.5 ${
-                  picked ? "border-emerald-400 bg-emerald-500/15" : "border-white/10 bg-black/20"
-                } active:scale-95`}
-              >
-                <MonsterSprite monster={m} size={38} dimmed={!picked && team.length >= 3} />
-                <div className="text-[9px] font-bold leading-tight">
-                  {COLOR_DOT[m.color]} {m.name}
-                </div>
-                <div className="text-[8px] text-gray-400">{m.role}</div>
-              </button>
-            );
-          })}
+          {(["green", "blue", "red"] as const).map((color) => (
+            <div key={color} className="flex flex-col gap-1">
+              <div className="rounded-md bg-white/5 py-0.5 text-center text-[10px] font-bold text-gray-300">
+                {COLOR_DOT[color]} {COLOR_LABEL[color]}
+              </div>
+              {MONSTERS.filter((m) => m.color === color).map((m) => {
+                const picked = team.includes(m.id);
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => toggleMonster(m.id)}
+                    className={`flex flex-col items-center gap-0.5 rounded-xl border p-1 ${
+                      picked ? "border-emerald-400 bg-emerald-500/15" : "border-white/10 bg-black/20"
+                    } active:scale-95`}
+                  >
+                    <MonsterSprite monster={m} size={36} dimmed={!picked && team.length >= 3} />
+                    <div className="text-center text-[9px] font-bold leading-tight">{m.name}</div>
+                    <div className="text-[8px] leading-tight text-gray-400">{m.role}</div>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
         {team.length > 0 && (
           <div className="mt-2 text-[10px] text-gray-400">
@@ -240,21 +250,46 @@ function SetupScreen() {
 function GameScreen() {
   const run = useArenaStore((s) => s.run)!;
   const assignCard = useArenaStore((s) => s.assignCard);
-  const discardCard = useArenaStore((s) => s.discardCard);
-  const rerollDraft = useArenaStore((s) => s.rerollDraft);
   const confirmPrep = useArenaStore((s) => s.confirmPrep);
   const finishBattle = useArenaStore((s) => s.finishBattle);
+  const chooseBlessing = useArenaStore((s) => s.chooseBlessing);
   const nextRound = useArenaStore((s) => s.nextRound);
   const quitToMenu = useArenaStore((s) => s.quitToMenu);
   const freshAchievements = useArenaStore((s) => s.freshAchievements);
   const clearFresh = useArenaStore((s) => s.clearFreshAchievements);
 
   const [selected, setSelected] = useState<string | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
   const op = getOperator(run.operatorId);
   const cfg = MODE_CONFIG[run.mode];
 
+  // 初回プレイ時、準備画面で対話式チュートリアルを自動表示
+  useEffect(() => {
+    if (window.localStorage.getItem("arena-tutorial-seen") !== "1") setShowTutorial(true);
+  }, []);
+  const closeTutorial = () => {
+    setShowTutorial(false);
+    try {
+      window.localStorage.setItem("arena-tutorial-seen", "1");
+    } catch {}
+  };
+
   if (run.phase === "battle" && run.lastResult) {
     return <BattleView result={run.lastResult} onFinished={finishBattle} />;
+  }
+
+  if (run.phase === "blessing") {
+    return (
+      <BlessingChoice
+        offered={run.pendingBlessings}
+        owned={run.blessings}
+        onChoose={(id) => {
+          sfx("coin");
+          clearFresh();
+          chooseBlessing(id);
+        }}
+      />
+    );
   }
 
   if (run.phase === "result" || run.phase === "victory" || run.phase === "gameover") {
@@ -284,33 +319,54 @@ function GameScreen() {
 
   return (
     <>
+      {showTutorial && <TutorialCoach onClose={closeTutorial} />}
       {/* ヘッダー：成績 + オペレーター */}
       <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-2">
         <OperatorBadge operator={op} size={32} />
         <div className="flex items-center gap-1.5 text-[10px] font-bold">
           <span className="rounded bg-emerald-500/20 px-2 py-1">🏅{run.wins}/{cfg.targetWins}</span>
           <span className="rounded bg-white/10 px-2 py-1">❤️{run.life}</span>
+          <button
+            onClick={() => setShowTutorial(true)}
+            className="rounded bg-white/10 px-2 py-1 active:scale-95"
+            aria-label="チュートリアル"
+          >
+            ❔
+          </button>
           <SoundToggle />
         </div>
       </div>
 
+      {/* 取得済み祝福（ラン内で永続・累積） */}
+      {run.blessings.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1 rounded-xl border border-amber-400/20 bg-amber-500/[0.06] px-2 py-1">
+          <span className="text-[9px] font-bold text-amber-300">✨祝福</span>
+          {run.blessings.map((id, i) => (
+            <span key={i} className="text-[13px]" title={BLESSING_MAP[id]?.name}>
+              {BLESSING_MAP[id]?.emoji}
+            </span>
+          ))}
+        </div>
+      )}
+
       <FieldBanner field={run.field} round={run.round} boss={isBossRound(run.round)} />
+
+      <EnemyPreview
+        builds={run.builds}
+        field={run.field}
+        operatorId={run.operatorId}
+        blessings={run.blessings}
+        round={run.round}
+      />
 
       <CardDraft
         draft={run.draft}
-        rerolls={run.rerolls}
+        budget={run.budget}
+        field={run.field}
         selectedCardId={selected}
         onSelect={(id) => {
           setSelected((cur) => (cur === id ? null : id));
           sfx("select");
-        }}
-        onDiscard={(id) => {
-          discardCard(id);
-          if (selected === id) setSelected(null);
-        }}
-        onReroll={() => {
-          rerollDraft();
-          sfx("roll");
         }}
       />
 

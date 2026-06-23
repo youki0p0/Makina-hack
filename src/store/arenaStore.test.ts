@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { useArenaStore } from "@/store/arenaStore";
-import { isEquipment, getCard } from "@/data/arena/cards";
+import { cardCost, isEquipment, getCard } from "@/data/arena/cards";
 
 // 環境は node（window 無し）のため永続化は no-op。ゲームループのロジックを検証する。
 function resetStore() {
@@ -23,7 +23,7 @@ describe("arenaStore ゲームループ", () => {
       if (run.phase === "victory" || run.phase === "gameover") break;
 
       if (run.phase === "draft") {
-        // 提示カードを3体に配ってから戦う
+        // 提示カードを予算内で3体に配ってから戦う
         run.draft.slice().forEach((id, i) => {
           const c = getCard(id);
           if (c) useArenaStore.getState().assignCard(id, isEquipment(c) ? i % 3 : (i + 1) % 3);
@@ -33,6 +33,9 @@ describe("arenaStore ゲームループ", () => {
         expect(r2.phase).toBe("battle");
         expect(r2.lastResult).toBeTruthy();
         useArenaStore.getState().finishBattle();
+      } else if (run.phase === "blessing") {
+        // 勝利後の祝福3択：先頭を選んで次ラウンドへ
+        useArenaStore.getState().chooseBlessing(run.pendingBlessings[0]);
       } else if (run.phase === "result") {
         useArenaStore.getState().nextRound();
       }
@@ -53,11 +56,22 @@ describe("arenaStore ゲームループ", () => {
     expect(useArenaStore.getState().run).toBeNull();
   });
 
-  it("リロールは残り回数だけ減る", () => {
+  it("カード割り当てでコスト予算が減り、予算オーバーは割り当て不可", () => {
     const s = useArenaStore.getState();
     s.startRun("short", "calibrator", ["moss_golem", "frost_sprite", "ember_imp"]);
-    const before = useArenaStore.getState().run!.rerolls;
-    useArenaStore.getState().rerollDraft();
-    expect(useArenaStore.getState().run!.rerolls).toBe(before - 1);
+    const run = useArenaStore.getState().run!;
+    const before = run.budget;
+    const firstId = run.draft[0];
+    const cost = cardCost(getCard(firstId));
+    useArenaStore.getState().assignCard(firstId, 0);
+    expect(useArenaStore.getState().run!.budget).toBe(before - cost);
+
+    // 予算を超えるカードは割り当てられない
+    useArenaStore.setState({
+      run: { ...useArenaStore.getState().run!, budget: 0, draft: [firstId] },
+    });
+    const draftBefore = useArenaStore.getState().run!.draft.length;
+    useArenaStore.getState().assignCard(firstId, 0);
+    expect(useArenaStore.getState().run!.draft.length).toBe(draftBefore);
   });
 });

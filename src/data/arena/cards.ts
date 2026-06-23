@@ -463,3 +463,16 @@ export function isSkill(c: Card): c is SkillCard {
 export function isEquipment(c: Card): c is EquipmentCard {
   return c.kind === "equipment";
 }
+
+/**
+ * カードのコスト（1ターンの予算で割り振る）。強いカードほど高い。
+ * 装備 = レア度、技 = レア度+1（能動的で強力なため割高）。
+ */
+export function cardCost(c: Card): number {
+  return c.kind === "skill" ? c.rarity + 1 : c.rarity;
+}
+
+export function cardCostById(id: string): number {
+  const c = getCard(id);
+  return c ? cardCost(c) : 0;
+}

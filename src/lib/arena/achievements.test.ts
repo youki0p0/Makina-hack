@@ -14,9 +14,11 @@ function baseRun(over: Partial<RunState>): RunState {
     life: 3,
     field: "forest",
     draft: [],
-    rerolls: 2,
+    budget: 5,
     phase: "result",
     lastResult: null,
+    blessings: [],
+    pendingBlessings: [],
     ...over,
   };
 }
