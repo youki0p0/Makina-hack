@@ -31,8 +31,19 @@ describe("クラス限定ロマン装備", () => {
   it("ロマン装備は ITEMS に登録され getItemById で復元できる（セーブ互換）", () => {
     expect(getItemById("rogue_twin_fang")?.name).toBe("宵闇の双牙");
     expect(getItemById("mage_truth_staff")?.name).toBe("真理の天杖");
-    // 少なくとも rogue/mage の2点が classLock 付きで存在する。
+    expect(getItemById("hexer_grimoire")?.name).toBe("呪詛の魔典");
+    expect(getItemById("archmage_finale")?.name).toBe("叡智の終焉");
+    // rogue/mage/hexer/archmage の4点が classLock 付きで存在する。
     const locked = ITEMS.filter((i) => i.classLock);
-    expect(locked.length).toBeGreaterThanOrEqual(2);
+    expect(locked.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("ヘクサー/アークメイジ専用装備も本人のみ装備可", () => {
+    const hex = getItemById("hexer_grimoire")!;
+    const arch = getItemById("archmage_finale")!;
+    expect(canEquip(hex, "hexer")).toBe(true);
+    expect(canEquip(hex, "mage")).toBe(false);
+    expect(canEquip(arch, "archmage")).toBe(true);
+    expect(canEquip(arch, "mage")).toBe(false);
   });
 });
