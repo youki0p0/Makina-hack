@@ -207,13 +207,22 @@ export interface RunState {
   losses: number;
   life: number;
   field: FieldId;
-  draft: string[]; // 提示中カードID
-  rerolls: number;
+  draft: string[]; // 提示中カードID（横スクロールで閲覧）
+  budget: number; // このラウンドで使えるコスト残量
   phase: RunPhase;
   lastResult: BattleResult | null;
+  blessings: string[]; // 取得済み祝福ID（ラン内で永続・累積）
+  pendingBlessings: string[]; // 勝利時に提示中の3択
 }
 
-export type RunPhase = "setup" | "draft" | "battle" | "result" | "gameover" | "victory";
+export type RunPhase =
+  | "setup"
+  | "draft"
+  | "battle"
+  | "result"
+  | "blessing"
+  | "gameover"
+  | "victory";
 
 // ---- 戦闘 ----
 

@@ -13,6 +13,7 @@ import { useArenaStore } from "@/store/arenaStore";
 import type { GameMode } from "@/types/arena";
 import SoundToggle from "@/components/SoundToggle";
 import BattleView from "@/components/arena/BattleView";
+import BlessingChoice from "@/components/arena/BlessingChoice";
 import BuildListPanel from "@/components/arena/BuildListPanel";
 import CodexOverlay from "@/components/arena/CodexOverlay";
 import HelpOverlay from "@/components/arena/HelpOverlay";
@@ -240,10 +241,9 @@ function SetupScreen() {
 function GameScreen() {
   const run = useArenaStore((s) => s.run)!;
   const assignCard = useArenaStore((s) => s.assignCard);
-  const discardCard = useArenaStore((s) => s.discardCard);
-  const rerollDraft = useArenaStore((s) => s.rerollDraft);
   const confirmPrep = useArenaStore((s) => s.confirmPrep);
   const finishBattle = useArenaStore((s) => s.finishBattle);
+  const chooseBlessing = useArenaStore((s) => s.chooseBlessing);
   const nextRound = useArenaStore((s) => s.nextRound);
   const quitToMenu = useArenaStore((s) => s.quitToMenu);
   const freshAchievements = useArenaStore((s) => s.freshAchievements);
@@ -255,6 +255,20 @@ function GameScreen() {
 
   if (run.phase === "battle" && run.lastResult) {
     return <BattleView result={run.lastResult} onFinished={finishBattle} />;
+  }
+
+  if (run.phase === "blessing") {
+    return (
+      <BlessingChoice
+        offered={run.pendingBlessings}
+        owned={run.blessings}
+        onChoose={(id) => {
+          sfx("coin");
+          clearFresh();
+          chooseBlessing(id);
+        }}
+      />
+    );
   }
 
   if (run.phase === "result" || run.phase === "victory" || run.phase === "gameover") {
@@ -298,19 +312,11 @@ function GameScreen() {
 
       <CardDraft
         draft={run.draft}
-        rerolls={run.rerolls}
+        budget={run.budget}
         selectedCardId={selected}
         onSelect={(id) => {
           setSelected((cur) => (cur === id ? null : id));
           sfx("select");
-        }}
-        onDiscard={(id) => {
-          discardCard(id);
-          if (selected === id) setSelected(null);
-        }}
-        onReroll={() => {
-          rerollDraft();
-          sfx("roll");
         }}
       />
 

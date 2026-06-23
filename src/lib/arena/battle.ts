@@ -8,6 +8,7 @@ import {
   fieldTransform,
 } from "@/lib/arena/fieldTransform";
 import { computeSynergies } from "@/lib/arena/synergy";
+import { applyBlessings } from "@/lib/arena/blessings";
 import type {
   BattleFrame,
   BattleResult,
@@ -503,8 +504,10 @@ export function simulateBattle(
   field: FieldId,
   round: number,
   _mode: GameMode,
+  blessings: string[] = [],
 ): BattleResult {
   const { mods } = computeSynergies(builds, operatorId);
+  applyBlessings(mods, blessings);
   const rng = mulberry32(round * 2654435761 + builds.length * 40503 + 7);
 
   const allies = buildAllies(builds, operatorId, field, mods);

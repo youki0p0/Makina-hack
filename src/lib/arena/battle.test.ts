@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { isBossRound, simulateBattle } from "@/lib/arena/battle";
-import { generateDraft, newRun } from "@/lib/arena/gameState";
-import { computeSynergies } from "@/lib/arena/synergy";
+import { budgetForRound, DRAFT_SIZE, generateDraft, newRun } from "@/lib/arena/gameState";
+import { computeSynergies, emptyTeamMods } from "@/lib/arena/synergy";
+import { applyBlessings, offerBlessings } from "@/lib/arena/blessings";
 import { fieldTransform } from "@/lib/arena/fieldTransform";
-import { ALL_CARDS, EQUIPMENT, SKILLS, isSkill } from "@/data/arena/cards";
+import { ALL_CARDS, EQUIPMENT, SKILLS, cardCost, isSkill } from "@/data/arena/cards";
 import { MONSTERS } from "@/data/arena/monsters";
 import { FIELDS } from "@/data/arena/fields";
 import type { FieldId, MonsterBuild } from "@/types/arena";
@@ -137,15 +138,42 @@ describe("データ整合性", () => {
 });
 
 describe("generateDraft / newRun", () => {
-  it("ドラフトは3枚を返す", () => {
-    expect(generateDraft(1)).toHaveLength(3);
-    expect(generateDraft(10)).toHaveLength(3);
+  it("ドラフトは規定枚数(6)を返す", () => {
+    expect(generateDraft(1)).toHaveLength(DRAFT_SIZE);
+    expect(generateDraft(10)).toHaveLength(DRAFT_SIZE);
   });
 
-  it("newRun はモード設定どおり初期化する", () => {
+  it("newRun はモード設定どおり初期化する（予算・祝福を含む）", () => {
     const run = newRun("long", "verdant", ["elder_treant", "venom_toad", "magma_beast"]);
     expect(run.life).toBe(5);
     expect(run.builds).toHaveLength(3);
     expect(run.phase).toBe("draft");
+    expect(run.budget).toBeGreaterThan(0);
+    expect(run.blessings).toEqual([]);
+  });
+});
+
+describe("コスト / 祝福", () => {
+  it("予算はラウンドと祝福で増える", () => {
+    expect(budgetForRound(1, [])).toBe(5);
+    expect(budgetForRound(3, [])).toBe(6);
+    expect(budgetForRound(1, ["budget"])).toBe(6);
+  });
+
+  it("技は装備より割高（レア度+1）", () => {
+    const flame = SKILLS[0];
+    expect(cardCost(flame)).toBe(flame.rarity + 1);
+    const eq = EQUIPMENT[0];
+    expect(cardCost(eq)).toBe(eq.rarity);
+  });
+
+  it("祝福で攻撃倍率が上がる", () => {
+    const m = emptyTeamMods();
+    applyBlessings(m, ["atk"]);
+    expect(m.atkMult).toBeGreaterThan(1);
+  });
+
+  it("祝福3択は3つを返す", () => {
+    expect(offerBlessings(123)).toHaveLength(3);
   });
 });
