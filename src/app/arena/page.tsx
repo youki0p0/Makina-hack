@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { MONSTERS, getMonster, COLOR_DOT } from "@/data/arena/monsters";
+import { MONSTERS, getMonster, COLOR_DOT, COLOR_LABEL } from "@/data/arena/monsters";
 import { OPERATORS } from "@/data/arena/operators";
 import { getOperator } from "@/data/arena/operators";
 import { isBossRound } from "@/lib/arena/battle";
@@ -191,25 +191,31 @@ function SetupScreen() {
         <div className="mb-2 text-xs font-bold text-gray-300">
           ③ 使役モンスターを3体選ぶ（{team.length}/3）
         </div>
+        {/* 色ごとの縦カラム（緑/青/赤）。各色に増えても下に伸びるだけで崩れない。 */}
         <div className="grid grid-cols-3 gap-1.5">
-          {MONSTERS.map((m) => {
-            const picked = team.includes(m.id);
-            return (
-              <button
-                key={m.id}
-                onClick={() => toggleMonster(m.id)}
-                className={`flex flex-col items-center gap-1 rounded-xl border p-1.5 ${
-                  picked ? "border-emerald-400 bg-emerald-500/15" : "border-white/10 bg-black/20"
-                } active:scale-95`}
-              >
-                <MonsterSprite monster={m} size={38} dimmed={!picked && team.length >= 3} />
-                <div className="text-[9px] font-bold leading-tight">
-                  {COLOR_DOT[m.color]} {m.name}
-                </div>
-                <div className="text-[8px] text-gray-400">{m.role}</div>
-              </button>
-            );
-          })}
+          {(["green", "blue", "red"] as const).map((color) => (
+            <div key={color} className="flex flex-col gap-1">
+              <div className="rounded-md bg-white/5 py-0.5 text-center text-[10px] font-bold text-gray-300">
+                {COLOR_DOT[color]} {COLOR_LABEL[color]}
+              </div>
+              {MONSTERS.filter((m) => m.color === color).map((m) => {
+                const picked = team.includes(m.id);
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => toggleMonster(m.id)}
+                    className={`flex flex-col items-center gap-0.5 rounded-xl border p-1 ${
+                      picked ? "border-emerald-400 bg-emerald-500/15" : "border-white/10 bg-black/20"
+                    } active:scale-95`}
+                  >
+                    <MonsterSprite monster={m} size={36} dimmed={!picked && team.length >= 3} />
+                    <div className="text-center text-[9px] font-bold leading-tight">{m.name}</div>
+                    <div className="text-[8px] leading-tight text-gray-400">{m.role}</div>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
         {team.length > 0 && (
           <div className="mt-2 text-[10px] text-gray-400">

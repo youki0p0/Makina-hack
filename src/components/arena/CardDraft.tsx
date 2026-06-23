@@ -69,6 +69,14 @@ export default function CardDraft({
           このラウンドのカードは配り終えた。準備完了でOK！
         </p>
       ) : (
+        <div className="relative">
+        {draft.length > 2 && (
+          <div className="mb-1 text-center text-[9px] text-sky-300/90 animate-pulse">
+            ← スワイプして {draft.length} 枚から選ぶ →
+          </div>
+        )}
+        {/* 右端のフェードでスクロール可能を示唆 */}
+        <div className="pointer-events-none absolute bottom-1 right-0 top-5 z-10 w-6 bg-gradient-to-l from-[#15131f] to-transparent" />
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           {draft.map((id) => {
             const c = getCard(id);
@@ -123,6 +131,7 @@ export default function CardDraft({
               </button>
             );
           })}
+        </div>
         </div>
       )}
 
