@@ -80,6 +80,8 @@ describe("伝説賭博セット", () => {
     const eff = computeSetEffects(eq);
     expect(eff.dodgeChance).toBeGreaterThan(0.3);
     expect(eff.rerollSix).toBe(true);
-    expect(eff.dropTierBonus).toBeGreaterThanOrEqual(10);
+    // 2pc: ドロップ率1.4倍＋強化ドロップ確率(★最大+1・変動ステ最大級)。
+    expect(eff.dropRateMult).toBeCloseTo(1.4);
+    expect(eff.dropUpgradeChance).toBeGreaterThan(0);
   });
 });

@@ -49,6 +49,7 @@ import {
 } from "@/data/items";
 import { forgeCost, forgeMax, rollForge, starInjectCost, type ForgeKind } from "@/data/forge";
 import { applyModifier, modTierForFloor, rollDropModTier } from "@/data/modifiers";
+import { applyMaxAffix } from "@/data/affixes";
 import { computeSetEffects, getSetDef } from "@/data/sets";
 import { getTitle, titleSouls } from "@/data/titles";
 import { grantTitles } from "@/lib/titleAward";
@@ -2491,13 +2492,25 @@ export const useGameStore = create<GameState>((set, get) => {
     // Smart drops: with 6 slots, bias procedural drops toward the weakest/empty
     // slot so gearing up doesn't take 2× as long as it did with 3 slots.
     const weakSlot = weakestSlot(state.equipped);
-    // 伝説賭博セット2pc: ドロップの★ティアを底上げ。
-    const dropTierBonus = computeSetEffects(state.equipped, state.classId).dropTierBonus;
+    // 伝説賭博セット2pc: ドロップ率1.4倍＋一定確率で「強化ドロップ」(★最大+1・変動ステ最大級)。
+    const setEff = computeSetEffects(state.equipped, state.classId);
+    const lootEnemy =
+      setEff.dropRateMult !== 1
+        ? { ...enemy, dropRate: Math.min(1, enemy.dropRate * setEff.dropRateMult) }
+        : enemy;
     const drops: Equipment[] = [];
     for (let i = 0; i < dropCount; i++) {
       const hint = Math.random() < 0.6 ? weakSlot : undefined;
-      const d = rollLoot(enemy, state.currentFloor, diff.rareBonus, hint);
-      if (d) drops.push(applyModifier(d, rollDropModTier(state.currentFloor, diff.upswing) + dropTierBonus));
+      let d = rollLoot(lootEnemy, state.currentFloor, diff.rareBonus, hint);
+      if (!d) continue;
+      let modTier = rollDropModTier(state.currentFloor, diff.upswing);
+      if (setEff.dropUpgradeChance > 0 && Math.random() < setEff.dropUpgradeChance) {
+        // ★ をその階層の最大+1まで底上げ。
+        modTier = Math.max(modTier, modTierForFloor(state.currentFloor) + 1);
+        // 変動ステを最大級に（まだアフィックスが無いものだけ＝二重付与を防ぐ）。
+        if (!d.affixId) d = applyMaxAffix(d);
+      }
+      drops.push(applyModifier(d, modTier));
     }
     const drop = drops[0] ?? null;
 

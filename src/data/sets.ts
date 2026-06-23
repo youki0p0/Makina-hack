@@ -35,8 +35,10 @@ export interface SetTierBonus {
   dodge?: number;
   /** リロール時に出目6を確定させる。 */
   rerollSix?: boolean;
-  /** ドロップの★ティアを底上げする量。 */
-  dropTierBonus?: number;
+  /** ドロップが「強化ドロップ」(★最大+1・変動ステ最大級)になる確率(0..1)。 */
+  dropUpgradeChance?: number;
+  /** ドロップ率の倍率（敵の drop rate に乗算）。 */
+  dropRateMult?: number;
 }
 
 export interface SetDef {
@@ -251,7 +253,7 @@ export const SET_DEFS: readonly SetDef[] = [
     icon: "👑",
     kingOnly: true,
     bonuses: [
-      { pieces: 2, desc: "ドロップの★ティア超向上(+10)", dropTierBonus: 10 },
+      { pieces: 2, desc: "ドロップ率1.4倍＋より強い装備(★最大+1・変動ステ最大級)が出やすい", dropUpgradeChance: 0.5, dropRateMult: 1.4 },
       { pieces: 4, desc: "リロール時に出目6が確定", rerollSix: true },
       { pieces: 6, desc: "回避力極大（敵の攻撃を45%無効化）", dodge: 0.45 },
     ],
@@ -430,8 +432,10 @@ export interface SetEffects {
   dodgeChance: number;
   /** リロール時に出目6を確定させる。 */
   rerollSix: boolean;
-  /** ドロップの★ティア底上げ量。 */
-  dropTierBonus: number;
+  /** ドロップが「強化ドロップ」(★最大+1・変動ステ最大級)になる確率(0..1)。 */
+  dropUpgradeChance: number;
+  /** ドロップ率の倍率（敵の drop rate に乗算）。 */
+  dropRateMult: number;
   /** 最終的な攻撃倍率(★スケール後の attack に (1+attackPct) を乗算)。 */
   attackPct: number;
   /** 最終的なHP倍率(maxHp に (1+maxHpPct) を乗算)。 */
@@ -630,7 +634,8 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
     rollTwoDice: false,
     dodgeChance: 0,
     rerollSix: false,
-    dropTierBonus: 0,
+    dropUpgradeChance: 0,
+    dropRateMult: 1,
     attackPct: 0,
     maxHpPct: 0,
     activeTiers: [],
@@ -659,7 +664,8 @@ export function computeSetEffects(equipped: EquippedItems, classId?: ClassId): S
       if (b.rollTwoDice) eff.rollTwoDice = true;
       if (b.dodge) eff.dodgeChance = Math.max(eff.dodgeChance, b.dodge);
       if (b.rerollSix) eff.rerollSix = true;
-      if (b.dropTierBonus) eff.dropTierBonus = Math.max(eff.dropTierBonus, b.dropTierBonus);
+      if (b.dropUpgradeChance) eff.dropUpgradeChance = Math.max(eff.dropUpgradeChance, b.dropUpgradeChance);
+      if (b.dropRateMult) eff.dropRateMult *= b.dropRateMult;
       if (b.faceOneToTwo) eff.diceModifiers.push(gamblerFaceOneToTwo());
     }
   }
