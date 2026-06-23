@@ -2084,8 +2084,7 @@ export const useGameStore = create<GameState>((set, get) => {
         coins: Math.max(0, s.coins - KING_BET + r.coins),
         hiCoins: s.hiCoins + r.hi,
         kingPity: nextPity,
-        // 一撃（挑戦勝利）でダイスラッシュ(AT)発動。
-        atGames: r.outcome === "jackpot" ? Math.max(s.atGames, AT_GAMES) : s.atGames,
+        // カジノ王は独立台。通常スロットのダイスラッシュ(共有 atGames)とは連動させない。
       });
       persist();
       return r;

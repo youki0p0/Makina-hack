@@ -217,7 +217,7 @@ export default function KingChallenge() {
         </button>
         {coins < KING_BET && <p className="mt-1 text-[11px] text-rose-300">コインが足りません（スロット/甘ダイスで稼いでね）。</p>}
         <p className="mt-1 text-[10px] text-gray-500">
-          RTP≈0.7。小当たり(1/200・天井{KING_SMALL_CEILING})＝+{fmt(KING_SMALL_PAY)}＋挑戦(勝率1/10)。勝てば一撃 +{fmt(KING_JACKPOT)}＆💎＆ダイスラッシュ！
+          RTP≈0.7。小当たり(1/200・天井{KING_SMALL_CEILING})＝+{fmt(KING_SMALL_PAY)}＋挑戦(勝率1/10)。勝てば一撃 +{fmt(KING_JACKPOT)}＆💎ハイコイン！
         </p>
         <p className="text-[10px] text-gray-600">※設定・イベントデーの対象外（常に固定オッズ）。</p>
       </div>
