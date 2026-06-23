@@ -292,7 +292,7 @@ function buildEnemies(
   rng: () => number,
 ): Combatant[] {
   const boss = isBossRound(round);
-  const sf = (1 + (round - 1) * 0.105) * (boss ? 1.12 : 1);
+  const sf = (1 + (round - 1) * 0.2) * (boss ? 1.25 : 1);
   const fStat = fieldStatMods(field);
   const nSkills = boss ? 3 : round < 3 ? 1 : round < 9 ? 2 : 3;
   const enemies: Combatant[] = [];

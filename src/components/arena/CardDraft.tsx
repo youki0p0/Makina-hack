@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import { cardCost, getCard, isSkill } from "@/data/arena/cards";
-import type { TargetMode } from "@/types/arena";
+import { fieldTransform } from "@/lib/arena/fieldTransform";
+import type { FieldId, TargetMode } from "@/types/arena";
 
 const RARITY_RING: Record<number, string> = {
   1: "border-white/20",
@@ -26,11 +27,13 @@ const TARGET_LABEL: Record<TargetMode, string> = {
 export default function CardDraft({
   draft,
   budget,
+  field,
   selectedCardId,
   onSelect,
 }: {
   draft: string[];
   budget: number;
+  field: FieldId;
   selectedCardId: string | null;
   onSelect: (id: string) => void;
 }) {
@@ -73,6 +76,8 @@ export default function CardDraft({
             const cost = cardCost(c);
             const affordable = cost <= budget;
             const skill = isSkill(c);
+            const eff = skill ? fieldTransform(c, field, 0) : null;
+            const changed = eff && (eff.name !== c.name || eff.fieldNote);
             return (
               <button
                 key={id}
@@ -97,8 +102,17 @@ export default function CardDraft({
                     {RARITY_LABEL[c.rarity]}
                   </span>
                 </div>
-                <span className="text-[11px] font-bold leading-tight">{c.name}</span>
-                <span className="text-[8px] leading-tight text-gray-400 line-clamp-2">{c.desc}</span>
+                <span className="text-[11px] font-bold leading-tight">
+                  {changed && eff ? eff.name : c.name}
+                  {changed && (
+                    <span className="ml-0.5 rounded bg-amber-500/30 px-0.5 text-[7px] text-amber-200">
+                      変化
+                    </span>
+                  )}
+                </span>
+                <span className="text-[8px] leading-tight text-gray-400 line-clamp-2">
+                  {changed && eff?.fieldNote ? eff.fieldNote : c.desc}
+                </span>
                 <span className="mt-auto flex flex-wrap gap-0.5">
                   {c.tags.slice(0, 3).map((t) => (
                     <span key={t} className="rounded bg-white/10 px-1 text-[7px] text-gray-400">
@@ -143,20 +157,37 @@ export default function CardDraft({
                   </div>
                 </div>
                 <p className="mt-2 text-[12px] leading-relaxed text-gray-200">{c.desc}</p>
-                {skill && (
-                  <div className="mt-2 space-y-0.5 text-[11px] text-gray-300">
-                    <div>🎯 対象: {TARGET_LABEL[c.targeting]}</div>
-                    {c.power > 0 && <div>💥 威力: 攻撃×{c.power}</div>}
-                    {c.heal ? <div>💚 回復: 攻撃×{c.heal}</div> : null}
-                    {c.shield ? <div>🛡️ シールド: {c.shield}</div> : null}
-                    <div>⏱️ クールダウン: {c.cooldown}</div>
-                    {c.apply && c.apply.length > 0 && (
-                      <div>
-                        ✨ 付与: {c.apply.map((a) => `${a.status}(${a.magnitude})`).join(" / ")}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {skill &&
+                  (() => {
+                    const eff = fieldTransform(c, field, 0);
+                    const isChanged = eff.name !== c.name || eff.fieldNote;
+                    return (
+                      <>
+                        {isChanged && (
+                          <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-500/10 p-2 text-[11px] text-amber-100">
+                            <div className="font-bold">🌍 このフィールドでの変化</div>
+                            <div className="mt-0.5">
+                              {eff.name !== c.name ? `→ ${eff.name}：` : ""}
+                              {eff.fieldNote ?? "効果が強化される"}
+                            </div>
+                          </div>
+                        )}
+                        <div className="mt-2 space-y-0.5 text-[11px] text-gray-300">
+                          <div>🎯 対象: {TARGET_LABEL[eff.targeting]}</div>
+                          {eff.power > 0 && <div>💥 威力: 攻撃×{eff.power}</div>}
+                          {eff.heal ? <div>💚 回復: 攻撃×{eff.heal}</div> : null}
+                          {eff.shield ? <div>🛡️ シールド: {eff.shield}</div> : null}
+                          {eff.pierce ? <div>🏛️ 防御無視（貫通）</div> : null}
+                          <div>⏱️ クールダウン: {eff.cooldown}</div>
+                          {eff.apply && eff.apply.length > 0 && (
+                            <div>
+                              ✨ 付与: {eff.apply.map((a) => `${a.status}(${a.magnitude})`).join(" / ")}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
                 <div className="mt-2 flex flex-wrap gap-1">
                   {c.tags.map((t) => (
                     <span

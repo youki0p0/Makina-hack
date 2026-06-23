@@ -313,6 +313,7 @@ function GameScreen() {
       <CardDraft
         draft={run.draft}
         budget={run.budget}
+        field={run.field}
         selectedCardId={selected}
         onSelect={(id) => {
           setSelected((cur) => (cur === id ? null : id));
