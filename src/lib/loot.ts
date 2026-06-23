@@ -6,6 +6,7 @@ import { applyModifier } from "@/data/modifiers";
 import { applyQuality, rollQuality } from "@/data/quality";
 import { rarityRank } from "@/lib/ui";
 import type {
+  ClassId,
   Consumable,
   Enemy,
   Equipment,
@@ -27,11 +28,15 @@ const RARITY_WEIGHT: Record<Rarity, number> = {
  * dice effects / set bonuses). Plain stat gear is generated procedurally, so it
  * is NOT in this list — see rollLoot, which mixes curated drops with procedural.
  */
-const CURATED_DROPPABLE = ITEMS.filter((i) => !i.gachaOnly && !i.casinoOnly && !i.unique);
+const CURATED_DROPPABLE = ITEMS.filter(
+  (i) => !i.gachaOnly && !i.casinoOnly && !i.unique && !i.classLock,
+);
 /** Curated Rare+ gear (incl. gacha-exclusives) for the targeted pull. */
 const CURATED_RAREPLUS = ITEMS.filter(
-  (i) => !i.casinoOnly && !i.unique && rarityRank[i.rarity] >= rarityRank.rare,
+  (i) => !i.casinoOnly && !i.unique && !i.classLock && rarityRank[i.rarity] >= rarityRank.rare,
 );
+/** クラス限定「ロマン装備」: 該当クラスで深層ボス撃破時のみ低確率ドロップ。 */
+const CLASS_EXCLUSIVE = ITEMS.filter((i) => i.classLock);
 
 /** Gacha currency gained by scrapping equipment, by rarity. */
 export const SCRAP_VALUE: Record<Rarity, number> = {
@@ -119,8 +124,20 @@ export function rollLoot(
   floor: number,
   rareBonus = 0,
   slotHint?: EquipmentSlot,
+  classId?: ClassId,
 ): Equipment | null {
   if (Math.random() > enemy.dropRate) return null;
+
+  // クラス限定「ロマン装備」: 該当クラスで対象階以上のボスを倒したとき低確率ドロップ。
+  if (classId && enemy.isBoss) {
+    const pool = CLASS_EXCLUSIVE.filter(
+      (i) => i.classLock === classId && (i.minFloor ?? 1) <= floor,
+    );
+    if (pool.length > 0 && Math.random() < 0.05) {
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      return withQuality({ ...pick }, floor);
+    }
+  }
 
   // 紋章(emblem): 3000階+のボスからのみ、低確率でドロップする上位部位。
   // セット効果の数値を深層ほど増幅する（emblemSetMult）。

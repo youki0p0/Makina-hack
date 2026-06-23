@@ -284,6 +284,8 @@ export function classEquipTags(id: ClassId): EquipTag[] {
 
 /** Whether the given class may equip the item (untagged items are universal). */
 export function canEquip(item: Equipment, id: ClassId): boolean {
+  // クラス限定装備は、その職業のときだけ装備可（タグ制限より優先）。
+  if (item.classLock) return item.classLock === id;
   if (!item.equipTag) return true;
   return classEquipTags(id).includes(item.equipTag);
 }

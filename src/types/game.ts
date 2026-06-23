@@ -167,6 +167,11 @@ export interface Equipment {
   forgeStreak?: number;
   /** 固有装備: 手作りの名前付きレジェ/エピック。6部位揃えると固有共鳴が発動する。 */
   signature?: boolean;
+  /**
+   * クラス限定装備: この ClassId の職業だけが装備できる「ロマン装備」。
+   * 装備制限の多い職業(盗賊/魔法系)へのご褒美。設定時は equipTag より優先。
+   */
+  classLock?: ClassId;
 }
 
 export type EquippedItems = {

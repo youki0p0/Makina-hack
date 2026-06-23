@@ -2556,7 +2556,7 @@ export const useGameStore = create<GameState>((set, get) => {
     const drops: Equipment[] = [];
     for (let i = 0; i < dropCount; i++) {
       const hint = Math.random() < 0.6 ? weakSlot : undefined;
-      let d = rollLoot(lootEnemy, state.currentFloor, rareBonus, hint);
+      let d = rollLoot(lootEnemy, state.currentFloor, rareBonus, hint, state.classId);
       if (!d) continue;
       let modTier = rollDropModTier(state.currentFloor, diff.upswing);
       // 【隠し】伝説賭博セット完成(6pc)の裏効果: 一定確率で「強化ドロップ」化
@@ -2889,7 +2889,7 @@ export const useGameStore = create<GameState>((set, get) => {
       const drops: Equipment[] = [];
       const count = diff.dropMin + Math.floor(Math.random() * (diff.dropMax - diff.dropMin + 1));
       for (let i = 0; i < count; i++) {
-        const d = rollLoot(enemy, state.modeFloor, diff.rareBonus);
+        const d = rollLoot(enemy, state.modeFloor, diff.rareBonus, undefined, state.classId);
         if (d) drops.push(applyModifier(d, rollDropModTier(state.modeFloor, diff.upswing)));
       }
       if (drops.length) {
