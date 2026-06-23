@@ -510,8 +510,8 @@ function castSkill(
   if (isOffense) {
     const foes = livingFoes(all, caster.side);
     if (foes.length === 0) return;
-    // レア度で威力に差（量より質：コモン乱発を抑え、強カードの価値を上げる）
-    const rf = skill.rarity === 1 ? 0.9 : skill.rarity === 3 ? 1.15 : 1;
+    // レア度で威力に差（量より質：コモン乱発を抑え、少数精鋭の高コスト技を強く・B）
+    const rf = skill.rarity === 1 ? 0.82 : skill.rarity === 3 ? 1.35 : 1.05;
     const baseRaw = atk * skill.power * critMult * caster.focusPowerMult * rf;
 
     if (skill.targeting === "area") {
@@ -612,9 +612,18 @@ export function simulateBattle(
   round: number,
   _mode: GameMode,
   blessings: string[] = [],
+  handicap = 0,
 ): BattleResult {
   const { mods } = computeSynergies(builds, operatorId);
   applyBlessings(mods, blessings);
+  // 逆境ボーナス(A)：負けが込むほど味方を底上げし、雑な編成でも立て直せる救済。
+  if (handicap > 0) {
+    const h = Math.min(3, handicap);
+    mods.shieldStart += h * 28;
+    mods.hpMult *= 1 + h * 0.07;
+    mods.atkMult *= 1 + h * 0.05;
+    mods.regenAdd += h * 2;
+  }
   firstDown = null; // 1戦ごとにリセット
   battleMatchupScale = Math.min(1, round / 6); // 序盤ほど相性の振れを抑える
   const rng = mulberry32(round * 2654435761 + builds.length * 40503 + 7);

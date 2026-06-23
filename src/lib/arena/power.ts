@@ -32,9 +32,9 @@ function unitRawPower(build: MonsterBuild, field: FieldId, operatorId: string): 
   for (const id of build.skillIds) {
     const c = getCard(id);
     if (!c || !isSkill(c)) continue;
-    // レア度威力差(#3)を反映。回復/シールドは生存に効くため厚めに評価。
-    const rf = c.rarity === 1 ? 0.9 : c.rarity === 3 ? 1.15 : 1;
-    v += 5 + c.power * 5 * rf + (c.heal ?? 0) * 8 + (c.shield ?? 0) * 0.25 + c.rarity * 2;
+    // レア度威力差(B)を反映。回復/シールドは生存に効くため厚めに評価。
+    const rf = c.rarity === 1 ? 0.82 : c.rarity === 3 ? 1.35 : 1.05;
+    v += 5 + c.power * 5 * rf + (c.heal ?? 0) * 8 + (c.shield ?? 0) * 0.25 + c.rarity * 3;
   }
   if (p.focused) v *= 1.15; // 集中エースは強化済み(#1)なので相応に高評価
   return v;
