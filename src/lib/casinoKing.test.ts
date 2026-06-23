@@ -78,8 +78,15 @@ describe("伝説賭博セット", () => {
     const eq = emptyEquipped();
     for (const slot of EQUIP_SLOTS as EquipmentSlot[]) eq[slot] = genSetItem("legendgambler", slot, 100);
     const eff = computeSetEffects(eq);
-    expect(eff.dodgeChance).toBeGreaterThan(0.3);
+    // 2pc: リロール6確定＋30%で与ダメージ2倍。
     expect(eff.rerollSix).toBe(true);
-    expect(eff.dropTierBonus).toBeGreaterThanOrEqual(10);
+    expect(eff.doubleDmgChance).toBeCloseTo(0.3);
+    // 4pc: 回避45%。
+    expect(eff.dodgeChance).toBeGreaterThan(0.4);
+    // 6pc: ドロップ率2倍＋レアドロップ比率増加。
+    expect(eff.dropRateMult).toBeCloseTo(2);
+    expect(eff.rareDropBonus).toBeGreaterThan(0);
+    // 6pc 隠し効果: 強化ドロップ(★最大+1・変動ステ最大級)。UI非表示だが効果は有効。
+    expect(eff.dropUpgradeChance).toBeGreaterThan(0);
   });
 });

@@ -49,6 +49,7 @@ import {
 } from "@/data/items";
 import { forgeCost, forgeMax, rollForge, starInjectCost, type ForgeKind } from "@/data/forge";
 import { applyModifier, modTierForFloor, rollDropModTier } from "@/data/modifiers";
+import { applyMaxAffix } from "@/data/affixes";
 import { computeSetEffects, getSetDef } from "@/data/sets";
 import { getTitle, titleSouls } from "@/data/titles";
 import { grantTitles } from "@/lib/titleAward";
@@ -1053,6 +1054,11 @@ export const useGameStore = create<GameState>((set, get) => {
         }
       }
       let totalEnemyDamage = action.enemyDamage + bonusDamage;
+      // 伝説賭博セット2pc: 一定確率で与ダメージ2倍。
+      if (setEff.doubleDmgChance > 0 && totalEnemyDamage > 0 && Math.random() < setEff.doubleDmgChance) {
+        totalEnemyDamage *= 2;
+        setLogs.push("伝説賭博セット: 暴れ打ち！ ダメージ2倍！");
+      }
       const attackHp = enemy.hp - totalEnemyDamage;
       if (setEff.lifestealAllPct > 0 && totalEnemyDamage > 0) {
         bonusHeal += Math.round(totalEnemyDamage * setEff.lifestealAllPct);
@@ -2491,13 +2497,26 @@ export const useGameStore = create<GameState>((set, get) => {
     // Smart drops: with 6 slots, bias procedural drops toward the weakest/empty
     // slot so gearing up doesn't take 2× as long as it did with 3 slots.
     const weakSlot = weakestSlot(state.equipped);
-    // 伝説賭博セット2pc: ドロップの★ティアを底上げ。
-    const dropTierBonus = computeSetEffects(state.equipped, state.classId).dropTierBonus;
+    // 伝説賭博セット6pc: ドロップ率2倍＋レアドロップ比率増加。
+    const setEff = computeSetEffects(state.equipped, state.classId);
+    const lootEnemy =
+      setEff.dropRateMult !== 1
+        ? { ...enemy, dropRate: Math.min(1, enemy.dropRate * setEff.dropRateMult) }
+        : enemy;
+    const rareBonus = diff.rareBonus + setEff.rareDropBonus;
     const drops: Equipment[] = [];
     for (let i = 0; i < dropCount; i++) {
       const hint = Math.random() < 0.6 ? weakSlot : undefined;
-      const d = rollLoot(enemy, state.currentFloor, diff.rareBonus, hint);
-      if (d) drops.push(applyModifier(d, rollDropModTier(state.currentFloor, diff.upswing) + dropTierBonus));
+      let d = rollLoot(lootEnemy, state.currentFloor, rareBonus, hint);
+      if (!d) continue;
+      let modTier = rollDropModTier(state.currentFloor, diff.upswing);
+      // 【隠し】伝説賭博セット完成(6pc)の裏効果: 一定確率で「強化ドロップ」化
+      // (その階層の★最大+1・変動ステを最大級アフィックスに)。UIには表示しない。
+      if (setEff.dropUpgradeChance > 0 && Math.random() < setEff.dropUpgradeChance) {
+        modTier = Math.max(modTier, modTierForFloor(state.currentFloor) + 1);
+        if (!d.affixId) d = applyMaxAffix(d);
+      }
+      drops.push(applyModifier(d, modTier));
     }
     const drop = drops[0] ?? null;
 
