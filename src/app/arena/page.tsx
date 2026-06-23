@@ -10,10 +10,10 @@ import { rankTitle } from "@/lib/arena/rank";
 import { useArenaStore } from "@/store/arenaStore";
 import type { GameMode } from "@/types/arena";
 import BattleView from "@/components/arena/BattleView";
+import BuildListPanel from "@/components/arena/BuildListPanel";
 import CardDraft from "@/components/arena/CardDraft";
-import CardSetPanel from "@/components/arena/CardSetPanel";
-import CharacterStatusPanel from "@/components/arena/CharacterStatusPanel";
 import FieldBanner from "@/components/arena/FieldBanner";
+import MonsterColumn from "@/components/arena/MonsterColumn";
 import MonsterSprite from "@/components/arena/MonsterSprite";
 import OperatorBadge from "@/components/arena/OperatorBadge";
 import ResultView from "@/components/arena/ResultView";
@@ -223,11 +223,10 @@ function GameScreen() {
         onReroll={rerollDraft}
       />
 
-      <div>
-        <div className="mb-1 text-[11px] font-bold text-gray-300">
-          🐲 味方3体{selected ? "（割り当て先を選ぶ）" : ""}
-        </div>
-        <CharacterStatusPanel
+      {/* 2カラム：左=カードセット / 右=3体＋オペレーター（モックアップ準拠） */}
+      <div className="grid grid-cols-2 gap-2">
+        <BuildListPanel builds={run.builds} field={run.field} operatorId={run.operatorId} />
+        <MonsterColumn
           builds={run.builds}
           field={run.field}
           operatorId={run.operatorId}
@@ -235,8 +234,6 @@ function GameScreen() {
           onAssign={onAssign}
         />
       </div>
-
-      <CardSetPanel builds={run.builds} operatorId={run.operatorId} />
 
       <button
         onClick={confirmPrep}
