@@ -4,6 +4,7 @@ import { applyModifier } from "@/data/modifiers";
 import { applyQuality } from "@/data/quality";
 import { availableSetKeys, getSetDef } from "@/data/sets";
 import type {
+  ClassId,
   DiceValue,
   EquipTag,
   Equipment,
@@ -92,6 +93,69 @@ const SIGNATURE_ITEMS: readonly Equipment[] = [
         faces: [4, 5, 6],
         effect: { lifestealPct: 0.25 },
         description: "4以上: 与ダメージ25%回復",
+      },
+    ],
+  },
+  // ===== クラス限定「ロマン装備」=====
+  // 装備制限の多い職業へのご褒美。classLock で本人だけ装備でき、効果は同格よりやや強め。
+  // 通常ドロップ対象外で、該当クラスで深層ボスを倒したときに低確率でのみ出る（loot.ts）。
+  {
+    id: "rogue_twin_fang",
+    name: "宵闇の双牙",
+    rarity: "legendary",
+    slot: "weapon",
+    classLock: "rogue",
+    signature: true,
+    attack: 14,
+    defense: 0,
+    maxHp: 0,
+    rerollModifier: 1,
+    minFloor: 20,
+    description: "【盗賊専用】攻撃+14・リロール+1。2以上で2回、6で4回攻撃＋10%吸命。",
+    diceModifiers: [
+      {
+        faces: [2, 3, 4, 5],
+        effect: { extraHits: 1, lifestealPct: 0.1 },
+        description: "2以上: 2回攻撃 (10%吸命)",
+      },
+      {
+        faces: [6],
+        effect: { extraHits: 3, lifestealPct: 0.1 },
+        label: "百花繚乱",
+        description: "6: 4回攻撃 (10%吸命)",
+      },
+    ],
+  },
+  {
+    id: "mage_truth_staff",
+    name: "真理の天杖",
+    rarity: "legendary",
+    slot: "weapon",
+    classLock: "mage",
+    signature: true,
+    attack: 12,
+    defense: 0,
+    maxHp: 10,
+    rerollModifier: 0,
+    minFloor: 20,
+    description: "【魔法使い専用】攻撃+12・HP+10。4で魔撃、5で大魔撃、6で極大火球＋12%吸命。",
+    diceModifiers: [
+      {
+        faces: [4],
+        effect: { kind: "skill", damageMultiplier: 2.2, lifestealPct: 0.12 },
+        description: "4: 魔力の一撃 (12%吸命)",
+      },
+      {
+        faces: [5],
+        effect: { kind: "skill", damageMultiplier: 2.8, lifestealPct: 0.12 },
+        label: "大魔撃",
+        description: "5: 大魔撃 (12%吸命)",
+      },
+      {
+        faces: [6],
+        effect: { kind: "fireball", damageMultiplier: 4.2, lifestealPct: 0.12 },
+        label: "極大火球",
+        description: "6: 極大火球 (12%吸命)",
       },
     ],
   },
