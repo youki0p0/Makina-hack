@@ -170,7 +170,7 @@ export default function CollectionPage() {
                 >
                   <div className="min-w-0">
                     <p className={`font-bold ${current ? "text-amber-200" : unlocked ? "text-gray-100" : "text-gray-500"}`}>
-                      {unlocked ? `《${t.name}》` : <><PixelGlyph kind="lock" size={12} /> ???</>}
+                      {unlocked ? <>《<GlyphText text={t.name} size={13} />》</> : <><PixelGlyph kind="lock" size={12} /> ???</>}
                     </p>
                     <p className="text-[10px] text-gray-400">{mask ? "??????（隠し称号）" : t.desc}</p>
                   </div>

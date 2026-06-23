@@ -37,6 +37,7 @@ function maxedProgress(): Progress {
     noDamageBossKills: 99,
     perfectClears: 999,
     maxSingleHit: 999999,
+    summerBest: 99999,
   };
 }
 

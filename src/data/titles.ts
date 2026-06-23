@@ -110,6 +110,8 @@ export const TITLES: readonly Title[] = [
   { id: "c_coin1k", name: "コイン稼ぎ", desc: "累計1000コイン獲得", tier: "easy", check: (p) => p.totalCoinsWon >= 1000 },
   { id: "c_coin10k", name: "コイン長者", desc: "累計10000コイン獲得", tier: "medium", check: (p) => p.totalCoinsWon >= 10000 },
   { id: "c_coin100k", name: "出玉の暴力", desc: "累計100000コイン獲得", tier: "hard", check: (p) => p.totalCoinsWon >= 100000 },
+  // 🎆 7月限定・夏の花火大会でスコア8000達成で付与（claimedTitles に直接記録／コスメ専用・完成度ゲート外）。
+  { id: "summer_hanabi", name: "🎆夏の花火師", desc: "夏の花火大会でスコア8000を達成（7月限定）", tier: "secret", hidden: true, noComplete: true, check: (p) => (p.summerBest ?? 0) >= 8000 },
   { id: "c_coin1m", name: "ミリオンの男", desc: "累計1000000コイン獲得", tier: "secret", hidden: true, check: (p) => p.totalCoinsWon >= 1000000 },
   { id: "c_jpbig", name: "二刀流博徒", desc: "ジャックポットとBIGの両方を達成", tier: "medium", check: (p) => p.jackpots >= 1 && p.slotBigCount >= 1 },
 

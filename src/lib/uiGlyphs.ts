@@ -52,6 +52,8 @@ export function consumableGlyphKind(kind: ConsumableKind): GlyphKind {
 
 /** Emoji → glyph map for converting free-text (battle log, help, etc.). */
 export const EMOJI_GLYPH: Record<string, GlyphKind> = {
+  "🎆": "firework",
+  "🎇": "firework",
   "⚔️": "attack",
   "🛡️": "defense",
   "🎲": "dice",
