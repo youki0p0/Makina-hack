@@ -31,6 +31,8 @@ function summarize(statuses: ActiveStatus[]): { kind: StatusKind; dps: number; t
 
 export default function EnemyCard() {
   const enemy = useGameStore((s) => s.currentEnemy);
+  const playerHp = useGameStore((s) => s.player.hp);
+  const playerDef = useGameStore((s) => s.stats().defense);
   const currentFloor = useGameStore((s) => s.currentFloor);
   const runMode = useGameStore((s) => s.runMode);
   const modeFloor = useGameStore((s) => s.modeFloor);
@@ -55,6 +57,13 @@ export default function EnemyCard() {
   const eatk = Math.max(0, enemy.attack - ((enemy.weakenTurns ?? 0) > 0 ? enemy.weakenAmount : 0));
   const edef = enemy.defense + (enemy.bonusDefense ?? 0);
   const abyss = abyssModifierFor(floor);
+
+  // 次に受ける目安ダメージ（攻め＝決定 か 守り＝リロール かの読み材料）。
+  // 通常攻撃の素点 = max(1, 敵攻撃 - 自防御)。乱数の特殊行動やガードは含まない“目安”。
+  // スタン中は次ターン殴ってこないので出さない。
+  const stunned = (enemy.stunTurns ?? 0) > 0;
+  const incoming = Math.max(1, eatk - playerDef);
+  const incomingLethal = incoming >= playerHp; // 素点で即死圏（チャージ中はさらに増える）
 
   return (
     <div
@@ -111,6 +120,18 @@ export default function EnemyCard() {
               <span key={key} className="text-cyan-300">{ENEMY_TRAIT_LABEL[key]}</span>
             ))}
         </p>
+
+        {/* 次に受ける目安ダメージ：攻めるか守るかの読み材料（スタン中は攻撃なし） */}
+        {!stunned && (
+          <p
+            className={`mt-0.5 text-[11px] font-bold ${incomingLethal ? "text-red-300" : "text-amber-200/90"}`}
+            title="敵の通常攻撃の素点（敵攻撃−自防御）。特殊行動やガードは含まない目安です。"
+          >
+            {incomingLethal ? "⚠️" : "🛡"} 次の被弾 目安 ~{fmt(incoming)}
+            {enemy.charging && <span className="ml-1 text-red-300">大技で増加</span>}
+            {incomingLethal && <span className="ml-1 animate-pulse">致命!</span>}
+          </p>
+        )}
 
         {abyss && (
           <p
