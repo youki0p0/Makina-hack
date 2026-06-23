@@ -1,3 +1,5 @@
+import { hashSeed } from "@/lib/hashSeed";
+
 export interface DailyBonus {
   id: string;
   label: string;
@@ -16,16 +18,7 @@ export function todaySeed(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
 /** A deterministic daily bonus based on the date (changes each day). */
 export function getDailyBonus(seed: string = todaySeed()): DailyBonus {
-  return OPTIONS[hash(seed) % OPTIONS.length];
+  return OPTIONS[hashSeed(seed) % OPTIONS.length];
 }
