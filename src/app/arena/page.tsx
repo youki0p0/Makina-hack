@@ -239,6 +239,13 @@ function SetupScreen() {
         {canStart ? "▶ バトル開始！" : "モンスターを3体選んでね"}
       </button>
 
+      <Link
+        href="/arena/echo"
+        className="flex items-center justify-center gap-1.5 rounded-2xl border border-fuchsia-500/40 bg-fuchsia-600/15 py-3 text-sm font-bold text-fuchsia-100 active:scale-95"
+      >
+        👻 残響戦（記録した編成でゴーストに挑む）
+      </Link>
+
       <p className="pb-4 text-center text-[10px] text-gray-600">
         毎ラウンド：フィールドが技を書き換える → カードを選んで3体に割り当て → 準備完了で自動戦闘
       </p>

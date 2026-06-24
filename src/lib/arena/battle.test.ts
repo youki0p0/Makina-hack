@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { colorMatchup, isBossRound, simulateBattle, teamColorAdvantage } from "@/lib/arena/battle";
+import {
+  colorMatchup,
+  isBossRound,
+  simulateBattle,
+  simulateEcho,
+  teamColorAdvantage,
+} from "@/lib/arena/battle";
 import { budgetForRound, DRAFT_SIZE, generateDraft, newRun } from "@/lib/arena/gameState";
 import { computeSynergies, emptyTeamMods } from "@/lib/arena/synergy";
 import { applyBlessings, offerBlessings } from "@/lib/arena/blessings";
@@ -83,6 +89,30 @@ describe("fieldTransform", () => {
     expect(t.name).toBe("蒸気斬り");
     expect(t.apply?.some((a) => a.status === "burn")).toBe(false);
     expect(t.apply?.some((a) => a.status === "blind")).toBe(true);
+  });
+});
+
+describe("残響戦 simulateEcho", () => {
+  it("両編成の観戦デュエルが完走し結果を返す", () => {
+    const player = rainbowBuilds();
+    const ghost: MonsterBuild[] = [
+      { monsterId: "magma_beast", equipmentIds: ["berserk_axe"], skillIds: ["meteor", "heavy_blow"] },
+      { monsterId: "elder_treant", equipmentIds: ["sacred_crown"], skillIds: ["healing_light"] },
+      { monsterId: "storm_hawk", equipmentIds: ["combo_gauntlet"], skillIds: ["chain_thunder"] },
+    ];
+    const res = simulateEcho(player, "calibrator", [], ghost, "pyroseer", ["atk"], "ruins");
+    expect(typeof res.win).toBe("boolean");
+    expect(res.frames.length).toBeGreaterThan(1);
+    expect(res.round).toBe(0);
+  });
+
+  it("同じ入力なら決定論的に同じ結果", () => {
+    const p = rainbowBuilds();
+    const g = rainbowBuilds();
+    const a = simulateEcho(p, "calibrator", [], g, "warden", [], "forest");
+    const b = simulateEcho(p, "calibrator", [], g, "warden", [], "forest");
+    expect(a.win).toBe(b.win);
+    expect(a.log.length).toBe(b.log.length);
   });
 });
 
