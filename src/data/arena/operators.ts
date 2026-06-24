@@ -63,10 +63,17 @@ export const OPERATORS: readonly OperatorDef[] = [
     concept:
       "古い遺跡守りの甲冑をまとう寡黙な観測者。陣を崩さぬ分散運用を得意とし、味方に守りを配る。",
     passiveName: "守勢展開",
-    passiveDesc: "技を3体に分散させると、戦闘開始時に全員へシールド+30。",
-    passive: { spreadShield: 30, equipDefenseBoost: 1 },
+    passiveDesc: "技を3体に分散させると、戦闘開始時に全員へシールド+24。装備による防御ボーナスは控えめ（上限あり）。",
+    passive: { spreadShield: 24, equipDefenseBoost: 1 },
   },
 ];
+
+/**
+ * 守勢展開の「装備1個ごとの防御+1」は、終盤フルビルド（装備十数個）で
+ * 際限なく硬くなりすぎていたため、1体あたりの合計ボーナスに上限を設ける。
+ * 通常プレイ（装備数個）では従来どおり、積み上げ編成だけが抑制される。
+ */
+export const EQUIP_DEF_BOOST_CAP = 4;
 
 export const OPERATOR_MAP: Record<string, OperatorDef> = Object.fromEntries(
   OPERATORS.map((o) => [o.id, o]),
