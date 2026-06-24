@@ -107,8 +107,30 @@ export const ECHO_GHOSTS: readonly EchoGhost[] = [
   },
 ];
 
+/**
+ * 👑 レジェンド残響。
+ * 開発時に「20人のゲーマー」に異なるビルドを作らせ、全フィールド×総当りで対戦させた
+ * トーナメントの優勝者（勝率1位 ＝ 93.9%）の編成をそのまま固定したもの。
+ * 不死鳥で蘇る重装の壁＋毒＋再生で、あらゆる相手を枯らし切った最強の記憶。
+ * tier 6（既存の5体より上位）として特別表示する。
+ */
+export const LEGEND_ECHO: EchoGhost = {
+  id: "legend_echo",
+  name: "👑 レジェンド残響",
+  flavor: "20人の頂点。不死鳥の加護をまとう不滅の壁が、毒と再生で全てを枯らし尽くした優勝者の記憶。",
+  tier: 6,
+  operatorId: "warden",
+  field: "ruins",
+  blessings: ["phoenix", "def", "regen"],
+  builds: [
+    b("moss_golem", ["iron_wall", "phoenix_feather", "thorn_mail"], ["taunt_roar", "guard_stance"]),
+    b("bramble_beast", ["life_orb"], ["bleed_strike", "poison_mist"]),
+    b("elder_treant", ["sacred_crown"], ["healing_light", "regen_wind"]),
+  ],
+};
+
 export function getGhost(id: string): EchoGhost | undefined {
-  return ECHO_GHOSTS.find((g) => g.id === id);
+  return [...ECHO_GHOSTS, LEGEND_ECHO].find((g) => g.id === id);
 }
 
 // ---- プレイヤーの残響ギャラリー（localStorage・複数保存） ----
