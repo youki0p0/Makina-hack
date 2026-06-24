@@ -277,7 +277,7 @@ function buildAllies(
     let focusPowerMult = 1;
     let dmgTakenMult = 1;
     if (focused) {
-      focusPowerMult = 1.4 + (op.passive.focusPowerBoost ?? 0);
+      focusPowerMult = 1.5 + (op.passive.focusPowerBoost ?? 0);
       dmgTakenMult = 1.1;
     }
 
@@ -490,7 +490,7 @@ function castSkill(
     return;
   }
 
-  const critMult = rng() * 100 < caster.crit ? 1.6 : 1;
+  const critMult = rng() * 100 < caster.crit ? 1.8 : 1;
   const atk = effAttack(caster);
 
   // 回復 / シールド系
@@ -573,7 +573,7 @@ function basicAttack(
   const foes = livingFoes(all, caster.side);
   const t = chooseTarget(foes, "front");
   if (!t) return;
-  const critMult = rng() * 100 < caster.crit ? 1.6 : 1;
+  const critMult = rng() * 100 < caster.crit ? 1.8 : 1;
   const raw = Math.round(effAttack(caster) * critMult);
   dealDamage(caster, t, raw, false, events);
   if (critMult > 1) events.push(`✨ ${caster.name} のクリティカル！`);
@@ -584,7 +584,10 @@ function tickStatuses(all: Combatant[], mods: TeamMods, isSecond: boolean, event
   for (const c of all) {
     if (!c.alive) continue;
     if (isSecond) {
-      const burn = sumStatus(c, "burn") + (sumStatus(c, "burn") > 0 ? mods.burnBonus : 0);
+      // 火傷は防御も反射も無視する継続火力。火力系の数少ない対・耐久ビルド手段なので
+      // 基礎火傷を少し強める（×1.3）。祝福(ember/inferno)は従来どおり加算。
+      const burnStacks = sumStatus(c, "burn");
+      const burn = burnStacks > 0 ? Math.round(burnStacks * 1.35) + mods.burnBonus : 0;
       const poison = sumStatus(c, "poison");
       if (burn > 0) {
         c.hp -= burn;
