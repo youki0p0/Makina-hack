@@ -257,6 +257,10 @@ export const TITLES: readonly Title[] = [
   { id: "echo100", name: "残響を統べる者", desc: "エコーバトル100勝", tier: "secret", hidden: true, check: (p) => p.echoWins >= 100 },
   { id: "t25h", name: "やり込みの鬼", desc: "累計25時間プレイ", tier: "hard", check: (p) => p.playSeconds >= 90000 },
 
+  // 旧難易度時代に深淵(3000階超)を踏破した開拓者へ贈られた特別称号（era2移行で2名へ付与）。
+  // noComplete: 真の称号(コンプ)の対象外（一般プレイヤーは取得不能なため）。
+  { id: "t_pioneer", name: "またオレ何かやっちゃいました？", desc: "旧難易度で深淵(3000階超)を踏破した開拓者の証", tier: "secret", hidden: true, noComplete: true, check: (p) => p.oldEraPioneer === true },
+
   { id: "completionist", name: "真の称号", desc: "他の称号を全て獲得", tier: "secret", hidden: true, check: (p) => p.claimedTitles.length >= TITLE_GATE },
 ];
 

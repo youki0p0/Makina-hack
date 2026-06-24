@@ -38,6 +38,7 @@ function maxedProgress(): Progress {
     perfectClears: 999,
     maxSingleHit: 999999,
     summerBest: 99999,
+    oldEraPioneer: true,
   };
 }
 

@@ -27,6 +27,7 @@ export default function TitlePage() {
 
   const seenHelp = useGameStore((s) => s.seenHelp);
   const markHelpSeen = useGameStore((s) => s.markHelpSeen);
+  const dismissEra2Reward = useGameStore((s) => s.dismissEra2Reward);
   const checkpoint = useGameStore((s) => s.checkpoint);
   const setStartFloor = useGameStore((s) => s.setStartFloor);
   const startFloorPref = useGameStore((s) => s.startFloorPref);
@@ -314,6 +315,34 @@ export default function TitlePage() {
       <p className="text-[10px] text-gray-600">
         操作は「リロール」と「決定」だけ。
       </p>
+
+      {/* era2移行のご褒美ポップアップ（旧時代の開拓者へ必ず1回表示） */}
+      {hydrated && progress.era2RewardPending && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-6">
+          <div className="w-full max-w-xs animate-pop rounded-2xl border border-amber-400/60 bg-[#15131f] p-5 text-center shadow-[0_0_24px_rgba(251,191,36,0.3)]">
+            <div className="text-3xl">🏆✨</div>
+            <h2 className="mt-1 text-base font-extrabold text-amber-200">称号を獲得！</h2>
+            <p className="mt-1 text-sm font-black text-amber-100">「またオレ何かやっちゃいました？」</p>
+            <p className="mt-3 text-xs leading-relaxed text-gray-300">
+              旧難易度で<span className="font-bold text-amber-300">深淵（3000階超）</span>を踏破した開拓者へ、
+              運営からの感謝のしるし。
+            </p>
+            <div className="mt-3 rounded-xl border border-cyan-400/30 bg-cyan-400/10 p-2 text-sm font-bold text-cyan-200">
+              💎 ハイコイン +15,000
+            </div>
+            <p className="mt-2 text-[11px] text-gray-400">
+              難易度の刷新にともない、<span className="font-bold">3000階から再スタート</span>になりました。
+              ランキングも新しくなっています。またの挑戦をお待ちしています！
+            </p>
+            <button
+              onClick={dismissEra2Reward}
+              className="mt-4 h-11 w-full rounded-xl bg-amber-600 font-extrabold text-white active:scale-95"
+            >
+              受け取る
+            </button>
+          </div>
+        </div>
+      )}
 
       {showFirstRun && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-6">
