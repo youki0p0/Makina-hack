@@ -162,6 +162,7 @@ import {
   buildFaces,
   canChangeClassNow,
   capInventory,
+  capEmblems,
   computePlayerStats,
   createPlayer,
   discover,
@@ -208,6 +209,8 @@ interface GameState {
   player: Player;
   equipped: EquippedItems;
   inventory: Equipment[];
+  /** 紋章(emblem)専用ストック（装備ストックとは別・最大30）。 */
+  emblems: Equipment[];
   currentEnemy: Enemy | null;
   currentFloor: number;
   battleState: BattleState;
@@ -377,6 +380,10 @@ interface GameState {
 
   // equipment
   equipItem: (itemIndex: number) => void;
+  /** 紋章ストックの index を装備する（既装備の紋章はストックへ戻る）。 */
+  equipEmblem: (index: number) => void;
+  /** 紋章ストックの index を分解する。 */
+  scrapEmblem: (index: number) => void;
   unequipItem: (slot: keyof EquippedItems) => void;
   /** Auto-equip the highest-scoring equippable item in every slot. */
   equipBest: () => void;
@@ -398,6 +405,8 @@ interface GameState {
   forgeStarWithMaterials: (loc: "inv" | EquipmentSlot, index: number) => void;
   markDailyStorySeen: () => void;
   markDailyHelpSeen: () => void;
+  /** era2移行ご褒美ポップアップを閉じる（再表示しない）。 */
+  dismissEra2Reward: () => void;
   // ログイン / クエスト
   refreshQuests: () => void;
   claimLogin: () => void;
@@ -540,6 +549,7 @@ export const useGameStore = create<GameState>((set, get) => {
       player: s.player,
       equipped: s.equipped,
       inventory: s.inventory,
+      emblems: s.emblems,
       currentFloor: s.currentFloor,
       gachaPoints: s.gachaPoints,
       souls: s.souls,
@@ -709,6 +719,7 @@ export const useGameStore = create<GameState>((set, get) => {
       player: loaded.player,
       equipped: loaded.equipped,
       inventory: loaded.inventory,
+      emblems: capEmblems(loaded.emblems, get().favorites).kept,
       currentFloor: loaded.currentFloor,
       gachaPoints: loaded.gachaPoints,
       souls: loaded.souls,
@@ -804,10 +815,34 @@ export const useGameStore = create<GameState>((set, get) => {
     //   });
     //   persist();
     // }
+
+    // 一度きりの補填(era2移行): 旧難易度で深淵(3000階超)を踏破していた開拓者へ、
+    // 称号「またオレ何かやっちゃいました？」＋💎ハイコイン15,000を付与し、3000階へ戻す。
+    // 対象判定はローカルの最高到達 > 3000（＝旧時代の到達者のみ。一般プレイヤーは新難易度で
+    // 到達困難なため実質 siro/Noro の2名）。次回起動時に必ずポップアップで通知する。
+    if (!loaded.progress.era2Reset) {
+      const pioneer = loaded.progress.highestFloorReached > 3000;
+      const progress: Progress = pioneer
+        ? {
+            ...loaded.progress,
+            era2Reset: true,
+            oldEraPioneer: true,
+            era2RewardPending: true,
+            highestFloorReached: 3000,
+            maxFloor: Math.min(loaded.progress.maxFloor, 3000),
+          }
+        : { ...loaded.progress, era2Reset: true };
+      set({
+        progress,
+        ...(pioneer ? { hiCoins: get().hiCoins + 15000, currentFloor: 3000 } : {}),
+      });
+      persist();
+    }
   }
 
   return {
     hydrated: false,
+    emblems: [],
     player: createPlayer(),
     equipped: emptyEquipped(),
     inventory: [],
@@ -921,6 +956,7 @@ export const useGameStore = create<GameState>((set, get) => {
           player: createPlayer(),
           equipped: { ...emptyEquipped(), weapon: starter },
           inventory: [],
+          emblems: [],
           currentFloor: 1,
           hydrated: true,
         });
@@ -937,6 +973,7 @@ export const useGameStore = create<GameState>((set, get) => {
         player: createPlayer(),
         equipped: { ...emptyEquipped(), weapon: starter },
         inventory: [],
+        emblems: [],
         currentFloor: 1,
         currentEnemy: null,
         battleState: "idle",
@@ -1464,17 +1501,47 @@ export const useGameStore = create<GameState>((set, get) => {
       persist();
     },
 
+    equipEmblem: (index: number) => {
+      const state = get();
+      const item = state.emblems[index];
+      if (!item || item.slot !== "emblem") return;
+      const previously = state.equipped.emblem;
+      let emblems = state.emblems.filter((_, i) => i !== index);
+      if (previously) emblems = capEmblems([...emblems, previously], state.favorites).kept;
+      const equipped: EquippedItems = { ...state.equipped, emblem: item };
+      const stats = currentStats(state.player, equipped);
+      const player = { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) };
+      set({ equipped, emblems, player, diceFaces: buildFaces(equipped, state.classId) });
+      persist();
+    },
+
+    scrapEmblem: (index: number) => {
+      const state = get();
+      const item = state.emblems[index];
+      if (!item) return;
+      if (item.noSell || state.favorites.includes(itemKey(item))) return;
+      set({
+        emblems: state.emblems.filter((_, i) => i !== index),
+        gachaPoints: state.gachaPoints + SCRAP_VALUE[item.rarity],
+      });
+      persist();
+    },
+
     unequipItem: (slot: keyof EquippedItems) => {
       const state = get();
       const item = state.equipped[slot];
       if (!item) return;
       const equipped: EquippedItems = { ...state.equipped, [slot]: null };
-      const inventory = [...state.inventory, item];
+      // 紋章は専用ストックへ戻す（装備ストックには入れない）。
+      const toEmblem = slot === "emblem";
+      const inventory = toEmblem ? state.inventory : [...state.inventory, item];
+      const emblems = toEmblem ? capEmblems([...state.emblems, item], state.favorites).kept : state.emblems;
       const stats = currentStats(state.player, equipped);
       const player = { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) };
       set({
         equipped,
         inventory,
+        emblems,
         player,
         diceFaces: buildFaces(equipped, state.classId),
       });
@@ -1487,12 +1554,15 @@ export const useGameStore = create<GameState>((set, get) => {
         it.attack * 2 + it.defense * 1.5 + it.maxHp * 0.4 + it.rerollModifier * 25 + (it.modTier ?? 0) * 5;
       const equipped: EquippedItems = { ...state.equipped };
       let inventory = [...state.inventory];
+      let emblems = [...state.emblems]; // 紋章は専用ストックから選ぶ
 
       for (const slot of EQUIP_SLOTS) {
-        // Best candidate in inventory for this slot (class-eligible).
+        const fromEmblem = slot === "emblem";
+        const pool = fromEmblem ? emblems : inventory;
+        // Best candidate in the relevant stock for this slot (class-eligible).
         let bestIdx = -1;
         let bestScore = equipped[slot] ? score(equipped[slot] as Equipment) : -Infinity;
-        inventory.forEach((it, i) => {
+        pool.forEach((it, i) => {
           if (it.slot !== slot || !canEquip(it, state.classId)) return;
           const s = score(it);
           if (s > bestScore) {
@@ -1501,16 +1571,19 @@ export const useGameStore = create<GameState>((set, get) => {
           }
         });
         if (bestIdx < 0) continue; // nothing better than what's equipped
-        const chosen = inventory[bestIdx];
-        inventory = inventory.filter((_, i) => i !== bestIdx);
-        if (equipped[slot]) inventory.push(equipped[slot] as Equipment);
+        const chosen = pool[bestIdx];
+        const nextPool = pool.filter((_, i) => i !== bestIdx);
+        if (equipped[slot]) nextPool.push(equipped[slot] as Equipment);
         equipped[slot] = chosen;
+        if (fromEmblem) emblems = nextPool;
+        else inventory = nextPool;
       }
 
       const stats = currentStats(state.player, equipped);
       set({
         equipped,
         inventory,
+        emblems,
         player: { ...state.player, hp: Math.min(state.player.hp, stats.maxHp) },
         diceFaces: buildFaces(equipped, state.classId),
       });
@@ -1716,6 +1789,13 @@ export const useGameStore = create<GameState>((set, get) => {
     markDailyHelpSeen: () => {
       if (get().seenDailyHelp) return;
       set({ seenDailyHelp: true });
+      persist();
+    },
+
+    dismissEra2Reward: () => {
+      const p = get().progress;
+      if (!p.era2RewardPending) return;
+      set({ progress: { ...p, era2RewardPending: false } });
       persist();
     },
 
@@ -2444,6 +2524,7 @@ export const useGameStore = create<GameState>((set, get) => {
         player: createPlayer(),
         equipped,
         inventory: [],
+        emblems: [],
         currentFloor: 1,
         currentEnemy: null,
         battleState: "idle",
@@ -2587,7 +2668,13 @@ export const useGameStore = create<GameState>((set, get) => {
         { text: `レベルアップ！ Lv${leveledPlayer.level} (全回復)`, tone: "good" },
       ]);
     }
-    const inventory = drops.length ? [...state.inventory, ...drops] : state.inventory;
+    // 紋章(emblem)は装備ストックとは別の専用ストックへ。装備は通常のインベントリへ。
+    const emblemDrops = drops.filter((d) => d.slot === "emblem");
+    const gearDrops = drops.filter((d) => d.slot !== "emblem");
+    const inventory = gearDrops.length ? [...state.inventory, ...gearDrops] : state.inventory;
+    const cappedEmblems = emblemDrops.length
+      ? capEmblems([...state.emblems, ...emblemDrops], state.favorites)
+      : { kept: state.emblems, material: 0 };
     for (const d of drops) {
       finalLog = pushLogs(finalLog, [{ text: `${d.name} を手に入れた！`, tone: "good" }]);
     }
@@ -2773,6 +2860,7 @@ export const useGameStore = create<GameState>((set, get) => {
     return {
       player: leveledPlayer,
       inventory: capped.kept,
+      emblems: cappedEmblems.kept,
       currentEnemy: enemy,
       currentFloor: newFloor,
       battleState: "won",
@@ -2784,7 +2872,7 @@ export const useGameStore = create<GameState>((set, get) => {
       checkpoint,
       startFloorPref,
       souls: soulsAfter,
-      gachaPoints: state.gachaPoints + bonusGacha + capped.material,
+      gachaPoints: state.gachaPoints + bonusGacha + capped.material + cappedEmblems.material,
       materials,
       worldCleared,
       pendingEnding: endingPending,

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   deleteEcho,
   ECHO_GHOSTS,
+  LEGEND_ECHO,
   loadEchoClears,
   loadEchoGallery,
   recordEchoClear,
@@ -197,7 +198,7 @@ export default function ArenaEchoPage() {
       {/* 名のある残響（curated） */}
       <section className="space-y-2">
         <div className="text-[11px] font-bold text-gray-300">
-          名のある残響（{clears.length}/{ECHO_GHOSTS.length} 撃破）
+          名のある残響（{clears.length}/{ECHO_GHOSTS.length + 1} 撃破）
         </div>
         {ECHO_GHOSTS.map((g) => (
           <GhostCard
@@ -217,6 +218,22 @@ export default function ArenaEchoPage() {
             }
           />
         ))}
+        {/* 👑 レジェンド残響：トーナメント優勝者（特別表示） */}
+        <LegendCard
+          ghost={LEGEND_ECHO}
+          cleared={clears.includes(LEGEND_ECHO.id)}
+          canFight={!!active}
+          onFight={() =>
+            fight({
+              name: LEGEND_ECHO.name,
+              operatorId: LEGEND_ECHO.operatorId,
+              builds: LEGEND_ECHO.builds,
+              blessings: LEGEND_ECHO.blessings,
+              field: LEGEND_ECHO.field,
+              ghostId: LEGEND_ECHO.id,
+            })
+          }
+        />
       </section>
 
       {/* オンライン対戦 */}
@@ -415,6 +432,50 @@ function GhostCard({
       >
         挑む
       </button>
+    </div>
+  );
+}
+
+function LegendCard({
+  ghost,
+  cleared,
+  canFight,
+  onFight,
+}: {
+  ghost: EchoGhost;
+  cleared: boolean;
+  canFight: boolean;
+  onFight: () => void;
+}) {
+  const power = useMemo(
+    () => allyTeamPower(ghost.builds, ghost.field, ghost.operatorId, ghost.blessings),
+    [ghost],
+  );
+  return (
+    <div className="relative overflow-hidden rounded-2xl border-2 border-amber-400/70 bg-gradient-to-br from-amber-500/15 via-yellow-500/5 to-transparent p-2 shadow-[0_0_18px_rgba(251,191,36,0.25)]">
+      <div className="pointer-events-none absolute -right-6 -top-6 text-6xl opacity-10">👑</div>
+      <div className="mb-1 flex items-center gap-1 text-[9px] font-black tracking-widest text-amber-300">
+        ✦ 20人の総当りを制した優勝者の残響 ✦
+      </div>
+      <div className="flex items-center gap-2">
+        <TeamRow builds={ghost.builds} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1 text-[12px] font-black text-amber-100">
+            {cleared && <span className="text-emerald-400">✔</span>}
+            {ghost.name}
+            <span className="text-[9px] text-amber-300">LEGEND</span>
+          </div>
+          <div className="truncate text-[9px] text-amber-200/70">⚱️遺跡・★{power}</div>
+          <div className="text-[9px] leading-tight text-gray-400">{ghost.flavor}</div>
+        </div>
+        <button
+          onClick={onFight}
+          disabled={!canFight}
+          className="shrink-0 rounded-xl bg-amber-500/90 px-3 py-2 text-[11px] font-black text-black disabled:opacity-40 active:scale-95"
+        >
+          挑む
+        </button>
+      </div>
     </div>
   );
 }

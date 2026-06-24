@@ -22,6 +22,8 @@ export default function RankingPage() {
   const currentRankingEntry = useGameStore((s) => s.currentRankingEntry);
 
   const [tab, setTab] = useState<Tab>("total");
+  // 新(era2)/旧(era1)ランキングの切り替え。難易度刷新で旧記録はアーカイブとして閲覧のみ。
+  const [era, setEra] = useState<"new" | "old">("new");
   const [job, setJob] = useState("mage");
   const [difficulty, setDifficulty] = useState("hell");
   const [entries, setEntries] = useState<RankingEntry[]>([]);
@@ -158,10 +160,36 @@ export default function RankingPage() {
         </select>
       )}
 
+      {/* 新/旧ランキング切替（難易度刷新で旧記録はアーカイブとして保全） */}
+      <div className="mb-2 flex gap-1">
+        {([
+          ["new", "🆕 新ランキング"],
+          ["old", "📜 旧ランキング"],
+        ] as const).map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setEra(k)}
+            className={`h-8 flex-1 rounded-lg text-[11px] font-bold active:scale-95 ${
+              era === k ? "bg-sky-600 text-white" : "bg-white/10 text-gray-300"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {era === "old" && (
+        <p className="mb-1 text-[10px] text-amber-300/80">
+          ※難易度刷新前の記録（閲覧のみ・更新されません）
+        </p>
+      )}
+
       {loading ? (
         <p className="font-mono text-xs text-emerald-500/60">読み込み中…</p>
       ) : (
-        <RankingList entries={entries} filter={filter} />
+        <RankingList
+          entries={entries.filter((e) => (era === "old" ? e.era === 1 : e.era !== 1))}
+          filter={filter}
+        />
       )}
 
       <Link

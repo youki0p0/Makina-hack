@@ -25,7 +25,12 @@ export interface RankingEntry {
   equipmentScore: number;
   totalPlayTime: number;
   updatedAt: string;
+  /** ランキング世代。1=旧(凍結アーカイブ) / 2=新。未指定は新扱い。 */
+  era?: number;
 }
+
+/** 現行（新）ランキングの世代。投稿は常にこの世代へ入る（DB側でも era=2 固定）。 */
+export const CURRENT_RANKING_ERA = 2;
 
 export type RankingFilter =
   | { kind: "total" }
@@ -41,7 +46,7 @@ const OWNER_KEY = "dice-ranking-owner-v1";
 // Columns we read back. owner_token is intentionally never selected — it is the
 // per-device ownership secret and must stay server-side.
 const READ_COLUMNS =
-  "player_name,highest_floor,cleared_1000,endless_abyss_floor,job,difficulty,title,has_shinki_makina,equipped_weapon_name,equipment_score,total_play_time,updated_at";
+  "player_name,highest_floor,cleared_1000,endless_abyss_floor,job,difficulty,title,has_shinki_makina,equipped_weapon_name,equipment_score,total_play_time,updated_at,era";
 
 const MAX_FLOOR = 999999;
 const MAX_SCORE = 1_000_000;
@@ -148,6 +153,7 @@ interface Row {
   equipment_score: number;
   total_play_time: number;
   updated_at: string;
+  era: number;
 }
 function fromRow(r: Row): RankingEntry {
   return {
@@ -163,6 +169,7 @@ function fromRow(r: Row): RankingEntry {
     equipmentScore: r.equipment_score ?? 0,
     totalPlayTime: r.total_play_time ?? 0,
     updatedAt: r.updated_at ?? new Date().toISOString(),
+    era: r.era ?? 1,
   };
 }
 

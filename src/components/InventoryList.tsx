@@ -58,9 +58,12 @@ function sortValue(item: Equipment, sort: Sort): number {
 
 export default function InventoryList() {
   const inventory = useGameStore((s) => s.inventory);
+  const emblems = useGameStore((s) => s.emblems);
   const equipped = useGameStore((s) => s.equipped);
   const favorites = useGameStore((s) => s.favorites);
   const equipItem = useGameStore((s) => s.equipItem);
+  const equipEmblem = useGameStore((s) => s.equipEmblem);
+  const scrapEmblem = useGameStore((s) => s.scrapEmblem);
   const equipBest = useGameStore((s) => s.equipBest);
   const scrapItem = useGameStore((s) => s.scrapItem);
   const scrapBulk = useGameStore((s) => s.scrapBulk);
@@ -73,6 +76,13 @@ export default function InventoryList() {
   const [sort, setSort] = useState<Sort>("rarity");
   // 「強化候補だけ」表示（装備中より強い＝▲のものに絞る）。
   const [onlyUpgrades, setOnlyUpgrades] = useState(false);
+
+  // 紋章(emblem)は装備ストックとは別の専用ストック(最大30)。フィルタ「紋章」では
+  // こちらを表示し、装備/分解も専用アクションを使う。
+  const isEmblemView = filter === "emblem";
+  const source = isEmblemView ? emblems : inventory;
+  const doEquip = (i: number) => (isEmblemView ? equipEmblem(i) : equipItem(i));
+  const doScrap = (i: number) => (isEmblemView ? scrapEmblem(i) : scrapItem(i));
 
   // 表示設定（フィルタ／並び／強化候補のみ）を localStorage に記憶し、次に開いたとき復元する。
   // セットフィルタは所持状況で消えうるのでセッション限り（ストランド防止）。
@@ -99,7 +109,7 @@ export default function InventoryList() {
   // ネイティブダイアログを出せずフリーズ/表示崩れする不具合の回避）。
   const [bulkConfirm, setBulkConfirm] = useState<{ msg: string; run: () => void } | null>(null);
 
-  const selectedItem = selected !== null ? inventory[selected] : null;
+  const selectedItem = selected !== null ? source[selected] : null;
 
   // Distinct sets the player currently owns (for the set filter dropdown).
   const ownedSets = useMemo(
@@ -125,7 +135,7 @@ export default function InventoryList() {
   // don't re-sort the whole (up to 300-item) inventory every time.
   const rows = useMemo(
     () =>
-      inventory
+      source
         .map((item, index) => ({ item, index }))
         .filter((r) => filter === "all" || r.item.slot === filter)
         .filter((r) => setKeyFilter === "all" || r.item.setId === setKeyFilter)
@@ -138,7 +148,7 @@ export default function InventoryList() {
           return sortValue(b.item, sort) - sortValue(a.item, sort);
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [inventory, filter, setKeyFilter, sort, favorites, onlyUpgrades, equipped, classId],
+    [source, filter, setKeyFilter, sort, favorites, onlyUpgrades, equipped, classId],
   );
 
   // 深層では所持品が上限(300件)まで増え、各行がcanvas生成のアイコンを持つため、全件を一度に
@@ -152,7 +162,9 @@ export default function InventoryList() {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-gray-300">所持品 ({inventory.length})</h2>
+        <h2 className="text-sm font-bold text-gray-300">
+          {isEmblemView ? `🟣 紋章ストック (${emblems.length}/30)` : `所持品 (${inventory.length})`}
+        </h2>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setOnlyUpgrades((v) => !v)}
@@ -186,7 +198,7 @@ export default function InventoryList() {
         ))}
       </div>
 
-      {ownedSets.length > 0 && (
+      {!isEmblemView && ownedSets.length > 0 && (
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-gray-500">セット:</span>
           <select
@@ -219,6 +231,8 @@ export default function InventoryList() {
         ))}
       </div>
 
+      {!isEmblemView && (
+      <>
       <div className="flex items-center gap-1">
         <span className="text-[10px] text-gray-500">一括分解:</span>
         {BULK_OPTIONS.map((b) => (
@@ -263,10 +277,21 @@ export default function InventoryList() {
       <p className="flex items-center gap-1 text-[10px] text-gray-500">
         <PixelGlyph kind="lock" size={12} /> ロックした装備は分解の対象外です。
       </p>
+      </>
+      )}
+      {isEmblemView && (
+        <p className="text-[10px] text-violet-300/80">
+          🟣 紋章は装備ストックとは別枠（最大30）。3000階+のボスからまれにドロップします。
+        </p>
+      )}
 
       {rows.length === 0 ? (
         <p className="rounded-xl border border-white/10 bg-black/20 p-4 text-center text-sm text-gray-500">
-          {inventory.length === 0 ? "まだ何も持っていない。敵を倒して装備を集めよう。" : "この分類のアイテムはない。"}
+          {isEmblemView
+            ? "紋章はまだ無い。3000階以上のボスを倒すと、まれに手に入る。"
+            : inventory.length === 0
+              ? "まだ何も持っていない。敵を倒して装備を集めよう。"
+              : "この分類のアイテムはない。"}
         </p>
       ) : (
         <div className="space-y-2">
@@ -334,11 +359,11 @@ export default function InventoryList() {
           equippable={canEquip(selectedItem, classId)}
           onToggleFavorite={() => toggleFavorite(itemKey(selectedItem))}
           onEquip={() => {
-            equipItem(selected);
+            doEquip(selected);
             setSelected(null);
           }}
           onScrap={() => {
-            scrapItem(selected);
+            doScrap(selected);
             setSelected(null);
           }}
           onClose={() => setSelected(null)}
