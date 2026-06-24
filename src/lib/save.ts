@@ -51,6 +51,7 @@ export interface LoadedState {
   player: Player;
   equipped: EquippedItems;
   inventory: Equipment[];
+  emblems: Equipment[];
   currentFloor: number;
   gachaPoints: number;
   souls: number;
@@ -116,6 +117,7 @@ function freshLoaded(equipped: EquippedItems, inventory: Equipment[]): LoadedSta
     player,
     equipped,
     inventory,
+    emblems: [],
     currentFloor: 1,
     gachaPoints: 0,
     souls: 0,
@@ -211,6 +213,7 @@ export function saveGame(state: LoadedState): void {
     player: state.player,
     equippedItems,
     inventoryItems: state.inventory.map((i) => toSavedItem(i)).filter((i): i is SavedItem => i !== null),
+    emblemItems: state.emblems.map((i) => toSavedItem(i)).filter((i): i is SavedItem => i !== null),
     currentFloor: state.currentFloor,
     gachaPoints: state.gachaPoints,
     souls: state.souls,
@@ -285,14 +288,21 @@ export function loadGame(): LoadedState | null {
       return acc;
     }, {} as EquippedItems);
 
-    const inventory = (data.inventoryItems ?? [])
+    const allInventory = (data.inventoryItems ?? [])
       .map((s) => getItemInstance(s.id, s.affixId, s.modTier, s.quality, s.forgeLevel, s.forgeStreak))
       .filter((i): i is Equipment => i !== null);
+    const savedEmblems = (data.emblemItems ?? [])
+      .map((s) => getItemInstance(s.id, s.affixId, s.modTier, s.quality, s.forgeLevel, s.forgeStreak))
+      .filter((i): i is Equipment => i !== null);
+    // 旧セーブ移行: 装備ストックに紛れている紋章を専用ストックへ移す（上限はストア側で処理）。
+    const inventory = allInventory.filter((i) => i.slot !== "emblem");
+    const emblems = [...savedEmblems, ...allInventory.filter((i) => i.slot === "emblem")];
 
     return {
       player: data.player,
       equipped,
       inventory,
+      emblems,
       currentFloor: data.currentFloor,
       gachaPoints: data.gachaPoints ?? 0,
       souls: data.souls ?? 0,
