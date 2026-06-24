@@ -94,9 +94,9 @@ describe("fieldTransform", () => {
 
 describe("残響ゴーストのデータ整合性", () => {
   it("全ゴーストのモンスター/カードIDが解決でき、3体編成である", async () => {
-    const { ECHO_GHOSTS } = await import("@/data/arena/echo");
+    const { ECHO_GHOSTS, LEGEND_ECHO } = await import("@/data/arena/echo");
     const { getMonster } = await import("@/data/arena/monsters");
-    for (const g of ECHO_GHOSTS) {
+    for (const g of [...ECHO_GHOSTS, LEGEND_ECHO]) {
       expect(g.builds).toHaveLength(3);
       for (const b of g.builds) {
         expect(getMonster(b.monsterId)).toBeTruthy();
