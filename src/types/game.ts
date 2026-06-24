@@ -412,6 +412,12 @@ export interface Progress {
   // ===== Title (称号) system =====
   /** Title ids already unlocked + soul-rewarded (idempotency ledger). */
   claimedTitles: string[];
+  /** 旧難易度時代に深淵(3000階超)を踏破した開拓者。era2移行で2人へ付与（称号と紐づく）。 */
+  oldEraPioneer?: boolean;
+  /** era2移行の一度きり補填migrationを適用済みか。 */
+  era2Reset?: boolean;
+  /** era2移行のご褒美ポップアップが未表示か（表示後に false）。 */
+  era2RewardPending?: boolean;
   /** Carried fractional soul remainder from title rewards (0 ≤ f < 1). */
   soulsFraction: number;
   /** Casino: cumulative slot BIG (ダイスラッシュ) hits. */

@@ -398,6 +398,8 @@ interface GameState {
   forgeStarWithMaterials: (loc: "inv" | EquipmentSlot, index: number) => void;
   markDailyStorySeen: () => void;
   markDailyHelpSeen: () => void;
+  /** era2移行ご褒美ポップアップを閉じる（再表示しない）。 */
+  dismissEra2Reward: () => void;
   // ログイン / クエスト
   refreshQuests: () => void;
   claimLogin: () => void;
@@ -804,6 +806,29 @@ export const useGameStore = create<GameState>((set, get) => {
     //   });
     //   persist();
     // }
+
+    // 一度きりの補填(era2移行): 旧難易度で深淵(3000階超)を踏破していた開拓者へ、
+    // 称号「またオレ何かやっちゃいました？」＋💎ハイコイン15,000を付与し、3000階へ戻す。
+    // 対象判定はローカルの最高到達 > 3000（＝旧時代の到達者のみ。一般プレイヤーは新難易度で
+    // 到達困難なため実質 siro/Noro の2名）。次回起動時に必ずポップアップで通知する。
+    if (!loaded.progress.era2Reset) {
+      const pioneer = loaded.progress.highestFloorReached > 3000;
+      const progress: Progress = pioneer
+        ? {
+            ...loaded.progress,
+            era2Reset: true,
+            oldEraPioneer: true,
+            era2RewardPending: true,
+            highestFloorReached: 3000,
+            maxFloor: Math.min(loaded.progress.maxFloor, 3000),
+          }
+        : { ...loaded.progress, era2Reset: true };
+      set({
+        progress,
+        ...(pioneer ? { hiCoins: get().hiCoins + 15000, currentFloor: 3000 } : {}),
+      });
+      persist();
+    }
   }
 
   return {
@@ -1716,6 +1741,13 @@ export const useGameStore = create<GameState>((set, get) => {
     markDailyHelpSeen: () => {
       if (get().seenDailyHelp) return;
       set({ seenDailyHelp: true });
+      persist();
+    },
+
+    dismissEra2Reward: () => {
+      const p = get().progress;
+      if (!p.era2RewardPending) return;
+      set({ progress: { ...p, era2RewardPending: false } });
       persist();
     },
 
