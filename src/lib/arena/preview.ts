@@ -1,6 +1,6 @@
 import { getCard, isEquipment, isSkill } from "@/data/arena/cards";
 import { getMonster } from "@/data/arena/monsters";
-import { getOperator } from "@/data/arena/operators";
+import { EQUIP_DEF_BOOST_CAP, getOperator } from "@/data/arena/operators";
 import { fieldTransform } from "@/lib/arena/fieldTransform";
 import type { EffectiveSkill, FieldId, MonsterBuild, SkillCard } from "@/types/arena";
 
@@ -31,14 +31,17 @@ export function slotPreview(
   let defense = m?.defense ?? 0;
   let speed = m?.speed ?? 0;
 
+  let passiveDefBoost = 0;
   for (const id of build.equipmentIds) {
     const c = getCard(id);
     if (!c || !isEquipment(c)) continue;
     hp += c.hp ?? 0;
     attack += c.attack ?? 0;
-    defense += (c.defense ?? 0) + (op.passive.equipDefenseBoost ?? 0);
+    defense += c.defense ?? 0;
+    passiveDefBoost += op.passive.equipDefenseBoost ?? 0;
     speed += c.speed ?? 0;
   }
+  defense += Math.min(passiveDefBoost, EQUIP_DEF_BOOST_CAP);
 
   const skills = build.skillIds
     .map((id) => getCard(id))

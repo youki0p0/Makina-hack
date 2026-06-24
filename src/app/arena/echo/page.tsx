@@ -79,6 +79,8 @@ export default function ArenaEchoPage() {
 
   const fight = (foe: Foe) => {
     if (!active) return;
+    // 残響戦も通常戦と同じく、ステージは毎回ランダムで選ばれる
+    const field = rollField();
     const result = simulateEcho(
       active.builds,
       active.operatorId,
@@ -86,7 +88,7 @@ export default function ArenaEchoPage() {
       foe.builds,
       foe.operatorId,
       foe.blessings,
-      foe.field,
+      field,
     );
     sfx("select");
     setDone(null);
@@ -136,6 +138,9 @@ export default function ArenaEchoPage() {
       <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-3 p-3">
         <div className="text-center text-xs font-bold text-fuchsia-300">
           👻 残響戦：{battle.foe.name}
+          <span className="ml-1 text-[10px] font-normal text-gray-400">
+            🎲 {getField(battle.result.field).emoji}{getField(battle.result.field).name}
+          </span>
         </div>
         <BattleView result={battle.result} onFinished={onFinished} />
       </main>
@@ -421,7 +426,7 @@ function GhostCard({
           <span className="text-[9px] text-amber-300">{"★".repeat(ghost.tier)}</span>
         </div>
         <div className="truncate text-[9px] text-gray-400">
-          {f.emoji}{f.name}・★{power}
+          🎲 ステージランダム・★{power}
         </div>
         <div className="text-[9px] leading-tight text-gray-500">{ghost.flavor}</div>
       </div>
@@ -455,7 +460,7 @@ function LegendCard({
     <div className="relative overflow-hidden rounded-2xl border-2 border-amber-400/70 bg-gradient-to-br from-amber-500/15 via-yellow-500/5 to-transparent p-2 shadow-[0_0_18px_rgba(251,191,36,0.25)]">
       <div className="pointer-events-none absolute -right-6 -top-6 text-6xl opacity-10">👑</div>
       <div className="mb-1 flex items-center gap-1 text-[9px] font-black tracking-widest text-amber-300">
-        ✦ 20人の総当りを制した優勝者の残響 ✦
+        ✦ 全構築の総当りを制した優勝者の残響 ✦
       </div>
       <div className="flex items-center gap-2">
         <TeamRow builds={ghost.builds} />
@@ -465,7 +470,7 @@ function LegendCard({
             {ghost.name}
             <span className="text-[9px] text-amber-300">LEGEND</span>
           </div>
-          <div className="truncate text-[9px] text-amber-200/70">⚱️遺跡・★{power}</div>
+          <div className="truncate text-[9px] text-amber-200/70">🎲 ステージランダム・★{power}</div>
           <div className="text-[9px] leading-tight text-gray-400">{ghost.flavor}</div>
         </div>
         <button

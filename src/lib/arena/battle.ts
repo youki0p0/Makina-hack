@@ -1,7 +1,7 @@
 import { getCard, isEquipment, isSkill } from "@/data/arena/cards";
 import { SKILLS } from "@/data/arena/cards";
 import { getMonster, MONSTERS } from "@/data/arena/monsters";
-import { getOperator } from "@/data/arena/operators";
+import { EQUIP_DEF_BOOST_CAP, getOperator } from "@/data/arena/operators";
 import {
   fieldGrantsRevive,
   fieldStatMods,
@@ -253,18 +253,22 @@ function buildAllies(
     let crit = 5;
     let equipRevive = false;
 
+    let passiveDefBoost = 0;
     for (const id of b.equipmentIds) {
       const c = getCard(id);
       if (!c || !isEquipment(c)) continue;
       hp += c.hp ?? 0;
       attack += c.attack ?? 0;
-      defense += (c.defense ?? 0) + (op.passive.equipDefenseBoost ?? 0);
+      defense += c.defense ?? 0;
+      passiveDefBoost += op.passive.equipDefenseBoost ?? 0;
       speed += c.speed ?? 0;
       reflect += c.reflectPct ?? 0;
       regen += c.regen ?? 0;
       crit += c.critAdd ?? 0;
       if (c.grantRevive) equipRevive = true;
     }
+    // 守勢展開の装備防御ボーナスは上限付き（フルビルドでの過剰耐久を抑制）
+    defense += Math.min(passiveDefBoost, EQUIP_DEF_BOOST_CAP);
 
     const skillCards = b.skillIds
       .map((id) => getCard(id))
