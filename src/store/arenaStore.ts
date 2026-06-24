@@ -9,7 +9,7 @@ import {
   unlockAchievements,
 } from "@/lib/arena/achievements";
 import { offerBlessings } from "@/lib/arena/blessings";
-import { labelForRun, saveEchoSelf } from "@/data/arena/echo";
+import { addEchoToGallery, labelForRun } from "@/data/arena/echo";
 import { allyTeamPower } from "@/lib/arena/power";
 import {
   budgetForRound,
@@ -180,8 +180,8 @@ export const useArenaStore = create<ArenaStore>((set, get) => ({
     if (phase === "victory" || phase === "gameover") {
       const rec = recordResult(run.mode, wins, run.round, cleared);
       ranks = { ...ranks, [run.mode]: rec };
-      // 残響戦用に、このランの編成をプレイヤーの「残響」として記録
-      saveEchoSelf({
+      // 残響戦用に、このランの編成をプレイヤーの「残響」としてギャラリーに記録
+      addEchoToGallery({
         builds: run.builds,
         operatorId: run.operatorId,
         blessings: run.blessings,

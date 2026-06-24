@@ -10,7 +10,7 @@ import { budgetForRound, DRAFT_SIZE, generateDraft, newRun } from "@/lib/arena/g
 import { computeSynergies, emptyTeamMods } from "@/lib/arena/synergy";
 import { applyBlessings, offerBlessings } from "@/lib/arena/blessings";
 import { fieldTransform } from "@/lib/arena/fieldTransform";
-import { ALL_CARDS, EQUIPMENT, SKILLS, cardCost, isSkill } from "@/data/arena/cards";
+import { ALL_CARDS, EQUIPMENT, SKILLS, cardCost, getCard, isSkill } from "@/data/arena/cards";
 import { MONSTERS } from "@/data/arena/monsters";
 import { FIELDS } from "@/data/arena/fields";
 import type { FieldId, MonsterBuild } from "@/types/arena";
@@ -89,6 +89,22 @@ describe("fieldTransform", () => {
     expect(t.name).toBe("蒸気斬り");
     expect(t.apply?.some((a) => a.status === "burn")).toBe(false);
     expect(t.apply?.some((a) => a.status === "blind")).toBe(true);
+  });
+});
+
+describe("残響ゴーストのデータ整合性", () => {
+  it("全ゴーストのモンスター/カードIDが解決でき、3体編成である", async () => {
+    const { ECHO_GHOSTS } = await import("@/data/arena/echo");
+    const { getMonster } = await import("@/data/arena/monsters");
+    for (const g of ECHO_GHOSTS) {
+      expect(g.builds).toHaveLength(3);
+      for (const b of g.builds) {
+        expect(getMonster(b.monsterId)).toBeTruthy();
+        for (const id of [...b.equipmentIds, ...b.skillIds]) {
+          expect(getCard(id)).toBeTruthy();
+        }
+      }
+    }
   });
 });
 
