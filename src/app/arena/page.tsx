@@ -390,21 +390,27 @@ function GameScreen() {
       </div>
 
       <button
-        onClick={() => {
-          sfx("select");
-          confirmPrep();
-        }}
-        className="sticky bottom-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 py-4 text-lg font-extrabold text-white shadow-xl active:scale-95"
-      >
-        ⚔️ 準備完了！！
-      </button>
-
-      <button
         onClick={quitToMenu}
         className="pb-3 text-center text-[10px] text-gray-500 underline"
       >
         ✖ ゲームをやめてメニューへ
       </button>
+
+      {/* 下部固定バーに隠れないためのスペーサー */}
+      <div aria-hidden className="h-20 shrink-0" />
+
+      {/* 準備完了：画面下のセーフゾーンに常時固定（スクロールしても動かない） */}
+      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md bg-gradient-to-t from-[#15131f] via-[#15131f]/95 to-transparent px-3 pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <button
+          onClick={() => {
+            sfx("select");
+            confirmPrep();
+          }}
+          className="w-full rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 py-4 text-lg font-extrabold text-white shadow-xl active:scale-95"
+        >
+          ⚔️ 準備完了！！
+        </button>
+      </div>
     </>
   );
 }
