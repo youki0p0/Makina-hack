@@ -109,23 +109,35 @@ export const ECHO_GHOSTS: readonly EchoGhost[] = [
 
 /**
  * 👑 レジェンド残響。
- * 開発時に「20人のゲーマー」に異なるビルドを作らせ、全フィールド×総当りで対戦させた
- * トーナメントの優勝者（勝率1位 ＝ 93.9%）の編成をそのまま固定したもの。
- * 不死鳥で蘇る重装の壁＋毒＋再生で、あらゆる相手を枯らし切った最強の記憶。
- * tier 6（既存の5体より上位）として特別表示する。
+ * 終盤ラン相当の「フルビルド」20体＋実オンライン残響を全フィールド×総当りで
+ * 対戦させたトーナメントの優勝者（勝率97.6%・★318）。装備と祝福を限界まで
+ * 積み上げた不滅の三重壁が、不死鳥・再生・反射・毒で相手を枯らし尽くす。
+ * オンラインの実プレイヤー残響にも打ち勝つ、真の頂点。tier 6 として特別表示。
  */
 export const LEGEND_ECHO: EchoGhost = {
   id: "legend_echo",
   name: "👑 レジェンド残響",
-  flavor: "20人の頂点。不死鳥の加護をまとう不滅の壁が、毒と再生で全てを枯らし尽くした優勝者の記憶。",
+  flavor: "全構築の頂点。積み上げた不滅の三重壁が、不死鳥と再生と反射で全てを呑み込む。オンラインの猛者すら退けた優勝者の記憶。",
   tier: 6,
   operatorId: "warden",
   field: "ruins",
-  blessings: ["phoenix", "def", "regen"],
+  blessings: ["phoenix", "def", "regen", "hp", "shield", "phoenix", "def", "regen", "hp", "heal", "shield", "def", "hp", "regen"],
   builds: [
-    b("moss_golem", ["iron_wall", "phoenix_feather", "thorn_mail"], ["taunt_roar", "guard_stance"]),
-    b("bramble_beast", ["life_orb"], ["bleed_strike", "poison_mist"]),
-    b("elder_treant", ["sacred_crown"], ["healing_light", "regen_wind"]),
+    b(
+      "moss_golem",
+      ["iron_wall", "mirror_shield", "thorn_mail", "life_orb", "sacred_crown", "guard_charm", "phoenix_feather", "iron_wall", "mirror_shield", "thorn_mail", "life_orb", "sacred_crown", "guard_charm", "phoenix_feather", "iron_wall", "mirror_shield"],
+      ["taunt_roar", "guard_stance", "barrier_song", "healing_light", "regen_wind", "mirror_barrier", "taunt_roar", "guard_stance", "barrier_song"],
+    ),
+    b(
+      "bramble_beast",
+      ["venom_fang", "thorn_mail", "life_orb", "sacred_crown", "guard_charm", "iron_wall", "mirror_shield", "thorn_mail", "life_orb", "sacred_crown", "guard_charm", "phoenix_feather", "venom_fang", "thorn_mail"],
+      ["poison_mist", "bleed_strike", "venom_bite", "healing_light", "regen_wind", "taunt_roar", "guard_stance", "barrier_song", "healing_light", "regen_wind"],
+    ),
+    b(
+      "elder_treant",
+      ["iron_wall", "mirror_shield", "thorn_mail", "life_orb", "sacred_crown", "guard_charm", "phoenix_feather", "iron_wall", "mirror_shield", "thorn_mail", "life_orb", "sacred_crown", "guard_charm"],
+      ["taunt_roar", "guard_stance", "barrier_song", "healing_light", "regen_wind", "mirror_barrier", "taunt_roar", "guard_stance", "barrier_song"],
+    ),
   ],
 };
 
