@@ -233,8 +233,8 @@ export const SKILLS: readonly SkillCard[] = [
     tags: ["attack", "haste", "single"],
     cooldown: 32,
     targeting: "single",
-    power: 1.2,
-    apply: [{ status: "haste", magnitude: 4, duration: 25 }],
+    power: 1.45,
+    apply: [{ status: "haste", magnitude: 6, duration: 25 }],
     desc: "敵1体に攻撃し、自分を加速。",
   },
   {
@@ -297,8 +297,8 @@ export const SKILLS: readonly SkillCard[] = [
     tags: ["blind", "single"],
     cooldown: 34,
     targeting: "single",
-    power: 0.8,
-    apply: [{ status: "blind", magnitude: 35, duration: 30 }],
+    power: 1.05,
+    apply: [{ status: "blind", magnitude: 42, duration: 30 }],
     desc: "敵1体に攻撃し、暗闇（命中低下）を付与。",
   },
   {
@@ -324,7 +324,7 @@ export const SKILLS: readonly SkillCard[] = [
     cooldown: 55,
     targeting: "allies",
     power: 0,
-    apply: [{ status: "haste", magnitude: 5, duration: 30, toAllies: true }],
+    apply: [{ status: "haste", magnitude: 8, duration: 30, toAllies: true }],
     desc: "味方全体を加速。",
   },
   {
@@ -349,8 +349,8 @@ export const SKILLS: readonly SkillCard[] = [
     tags: ["critical", "attack", "single"],
     cooldown: 28,
     targeting: "lowest",
-    power: 1.1,
-    apply: [{ status: "atkUp", magnitude: 3, duration: 20 }],
+    power: 1.3,
+    apply: [{ status: "atkUp", magnitude: 5, duration: 20 }],
     desc: "弱った敵を狙い、自分の攻撃を上げる。",
   },
   {
@@ -388,8 +388,8 @@ export const SKILLS: readonly SkillCard[] = [
     tags: ["attack", "single"],
     cooldown: 33,
     targeting: "single",
-    power: 1.1,
-    apply: [{ status: "defDown", magnitude: 12, duration: 30 }],
+    power: 1.35,
+    apply: [{ status: "defDown", magnitude: 18, duration: 30 }],
     desc: "敵1体に攻撃し、防御を下げる。",
   },
   {

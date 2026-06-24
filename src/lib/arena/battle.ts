@@ -304,7 +304,9 @@ function buildAllies(
       baseDefense: Math.round((defense) * mods.defMult * fStat.defMult),
       baseSpeed: Math.max(1, Math.round(speed * mods.spdMult * fStat.spdMult)),
       crit: crit + mods.critAdd,
-      reflectPct: reflect,
+      // 反射は上限50%。装備を積み増した編成での「反射100%超で殴った側が自滅」を防ぎ、
+      // 攻撃系（特に手数の多い速度ビルド）が反射壁を崩せる余地を残す。
+      reflectPct: Math.min(reflect, 50),
       regenFlat: regen + mods.regenAdd,
       dmgTakenMult,
       focusPowerMult,

@@ -51,8 +51,8 @@ export const OPERATORS: readonly OperatorDef[] = [
     concept:
       "浮遊する観測端末を操る指揮官。青いバイザー越しに戦場を解析し、味方の術式巡りを最適化する。",
     passiveName: "術式同期",
-    passiveDesc: "Blue 系モンスターの技クールダウンを15%短縮。",
-    passive: { colorCdReduce: { color: "blue", pct: 0.15 } },
+    passiveDesc: "Blue 系モンスターの技クールダウンを20%短縮。",
+    passive: { colorCdReduce: { color: "blue", pct: 0.2 } },
   },
   {
     id: "warden",
