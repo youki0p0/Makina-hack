@@ -83,7 +83,80 @@ export async function publishEcho(echo: {
   }
 }
 
-/** 対戦相手（他プレイヤーの残響）をランダムめに取得。失敗時は空配列。 */
+export interface PvpStats {
+  wins: number;
+  losses: number;
+  streak: number;
+  bestStreak: number;
+}
+
+export interface LeaderboardEntry {
+  playerName: string;
+  wins: number;
+  losses: number;
+  bestStreak: number;
+  streak: number;
+}
+
+const STREAK_KEY = "arena-pvp-streak-v1";
+
+/** ローカルの連勝（即時表示用。オフラインでも増減する）。 */
+export function loadLocalStreak(): number {
+  if (typeof window === "undefined") return 0;
+  return Number(window.localStorage.getItem(STREAK_KEY) ?? 0) || 0;
+}
+export function updateLocalStreak(win: boolean): number {
+  const next = win ? loadLocalStreak() + 1 : 0;
+  try {
+    window.localStorage.setItem(STREAK_KEY, String(next));
+  } catch {
+    /* ignore */
+  }
+  return next;
+}
+
+/** オンライン対戦の勝敗をサーバーに記録（連勝/勝率ランキング用）。失敗時 null。 */
+export async function reportResult(playerName: string, win: boolean): Promise<PvpStats | null> {
+  const sb = getSupabaseClient();
+  if (!sb) return null;
+  try {
+    const { data, error } = await sb.rpc("report_arena_result", {
+      p_token: ownerToken(),
+      p_name: (playerName || "Guest").trim().slice(0, 16) || "Guest",
+      p_win: win,
+    });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (error || !row) return null;
+    return {
+      wins: Number(row.wins ?? 0),
+      losses: Number(row.losses ?? 0),
+      streak: Number(row.streak ?? 0),
+      bestStreak: Number(row.best_streak ?? 0),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 勝敗ランキング（最高連勝→勝数→勝率）を取得。失敗時は空配列。 */
+export async function fetchLeaderboard(limit = 20): Promise<LeaderboardEntry[]> {
+  const sb = getSupabaseClient();
+  if (!sb) return [];
+  try {
+    const { data, error } = await sb.rpc("fetch_arena_leaderboard", { p_limit: limit });
+    if (error || !Array.isArray(data)) return [];
+    return data.map((r: Record<string, unknown>) => ({
+      playerName: String(r.player_name ?? "Guest"),
+      wins: Number(r.wins ?? 0),
+      losses: Number(r.losses ?? 0),
+      bestStreak: Number(r.best_streak ?? 0),
+      streak: Number(r.streak ?? 0),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchOpponents(limit = 20): Promise<OnlineEcho[]> {
   const sb = getSupabaseClient();
   if (!sb) return [];
