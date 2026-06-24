@@ -7,11 +7,13 @@ import type { GameMode, MonsterBuild } from "@/types/arena";
  */
 
 export interface EchoSnapshot {
+  id: string;
   builds: MonsterBuild[];
   operatorId: string;
   blessings: string[];
   label: string; // 「ショート10勝の残響」等
   power: number; // 記録時の総合力★（任意・表示用）
+  ts: number; // 記録時刻（新しい順表示用）
 }
 
 export interface EchoGhost {
@@ -109,27 +111,64 @@ export function getGhost(id: string): EchoGhost | undefined {
   return ECHO_GHOSTS.find((g) => g.id === id);
 }
 
-// ---- プレイヤーの残響スナップショット（localStorage） ----
-const SELF_KEY = "arena-echo-self-v1";
+// ---- プレイヤーの残響ギャラリー（localStorage・複数保存） ----
+const GALLERY_KEY = "arena-echo-gallery-v1";
+const LEGACY_SELF_KEY = "arena-echo-self-v1";
 const CLEAR_KEY = "arena-echo-clears-v1";
+const MAX_GALLERY = 6;
 
-export function saveEchoSelf(snap: EchoSnapshot): void {
-  if (typeof window === "undefined") return;
+export function loadEchoGallery(): EchoSnapshot[] {
+  if (typeof window === "undefined") return [];
   try {
-    window.localStorage.setItem(SELF_KEY, JSON.stringify(snap));
+    const raw = window.localStorage.getItem(GALLERY_KEY);
+    if (raw) return JSON.parse(raw) as EchoSnapshot[];
+    // 旧・単体キーからの移行
+    const legacy = window.localStorage.getItem(LEGACY_SELF_KEY);
+    if (legacy) {
+      const s = JSON.parse(legacy) as Partial<EchoSnapshot>;
+      const migrated: EchoSnapshot = {
+        id: "legacy",
+        builds: s.builds ?? [],
+        operatorId: s.operatorId ?? "calibrator",
+        blessings: s.blessings ?? [],
+        label: s.label ?? "過去の残響",
+        power: s.power ?? 0,
+        ts: 0,
+      };
+      return migrated.builds.length ? [migrated] : [];
+    }
+    return [];
   } catch {
-    /* ignore */
+    return [];
   }
 }
 
-export function loadEchoSelf(): EchoSnapshot | null {
-  if (typeof window === "undefined") return null;
+/** 新しい残響をギャラリー先頭に追加（上限 MAX_GALLERY、古いものを破棄）。 */
+export function addEchoToGallery(snap: Omit<EchoSnapshot, "id" | "ts">): EchoSnapshot[] {
+  if (typeof window === "undefined") return [];
+  const list = loadEchoGallery();
+  const entry: EchoSnapshot = {
+    ...snap,
+    id: `e${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`,
+    ts: Date.now(),
+  };
+  const next = [entry, ...list].slice(0, MAX_GALLERY);
   try {
-    const raw = window.localStorage.getItem(SELF_KEY);
-    return raw ? (JSON.parse(raw) as EchoSnapshot) : null;
+    window.localStorage.setItem(GALLERY_KEY, JSON.stringify(next));
   } catch {
-    return null;
+    /* ignore */
   }
+  return next;
+}
+
+export function deleteEcho(id: string): EchoSnapshot[] {
+  const next = loadEchoGallery().filter((e) => e.id !== id);
+  try {
+    window.localStorage.setItem(GALLERY_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+  return next;
 }
 
 export function loadEchoClears(): string[] {
