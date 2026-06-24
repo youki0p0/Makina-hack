@@ -491,6 +491,8 @@ export interface SaveData {
   /** Current: item instances with optional affixes. */
   equippedItems?: { [K in EquipmentSlot]: SavedItem | null };
   inventoryItems?: SavedItem[];
+  /** 紋章(emblem)専用ストック（装備ストックとは別・最大30）。 */
+  emblemItems?: SavedItem[];
   currentFloor: number;
   // (DungeonMaterials は下部で定義)
   /** Gacha currency from scrapping equipment (optional for old saves). */

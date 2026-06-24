@@ -196,22 +196,26 @@ export function discover(list: string[], id: string): string[] {
  * エンドレスの★上げ運用で枠が足りないため 150→300 に拡大。
  */
 export const MAX_INVENTORY = 300;
+/** 紋章(emblem)専用ストックの上限。装備ストックとは別枠で、自動分解の巻き添えにしない。 */
+export const MAX_EMBLEMS = 30;
 
-export function capInventory(
-  inv: Equipment[],
+/** 上限超過時に弱い方から自動分解する汎用ロジック（装備/紋章で共用）。 */
+function capStock(
+  items: Equipment[],
   favorites: string[],
+  max: number,
 ): { kept: Equipment[]; material: number } {
-  if (inv.length <= MAX_INVENTORY) return { kept: inv, material: 0 };
+  if (items.length <= max) return { kept: items, material: 0 };
   const score = (it: Equipment) =>
     it.attack * 2 + it.defense * 1.5 + it.maxHp * 0.4 + (it.modTier ?? 0) * 5 + (it.forgeLevel ?? 0) * 8;
   const locked: Equipment[] = [];
   const removable: Equipment[] = [];
-  for (const it of inv) {
+  for (const it of items) {
     if (it.noSell || favorites.includes(itemKey(it))) locked.push(it);
     else removable.push(it);
   }
   removable.sort((a, b) => score(a) - score(b)); // weakest first
-  const toRemove = Math.max(0, locked.length + removable.length - MAX_INVENTORY);
+  const toRemove = Math.max(0, locked.length + removable.length - max);
   let material = 0;
   const kept = [...locked];
   removable.forEach((it, i) => {
@@ -219,6 +223,21 @@ export function capInventory(
     else kept.push(it);
   });
   return { kept, material };
+}
+
+export function capInventory(
+  inv: Equipment[],
+  favorites: string[],
+): { kept: Equipment[]; material: number } {
+  return capStock(inv, favorites, MAX_INVENTORY);
+}
+
+/** 紋章ストック(最大30)の上限処理。装備ストックとは独立。 */
+export function capEmblems(
+  emblems: Equipment[],
+  favorites: string[],
+): { kept: Equipment[]; material: number } {
+  return capStock(emblems, favorites, MAX_EMBLEMS);
 }
 
 /**
