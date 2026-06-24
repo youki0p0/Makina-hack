@@ -17,11 +17,16 @@ import { rollField } from "@/lib/arena/gameState";
 import { simulateEcho } from "@/lib/arena/battle";
 import { allyTeamPower } from "@/lib/arena/power";
 import {
+  fetchLeaderboard,
   fetchOpponents,
+  loadLocalStreak,
   loadPlayerName,
   onlineEnabled,
   publishEcho,
+  reportResult,
   savePlayerName,
+  updateLocalStreak,
+  type LeaderboardEntry,
   type OnlineEcho,
 } from "@/lib/arena/echoOnline";
 import { sfx } from "@/lib/audio/sfx";
@@ -37,6 +42,7 @@ interface Foe {
   blessings: string[];
   field: FieldId;
   ghostId?: string; // curated のみ
+  online?: boolean; // オンライン対戦相手（ランキングに記録）
 }
 
 export default function ArenaEchoPage() {
@@ -52,6 +58,8 @@ export default function ArenaEchoPage() {
   const [opponents, setOpponents] = useState<OnlineEcho[]>([]);
   const [netMsg, setNetMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [leaders, setLeaders] = useState<LeaderboardEntry[]>([]);
+  const [streak, setStreak] = useState(0);
 
   useEffect(() => {
     const g = loadEchoGallery();
@@ -59,6 +67,8 @@ export default function ArenaEchoPage() {
     setActiveId(g[0]?.id ?? null);
     setClears(loadEchoClears());
     setName(loadPlayerName());
+    setStreak(loadLocalStreak());
+    if (onlineEnabled()) fetchLeaderboard(20).then(setLeaders);
   }, []);
 
   const active = useMemo(
@@ -86,6 +96,11 @@ export default function ArenaEchoPage() {
     if (!battle) return;
     const win = battle.result.win;
     if (win && battle.foe.ghostId) setClears(recordEchoClear(battle.foe.ghostId));
+    // オンライン対戦のみ勝敗ランキングに記録
+    if (battle.foe.online) {
+      setStreak(updateLocalStreak(win));
+      reportResult(name || "Guest", win).then(() => fetchLeaderboard(20).then(setLeaders));
+    }
     setDone({ name: battle.foe.name, win });
     setBattle(null);
   };
@@ -243,6 +258,9 @@ export default function ArenaEchoPage() {
               {loading ? "…通信中" : "🔄 対戦相手を探す"}
             </button>
             {netMsg && <p className="text-center text-[10px] text-sky-200">{netMsg}</p>}
+            <div className="text-center text-[11px] font-bold text-amber-200">
+              🔥 現在 {streak} 連勝中
+            </div>
             {opponents.map((o) => (
               <OpponentRow
                 key={o.id}
@@ -255,6 +273,7 @@ export default function ArenaEchoPage() {
                     builds: o.builds,
                     blessings: o.blessings,
                     field: rollField(),
+                    online: true,
                   })
                 }
               />
@@ -263,8 +282,40 @@ export default function ArenaEchoPage() {
         )}
       </section>
 
+      {/* オンライン勝敗ランキング */}
+      {online && leaders.length > 0 && (
+        <section className="space-y-1 rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] p-3">
+          <div className="text-[11px] font-bold text-amber-200">🏅 オンラインランキング（最高連勝順）</div>
+          {leaders.map((e, i) => {
+            const total = e.wins + e.losses;
+            const rate = total > 0 ? Math.round((e.wins / total) * 100) : 0;
+            const me = name && e.playerName === name;
+            return (
+              <div
+                key={i}
+                className={`flex items-center gap-2 rounded-lg px-2 py-1 text-[11px] ${
+                  me ? "bg-amber-500/20" : "bg-black/20"
+                }`}
+              >
+                <span className="w-5 shrink-0 text-center font-black text-amber-300">
+                  {i + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-bold text-gray-100">
+                  {e.playerName}
+                  {me && <span className="ml-1 text-[8px] text-amber-300">YOU</span>}
+                </span>
+                <span className="shrink-0 text-amber-200">🔥{e.bestStreak}</span>
+                <span className="shrink-0 text-gray-300">
+                  {e.wins}勝{e.losses}敗・{rate}%
+                </span>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
       <p className="pb-4 text-center text-[10px] text-gray-600">
-        残響戦は記録の再現バトル。通常モードの成績には影響しません。
+        残響戦は記録の再現バトル。通常モードの成績には影響しません（オンライン対戦のみ勝敗を記録）。
       </p>
     </main>
   );
