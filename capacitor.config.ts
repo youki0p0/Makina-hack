@@ -3,7 +3,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 const config: CapacitorConfig = {
   // App Store の Bundle Identifier。必要なら Apple Developer の登録に合わせて変更する。
   appId: "com.diceexmachina.dungeon",
-  appName: "ダイスダンジョン",
+  appName: "ダイスエクスマキナ",
   // next build (CAP_BUILD=1) が静的書き出しする先。
   webDir: "out",
   ios: {
