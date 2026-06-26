@@ -67,9 +67,9 @@ export default function BattleScreen() {
 
   return (
     <div
-      className="flex h-[100dvh] flex-col gap-2 overflow-hidden px-3 pt-2"
+      className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-3 pt-2"
       style={{
-        paddingTop: "max(0.5rem, env(safe-area-inset-top))",
+        // セーフエリア余白は .app-shell が一括で持つ。ここは通常の余白だけ。
         background: getWorldBackground(world),
         // NOTE: no `background-attachment: fixed` — on mobile it forces the whole
         // multi-layer background to re-rasterize on every repaint (each dice
@@ -127,11 +127,8 @@ export default function BattleScreen() {
         <BattleLog />
       </div>
 
-      {/* Pinned action area, padded above the browser/system bar. */}
-      <div
-        className="flex flex-col gap-2"
-        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-      >
+      {/* Pinned action area. セーフエリア下端は .app-shell が確保するので通常余白のみ。 */}
+      <div className="flex flex-col gap-2 pb-3">
         <ActionButtons />
       </div>
 

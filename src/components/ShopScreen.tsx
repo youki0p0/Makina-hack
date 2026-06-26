@@ -70,9 +70,9 @@ export default function ShopScreen() {
 
   return (
     <div
-      className="flex h-[100dvh] flex-col gap-2 overflow-hidden px-3"
+      className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-3 pt-2"
       style={{
-        paddingTop: "max(0.5rem, env(safe-area-inset-top))",
+        // セーフエリア余白は .app-shell が一括で持つ。ここは通常の余白だけ。
         background: getWorldBackground(world),
         // No `background-attachment: fixed` — it's a mobile repaint killer (see BattleScreen).
       }}
@@ -153,11 +153,8 @@ export default function ShopScreen() {
         })}
       </div>
 
-      {/* Pinned action area, padded above the browser/system bar. */}
-      <div
-        className="flex flex-col gap-2"
-        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-      >
+      {/* Pinned action area. セーフエリア下端は .app-shell が確保するので通常余白のみ。 */}
+      <div className="flex flex-col gap-2 pb-3">
         <PlayerStatus />
         <div className="flex gap-2">
           <button
