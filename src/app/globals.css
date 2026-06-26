@@ -26,6 +26,12 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
+  /* iOS のノッチ/ダイナミックアイランド・ホームインジケータを避ける（viewport-fit=cover 前提）。
+     Web ブラウザでは env() が 0 になるので従来表示と変わらない。 */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 button {
