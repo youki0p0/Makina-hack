@@ -9,9 +9,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:ios": "node scripts/gen-version.mjs && CAP_BUILD=1 next build",
+    "sync:ios": "npm run build:ios && cap sync ios",
+    "open:ios": "cap open ios"
   },
   "dependencies": {
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/ios": "^6.2.1",
+    "@capacitor/splash-screen": "^6.0.4",
+    "@capacitor/status-bar": "^6.0.3",
     "@supabase/supabase-js": "^2.108.2",
     "next": "14.2.5",
     "react": "18.3.1",
@@ -19,6 +26,7 @@
     "zustand": "4.5.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "^6.2.1",
     "@types/node": "20.14.10",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",

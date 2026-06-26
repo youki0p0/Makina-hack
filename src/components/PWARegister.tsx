@@ -40,6 +40,12 @@ async function enforceLatestVersion(): Promise<void> {
 
 export default function PWARegister() {
   useEffect(() => {
+    // Capacitor(iOS ネイティブ殻)では資産はバンドル同梱で、SW は capacitor:// で動かず
+    // version.json も常に一致するため、バージョンゲート/SW 登録は丸ごとスキップする。
+    if (typeof window !== "undefined" && (window as { Capacitor?: unknown }).Capacitor) {
+      return;
+    }
+
     void enforceLatestVersion();
 
     if (!("serviceWorker" in navigator)) return;
