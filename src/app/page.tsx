@@ -309,6 +309,16 @@ export default function TitlePage() {
           >
             📜 リリースノート（更新履歴）
           </Link>
+
+          {/* サポート / プライバシー（App Store 申請用にも必要なページ） */}
+          <div className="flex gap-3">
+            <Link href="/support" className="text-[11px] text-gray-600 underline active:scale-95">
+              🛟 サポート
+            </Link>
+            <Link href="/privacy" className="text-[11px] text-gray-600 underline active:scale-95">
+              🔒 プライバシー
+            </Link>
+          </div>
         </div>
       )}
 
