@@ -47,17 +47,25 @@ Xcode が `ios/App/App.xcworkspace` を開きます（`.xcodeproj` ではなく 
 
 ## 5. アイコンとスプラッシュ画像
 
-このリポジトリにはアプリ用の PNG アイコン素材は含めていません（Web 版は SVG 1枚）。
-Mac 側で 1024×1024 の PNG を用意し、Capacitor のアセット生成ツールで一括生成できます。
+**設定済み**。アプリアイコン（1024×1024・透過なし）とスプラッシュ（2732×2732・暗背景＋
+中央ロゴ）はリポジトリに組み込み済みなので、このままビルドできます。
+
+- アプリアイコン: `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`
+- スプラッシュ: `ios/App/App/Assets.xcassets/Splash.imageset/*.png`
+- 生成元素材: `assets/icon.png` / `assets/splash.png`
+
+差し替えたい・各サイズを最適化したい場合は、Mac 側で Capacitor のアセット生成ツールを使えます。
 
 ```bash
-# 元画像を用意: assets/icon.png (1024x1024), assets/splash.png (2732x2732 推奨)
+# assets/icon.png (1024x1024), assets/splash.png (2732x2732) を差し替えてから:
 npm install --save-dev @capacitor/assets
 npx capacitor-assets generate --ios
 ```
 
-> 注: `@capacitor/assets` は `sharp` を使うため、Linux のCIではなく Mac 側で実行してください。
-> 手動で行う場合は Xcode の `Assets.xcassets` の AppIcon に各サイズを設定します。
+> 注: `@capacitor/assets` は `sharp` を使うため Mac 側で実行してください。
+
+> アイコンは角丸と金枠が画像に焼き込まれています。iOS は独自の角丸マスクを上から重ねるため、
+> 角の金枠がわずかに削れる場合があります。気になる場合は角を含まないフルブリード版に差し替えてください。
 
 ## 6. 実機/シミュレータで確認 → 提出
 
