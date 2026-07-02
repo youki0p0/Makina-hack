@@ -1,0 +1,7 @@
+# Jen runtime state
+.jen/
+.claude/worktrees/
+
+# Local Claude preferences
+CLAUDE.local.md
+.claude/settings.local.json

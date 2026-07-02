@@ -29,3 +29,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Jen runtime state
+.jen/
+.claude/worktrees/
+
+# Local Claude preferences
+CLAUDE.local.md
+.claude/settings.local.json
